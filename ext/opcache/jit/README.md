@@ -1,4 +1,4 @@
-# zend\_jit\_experement
+# zend\_jit\_experiment
 
 This branch contains PoC implementaton of transparent JIT for PHP.
 JIT is implemented as a part of OPCache. It doesn't require any changes in the PHP engine itself and should be 100% comatible by design.
