@@ -49,7 +49,7 @@ JIT provides more than 5 times speedup on bench.php (30 times on some specific b
 | strcat(200000)   |  0.008  | 0.004  |
 | Total            |  1.147  | 0.206  |
 
-Unfortuantely, JIT doesn't improve performance of real life apps. Also LLVM compilation time is not suatable for run-time code generation (it make take few minutes).
+Unfortunately, JIT doesn't improve performance of real life apps. Also LLVM compilation time is not suatable for run-time code generation (it make take few minutes).
 
 # Discovering
 
