@@ -1111,7 +1111,7 @@ static int zend_jit_call_handler(zend_llvm_ctx &llvm_ctx,
 				{"ISSET_ISEMPTY_PROP_OBJ",          3},
 				{"HANDLE_EXCEPTION",                0},
 				{"USER_OPCODE",                     0},
-				{"OP_151",                          0},
+				{"ASSERT_CHECK",                    0},
 				{"JMP_SET",                         1},
 				{"DECLARE_LAMBDA_FUNCTION",         3},
 				{"ADD_TRAIT",                       0},
@@ -18181,13 +18181,28 @@ static int zend_jit_codegen_ex(zend_jit_context *ctx,
 						zend_brk_cont_element *jmp_to;
 
 						do {
+							if (array_offset == -1) {
+								nest_levels = -1;
+								break;
+							}
 							jmp_to = &op_array->brk_cont_array[array_offset];
 							array_offset = jmp_to->parent;
 						} while (--nest_levels > 0);
-						if (opline->opcode == ZEND_BRK) {
-							llvm_ctx.builder.CreateBr(TARGET_BB(jmp_to->brk));
+						if (nest_levels >= 0) {
+							if (opline->opcode == ZEND_BRK) {
+								llvm_ctx.builder.CreateBr(TARGET_BB(jmp_to->brk));
+							} else {
+								llvm_ctx.builder.CreateBr(TARGET_BB(jmp_to->cont));
+							}
 						} else {
-							llvm_ctx.builder.CreateBr(TARGET_BB(jmp_to->cont));
+							int level = Z_LVAL_P(RT_CONSTANT(llvm_ctx.op_array, *OP2_OP()));
+							if (level == 1) {
+								zend_jit_error_noreturn(llvm_ctx, opline, E_ERROR,
+									"Cannot break/continue 1 level");
+							} else {
+								zend_jit_error_noreturn(llvm_ctx, opline, E_ERROR,
+									"Cannot break/continue %d levels", llvm_ctx.builder.getInt32(level));
+							}
 						}
 					}
 					break;
@@ -18220,6 +18235,7 @@ static int zend_jit_codegen_ex(zend_jit_context *ctx,
 				case ZEND_COALESCE:
 				case ZEND_FE_RESET_R:
 				case ZEND_FE_RESET_RW:
+				case ZEND_ASSERT_CHECK:
 					if (!zend_jit_handler(llvm_ctx, opline)) return 0;
 					if (!zend_jit_cond_jmp(llvm_ctx, opline, OP_JMP_ADDR(opline, *OP2_OP()), TARGET_BB(OP_JMP_ADDR(opline, *OP2_OP()) - op_array->opcodes), TARGET_BB(block[b + 1].start))) return 0;
 					break;

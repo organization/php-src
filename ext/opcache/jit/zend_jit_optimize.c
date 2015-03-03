@@ -324,6 +324,7 @@ static int zend_jit_sort_blocks(zend_jit_context *ctx, zend_op_array *op_array)
 			case ZEND_FE_RESET_R:
 			case ZEND_FE_RESET_RW:
 			case ZEND_NEW:
+			case ZEND_ASSERT_CHECK:
 				block[bb->successors[0]].flags |= TARGET_BLOCK_MARK;
 				block[bb->successors[1]].flags |= FOLLOW_BLOCK_MARK;
 				break;
@@ -1545,6 +1546,13 @@ static int zend_jit_calc_range(zend_jit_context *ctx, zend_op_array *op_array, i
 					tmp->overflow  = OP1_RANGE_OVERFLOW();
 					return 1;
 				}
+			}
+			break;
+		case ZEND_ASSERT_CHECK:
+			if (info->ssa[line].result_def == var) {
+				tmp->min = 0;
+				tmp->max = 1;
+				return 1;
 			}
 			break;
 		case ZEND_SEND_VAR:
@@ -2923,6 +2931,7 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 		case ZEND_ISSET_ISEMPTY_VAR:
 		case ZEND_ISSET_ISEMPTY_DIM_OBJ:
 		case ZEND_ISSET_ISEMPTY_PROP_OBJ:
+		case ZEND_ASSERT_CHECK:
 			UPDATE_SSA_TYPE(MAY_BE_DEF|MAY_BE_RC1|MAY_BE_FALSE|MAY_BE_TRUE, ssa[i].result_def);
 			break;
 		case ZEND_CAST:

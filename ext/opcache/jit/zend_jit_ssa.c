@@ -644,7 +644,7 @@ void zend_jit_dump_ssa_line(zend_op_array *op_array, uint32_t line)
 		{"ISSET_ISEMPTY_PROP_OBJ",          0},
 		{"HANDLE_EXCEPTION",                0},
 		{"USER_OPCODE",                     0},
-		{"???",                             0},
+		{"ASSERT_CHECK",                    OP2_ADDR},
 		{"JMP_SET",                         OP2_ADDR},
 		{"DECLARE_LAMBDA_FUNCTION",         0},
 		{"ADD_TRAIT",                       0},
@@ -1047,13 +1047,19 @@ int zend_jit_build_cfg(zend_jit_context *ctx, zend_op_array *op_array)
 					zend_brk_cont_element *jmp_to;
 
 					do {
+						if (array_offset == -1) {
+							nest_levels = -1;
+							break;
+						}
 						jmp_to = &op_array->brk_cont_array[array_offset];
 						array_offset = jmp_to->parent;
 					} while (--nest_levels > 0);
-					if (opline->opcode == ZEND_BRK) {
-						TARGET_BLOCK(jmp_to->brk);
-					} else {
-						TARGET_BLOCK(jmp_to->cont);
+					if (nest_levels >= 0) {
+						if (opline->opcode == ZEND_BRK) {
+							TARGET_BLOCK(jmp_to->brk);
+						} else {
+							TARGET_BLOCK(jmp_to->cont);
+						}
 					}
 				} else {
 					has_indirect_jmp = 1;
@@ -1164,6 +1170,7 @@ int zend_jit_build_cfg(zend_jit_context *ctx, zend_op_array *op_array)
 			case ZEND_JMPNZ_EX:
 			case ZEND_JMP_SET:
 			case ZEND_COALESCE:
+			case ZEND_ASSERT_CHECK:
 				TARGET_BLOCK(OP_JMP_ADDR(opline, opline->op2) - op_array->opcodes);
 				FOLLOW_BLOCK(i + 1);
 				break;
@@ -1293,12 +1300,18 @@ int zend_jit_build_cfg(zend_jit_context *ctx, zend_op_array *op_array)
 					zend_brk_cont_element *jmp_to;
 
 					do {
+						if (array_offset == -1) {
+							nest_levels = -1;
+							break;
+						}
 						jmp_to = &op_array->brk_cont_array[array_offset];
 						array_offset = jmp_to->parent;
 					} while (--nest_levels > 0);
-					record_successor(block, j, 0,
+					if (nest_levels >= 0) {
+						record_successor(block, j, 0,
 									 block_map[(opline->opcode == ZEND_BRK)
 											   ? jmp_to->brk : jmp_to->cont]);
+					}
 				}
 				break;
 			case ZEND_RETURN:
@@ -1332,6 +1345,7 @@ int zend_jit_build_cfg(zend_jit_context *ctx, zend_op_array *op_array)
 			case ZEND_JMPNZ_EX:
 			case ZEND_JMP_SET:
 			case ZEND_COALESCE:
+			case ZEND_ASSERT_CHECK:
 				record_successor(block, j, 0, block_map[OP_JMP_ADDR(opline, opline->op2) - op_array->opcodes]);
 				record_successor(block, j, 1, j + 1);
 				break;
