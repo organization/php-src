@@ -247,7 +247,7 @@ PHP_FUNCTION(gethostbynamel)
 
 	if(hostname_len > MAXFQDNLEN) {
 		/* name too long, protect from CVE-2015-0235 */
-		php_error_docref(NULL TSRMLS_CC, E_WARNING, "Host name is too long, the limit is %d characters", MAXFQDNLEN);
+		php_error_docref(NULL, E_WARNING, "Host name is too long, the limit is %d characters", MAXFQDNLEN);
 		RETURN_FALSE;
 	}
 
@@ -547,14 +547,14 @@ static u_char *php_parserr(u_char *cp, u_char *end, querybuf *answer, int type_t
 						n = dlen - (l1 + 1);
 					}
 					if (n) {
-						memcpy(tp->val + l2 , cp + l1 + 1, n);
+						memcpy(ZSTR_VAL(tp) + l2 , cp + l1 + 1, n);
 						add_next_index_stringl(&entries, (char *) cp + l1 + 1, n);
 					}
 					l1 = l1 + n + 1;
 					l2 = l2 + n;
 				}
-				tp->val[l2] = '\0';
-				tp->len = l2;
+				ZSTR_VAL(tp)[l2] = '\0';
+				ZSTR_LEN(tp) = l2;
 				cp += dlen;
 
 				add_assoc_str(subarray, "txt", tp);

@@ -52,10 +52,18 @@ static size_t php_zip_ops_read(php_stream *stream, char *buf, size_t count)
 	if (self->za && self->zf) {
 		n = zip_fread(self->zf, buf, count);
 		if (n < 0) {
+#if LIBZIP_VERSION_MAJOR < 1
 			int ze, se;
 			zip_file_error_get(self->zf, &ze, &se);
 			stream->eof = 1;
 			php_error_docref(NULL, E_WARNING, "Zip stream error: %s", zip_file_strerror(self->zf));
+#else
+			zip_error_t *err;
+			err = zip_file_get_error(self->zf);
+			stream->eof = 1;
+			php_error_docref(NULL TSRMLS_CC, E_WARNING, "Zip stream error: %s", zip_error_strerror(err));
+			zip_error_fini(err);
+#endif
 			return 0;
 		}
 		/* cast count to signed value to avoid possibly negative n
@@ -254,7 +262,7 @@ php_stream *php_stream_zip_opener(php_stream_wrapper *wrapper,
 											const char *path,
 											const char *mode,
 											int options,
-											char **opened_path,
+											zend_string **opened_path,
 											php_stream_context *context STREAMS_DC)
 {
 	int path_len;
@@ -314,7 +322,7 @@ php_stream *php_stream_zip_opener(php_stream_wrapper *wrapper,
 			stream = php_stream_alloc(&php_stream_zipio_ops, self, NULL, mode);
 
 			if (opened_path) {
-				*opened_path = estrdup(path);
+				*opened_path = zend_string_init(path, strlen(path), 0);
 			}
 		} else {
 			zip_close(za);

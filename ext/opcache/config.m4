@@ -17,7 +17,14 @@ PHP_ARG_WITH(valgrind, with valgrind support,
 PHP_ARG_WITH(oprofile, with oprofile support,
 [  --with-oprofile=[DIR]  specific oprofile installed location ], no, no)
 
+PHP_ARG_ENABLE(opcache-file, whether to enable file based caching (experimental),
+[  --enable-opcache-file   Enable file based caching], no)
+
 if test "$PHP_OPCACHE" != "no"; then
+
+  if test "$PHP_OPCACHE_FILE" == "yes"; then
+    AC_DEFINE(HAVE_OPCACHE_FILE_CACHE, 1, [Define to enable file based caching (experimental)])
+  fi
 
   AC_CHECK_FUNC(mprotect,[
     AC_DEFINE(HAVE_MPROTECT, 1, [Define if you have mprotect() function])
@@ -450,6 +457,7 @@ fi
 	zend_accelerator_module.c \
 	zend_persist.c \
 	zend_persist_calc.c \
+	zend_file_cache.c \
 	zend_shared_alloc.c \
 	zend_accelerator_util_funcs.c \
 	shared_alloc_shm.c \
@@ -467,7 +475,10 @@ fi
 	shared,,-DZEND_ENABLE_STATIC_TSRMLS_CACHE=1,,yes)
 
   PHP_ADD_BUILD_DIR([$ext_builddir/Optimizer], 1)
+
   if test "$PHP_JIT" != "no"; then
 	PHP_ADD_BUILD_DIR([$ext_builddir/jit], 1)
   fi
+
+  PHP_ADD_EXTENSION_DEP(opcache, pcre)
 fi

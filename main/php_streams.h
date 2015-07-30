@@ -134,7 +134,7 @@ typedef struct _php_stream_ops  {
 typedef struct _php_stream_wrapper_ops {
 	/* open/create a wrapped stream */
 	php_stream *(*stream_opener)(php_stream_wrapper *wrapper, const char *filename, const char *mode,
-			int options, char **opened_path, php_stream_context *context STREAMS_DC);
+			int options, zend_string **opened_path, php_stream_context *context STREAMS_DC);
 	/* close/destroy a wrapped stream */
 	int (*stream_closer)(php_stream_wrapper *wrapper, php_stream *stream);
 	/* stat a wrapped stream */
@@ -143,7 +143,7 @@ typedef struct _php_stream_wrapper_ops {
 	int (*url_stat)(php_stream_wrapper *wrapper, const char *url, int flags, php_stream_statbuf *ssb, php_stream_context *context);
 	/* open a "directory" stream */
 	php_stream *(*dir_opener)(php_stream_wrapper *wrapper, const char *filename, const char *mode,
-			int options, char **opened_path, php_stream_context *context STREAMS_DC);
+			int options, zend_string **opened_path, php_stream_context *context STREAMS_DC);
 
 	const char *label;
 
@@ -166,24 +166,26 @@ struct _php_stream_wrapper	{
 	int is_url;						/* so that PG(allow_url_fopen) can be respected */
 };
 
-#define PHP_STREAM_FLAG_NO_SEEK						1
-#define PHP_STREAM_FLAG_NO_BUFFER					2
+#define PHP_STREAM_FLAG_NO_SEEK						0x1
+#define PHP_STREAM_FLAG_NO_BUFFER					0x2
 
-#define PHP_STREAM_FLAG_EOL_UNIX					0 /* also includes DOS */
-#define PHP_STREAM_FLAG_DETECT_EOL					4
-#define PHP_STREAM_FLAG_EOL_MAC						8
+#define PHP_STREAM_FLAG_EOL_UNIX					0x0 /* also includes DOS */
+#define PHP_STREAM_FLAG_DETECT_EOL					0x4
+#define PHP_STREAM_FLAG_EOL_MAC						0x8
 
 /* set this when the stream might represent "interactive" data.
  * When set, the read buffer will avoid certain operations that
  * might otherwise cause the read to block for much longer than
  * is strictly required. */
-#define PHP_STREAM_FLAG_AVOID_BLOCKING				16
+#define PHP_STREAM_FLAG_AVOID_BLOCKING					0x10
 
-#define PHP_STREAM_FLAG_NO_CLOSE					32
+#define PHP_STREAM_FLAG_NO_CLOSE					0x20
 
-#define PHP_STREAM_FLAG_IS_DIR						64
+#define PHP_STREAM_FLAG_IS_DIR						0x40
 
-#define PHP_STREAM_FLAG_NO_FCLOSE					128
+#define PHP_STREAM_FLAG_NO_FCLOSE					0x80
+
+#define PHP_STREAM_FLAG_WAS_WRITTEN					0x80000000
 
 struct _php_stream  {
 	php_stream_ops *ops;
@@ -284,6 +286,7 @@ PHPAPI int php_stream_from_persistent_id(const char *persistent_id, php_stream *
 #define PHP_STREAM_FREE_RSRC_DTOR			8 /* called from the resource list dtor */
 #define PHP_STREAM_FREE_PERSISTENT			16 /* manually freeing a persistent connection */
 #define PHP_STREAM_FREE_IGNORE_ENCLOSING	32 /* don't close the enclosing stream instead */
+#define PHP_STREAM_FREE_KEEP_RSRC			64 /* keep associated zend_resource */
 #define PHP_STREAM_FREE_CLOSE				(PHP_STREAM_FREE_CALL_DTOR | PHP_STREAM_FREE_RELEASE_STREAM)
 #define PHP_STREAM_FREE_CLOSE_CASTED		(PHP_STREAM_FREE_CLOSE | PHP_STREAM_FREE_PRESERVE_HANDLE)
 #define PHP_STREAM_FREE_CLOSE_PERSISTENT	(PHP_STREAM_FREE_CLOSE | PHP_STREAM_FREE_PERSISTENT)
@@ -306,6 +309,9 @@ PHPAPI size_t _php_stream_read(php_stream *stream, char *buf, size_t count);
 PHPAPI size_t _php_stream_write(php_stream *stream, const char *buf, size_t count);
 #define php_stream_write_string(stream, str)	_php_stream_write(stream, str, strlen(str))
 #define php_stream_write(stream, buf, count)	_php_stream_write(stream, (buf), (count))
+
+PHPAPI void _php_stream_fill_read_buffer(php_stream *stream, size_t size);
+#define php_stream_fill_read_buffer(stream, size)	_php_stream_fill_read_buffer((stream), (size))
 
 #ifdef ZTS
 PHPAPI size_t _php_stream_printf(php_stream *stream, const char *fmt, ...) PHP_ATTRIBUTE_FORMAT(printf, 3, 4);
@@ -404,6 +410,9 @@ END_EXTERN_C()
 /* set or release lock on a stream */
 #define PHP_STREAM_OPTION_LOCKING		6
 
+/* Enable/disable blocking reads on anonymous pipes on Windows. */
+#define PHP_STREAM_OPTION_PIPE_BLOCKING 7
+
 /* whether or not locking is supported */
 #define PHP_STREAM_LOCK_SUPPORTED		1
 
@@ -500,7 +509,6 @@ END_EXTERN_C()
 #define USE_PATH                        0x00000001
 #define IGNORE_URL                      0x00000002
 #define REPORT_ERRORS                   0x00000008
-#define ENFORCE_SAFE_MODE               0 /* for BC only */
 
 /* If you don't need to write to the stream, but really need to
  * be able to seek, use this flag in your options. */
@@ -541,6 +549,9 @@ END_EXTERN_C()
 /* assume the path passed in exists and is fully expanded, avoiding syscalls */
 #define STREAM_ASSUME_REALPATH          0x00004000
 
+/* Allow blocking reads on anonymous pipes on Windows. */
+#define STREAM_USE_BLOCKING_PIPE        0x00008000
+
 /* Antique - no longer has meaning */
 #define IGNORE_URL_WIN 0
 
@@ -554,7 +565,7 @@ PHPAPI int php_register_url_stream_wrapper(const char *protocol, php_stream_wrap
 PHPAPI int php_unregister_url_stream_wrapper(const char *protocol);
 PHPAPI int php_register_url_stream_wrapper_volatile(const char *protocol, php_stream_wrapper *wrapper);
 PHPAPI int php_unregister_url_stream_wrapper_volatile(const char *protocol);
-PHPAPI php_stream *_php_stream_open_wrapper_ex(const char *path, const char *mode, int options, char **opened_path, php_stream_context *context STREAMS_DC);
+PHPAPI php_stream *_php_stream_open_wrapper_ex(const char *path, const char *mode, int options, zend_string **opened_path, php_stream_context *context STREAMS_DC);
 PHPAPI php_stream_wrapper *php_stream_locate_url_wrapper(const char *path, const char **path_for_open, int options);
 PHPAPI const char *php_stream_locate_eol(php_stream *stream, zend_string *buf);
 

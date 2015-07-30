@@ -53,12 +53,6 @@
 
 #include "php_apache.h"
 
-#ifdef PHP_WIN32
-# if _MSC_VER <= 1300
-#  include "win32/php_strtoi64.h"
-# endif
-#endif
-
 /* UnixWare and Netware define shutdown to _shutdown, which causes problems later
  * on when using a structure member named shutdown. Since this source
  * file does not use the system call shutdown, it is safe to #undef it.K
@@ -700,6 +694,7 @@ zend_first_try {
 } zend_end_try();
 		}
 		apr_brigade_cleanup(brigade);
+		apr_pool_cleanup_run(r->pool, (void *)&SG(server_context), php_server_context_cleanup);
 	} else {
 		ctx->r = parent_req;
 	}
@@ -717,6 +712,9 @@ void php_ap2_register_hook(apr_pool_t *p)
 	ap_hook_pre_config(php_pre_config, NULL, NULL, APR_HOOK_MIDDLE);
 	ap_hook_post_config(php_apache_server_startup, NULL, NULL, APR_HOOK_MIDDLE);
 	ap_hook_handler(php_handler, NULL, NULL, APR_HOOK_MIDDLE);
+#ifdef ZEND_SIGNALS
+	ap_hook_child_init(zend_signal_init, NULL, NULL, APR_HOOK_MIDDLE);
+#endif
 	ap_hook_child_init(php_apache_child_init, NULL, NULL, APR_HOOK_MIDDLE);
 }
 

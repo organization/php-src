@@ -38,7 +38,7 @@ extern zend_module_entry zip_module_entry;
 #define ZIP_OVERWRITE ZIP_TRUNCATE
 #endif
 
-#define PHP_ZIP_VERSION "1.12.4"
+#define PHP_ZIP_VERSION "1.13.0dev"
 
 #ifndef  Z_SET_REFCOUNT_P
 # if PHP_MAJOR_VERSION < 6 && (PHP_MAJOR_VERSION == 5 && PHP_MINOR_VERSION < 3)
@@ -90,7 +90,7 @@ static inline ze_zip_object *php_zip_fetch_object(zend_object *obj) {
 
 #define Z_ZIP_P(zv) php_zip_fetch_object(Z_OBJ_P((zv)))
 
-php_stream *php_stream_zip_opener(php_stream_wrapper *wrapper, const char *path, const char *mode, int options, char **opened_path, php_stream_context *context STREAMS_DC);
+php_stream *php_stream_zip_opener(php_stream_wrapper *wrapper, const char *path, const char *mode, int options, zend_string **opened_path, php_stream_context *context STREAMS_DC);
 php_stream *php_stream_zip_open(const char *filename, const char *path, const char *mode STREAMS_DC);
 
 extern php_stream_wrapper php_stream_zip_wrapper;

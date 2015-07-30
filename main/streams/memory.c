@@ -376,7 +376,7 @@ static size_t php_stream_temp_write(php_stream *stream, const char *buf, size_t 
 		if (memsize + count >= ts->smax) {
 			php_stream *file = php_stream_fopen_temporary_file(ts->tmpdir, "php", NULL);
 			if (file == NULL) {
-				php_error_docref(NULL TSRMLS_CC, E_WARNING, "Unable to create temporary file, Check permissions in temporary files directory.");
+				php_error_docref(NULL, E_WARNING, "Unable to create temporary file, Check permissions in temporary files directory.");
 				return 0;
 			}
 			php_stream_write(file, membuf, memsize);
@@ -619,7 +619,7 @@ PHPAPI php_stream_ops php_stream_rfc2397_ops = {
 };
 
 static php_stream * php_stream_url_wrap_rfc2397(php_stream_wrapper *wrapper, const char *path,
-												const char *mode, int options, char **opened_path,
+												const char *mode, int options, zend_string **opened_path,
 												php_stream_context *context STREAMS_DC) /* {{{ */
 {
 	php_stream *stream;
@@ -724,8 +724,8 @@ static php_stream * php_stream_url_wrap_rfc2397(php_stream_wrapper *wrapper, con
 			php_stream_wrapper_log_error(wrapper, options, "rfc2397: unable to decode");
 			return NULL;
 		}
-		comma = base64_comma->val;
-		ilen = (int)base64_comma->len;
+		comma = ZSTR_VAL(base64_comma);
+		ilen = (int)ZSTR_LEN(base64_comma);
 	} else {
 		comma = estrndup(comma, dlen);
 		dlen = php_url_decode(comma, (int)dlen);
