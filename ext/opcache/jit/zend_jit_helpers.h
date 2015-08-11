@@ -48,10 +48,6 @@ ZEND_FASTCALL zend_string* zend_jit_helper_string_alloc(size_t len, int persiste
 ZEND_FASTCALL zend_string* zend_jit_helper_string_realloc(zend_string *str, size_t len, int persistent);
 ZEND_FASTCALL void zend_jit_helper_string_release(zend_string *str);
 ZEND_FASTCALL int zend_jit_helper_handle_numeric_str(zend_string *str, zend_ulong *idx);
-ZEND_FASTCALL void zend_jit_helper_check_internal_type_hint(zend_function *zf, uint32_t arg_num, zval *arg);
-ZEND_FASTCALL void zend_jit_helper_check_type_hint(zend_function *zf, uint32_t arg_num, zval *arg);
-ZEND_FASTCALL void zend_jit_helper_check_type_hint_ex(zend_function *zf, uint32_t arg_num, zval *arg, zval *default_value);
-ZEND_FASTCALL void zend_jit_helper_check_missing_arg(zend_execute_data *execute_data, uint32_t arg_num);
 ZEND_FASTCALL zend_ulong zend_jit_helper_slow_str_index(zval *dim, uint32_t type);
 zend_ulong zend_jit_helper_dval_to_lval(double dval);
 ZEND_FASTCALL int zend_jit_helper_slow_fetch_address_obj(zval *container, zval *retval, zval *result);

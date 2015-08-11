@@ -534,7 +534,7 @@ void zend_jit_dump_ssa_line(zend_op_array *op_array, uint32_t line)
 		{"ASSIGN",                          0},
 		{"ASSIGN_REF",                      0},
 		{"ECHO",                            0},
-		{"PRINT",                           0},
+		{"???",                             0},
 		{"JMP",                             OP1_ADDR},
 		{"JMPZ",                            OP2_ADDR},
 		{"JMPNZ",                           OP2_ADDR},
@@ -542,14 +542,14 @@ void zend_jit_dump_ssa_line(zend_op_array *op_array, uint32_t line)
 		{"JMPZ_EX",                         OP2_ADDR},
 		{"JMPNZ_EX",                        OP2_ADDR},
 		{"CASE",                            0},
-		{"SWITCH_FREE",                     0},
-		{"BRK",                             0},
-		{"CONT",                            0},
-		{"BOOL",                            0},
 		{"???",                             0},
-		{"ADD_CHAR",                        0},
-		{"ADD_STRING",                      0},
-		{"ADD_VAR",                         0},
+		{"???",                             0},
+		{"???",                             0},
+		{"BOOL",                            0},
+		{"FAST_CONCAT",                     0},
+		{"ROPE_INIT",                       0},
+		{"ROPE_ADD",                        0},
+		{"ROPE_END",                        0},
 		{"BEGIN_SILENCE",                   0},
 		{"END_SILENCE",                     0},
 		{"INIT_FCALL_BY_NAME",              0},
@@ -571,7 +571,7 @@ void zend_jit_dump_ssa_line(zend_op_array *op_array, uint32_t line)
 		{"UNSET_DIM",                       0},
 		{"UNSET_OBJ",                       0},
 		{"FE_RESET_R",                      OP2_ADDR},
-		{"FE_FETCH_R",                      OP2_ADDR},
+		{"FE_FETCH_R",                      EXT_REL_LINE},
 		{"EXIT",                            0},
 		{"FETCH_R",                         0},
 		{"FETCH_DIM_R",                     0},
@@ -593,7 +593,7 @@ void zend_jit_dump_ssa_line(zend_op_array *op_array, uint32_t line)
 		{"FETCH_OBJ_UNSET",                 0},
 		{"FETCH_DIM_TMP_VAR",               0},
 		{"FETCH_CONSTANT",                  0},
-		{"GOTO",                            OP1_ADDR},
+		{"???",                             0},
 		{"EXT_STMT",                        0},
 		{"EXT_FCALL_BEGIN",                 0},
 		{"EXT_FCALL_END",                   0},
@@ -619,7 +619,7 @@ void zend_jit_dump_ssa_line(zend_op_array *op_array, uint32_t line)
 		{"TYPE_CHECK",                      0}, //???
 		{"VERIFY_RETURN_TYPE",              0},
 		{"FE_RESET_RW",                     OP2_ADDR},
-		{"FE_FETCH_RW",                     OP2_ADDR},
+		{"FE_FETCH_RW",                     EXT_REL_LINE},
 		{"FE_FREE",                         0},
 		{"INIT_DYNAMIC_CALL",               0},
 		{"DO_ICALL",                        0},
@@ -635,7 +635,7 @@ void zend_jit_dump_ssa_line(zend_op_array *op_array, uint32_t line)
 		{"DECLARE_CLASS",                   0},
 		{"DECLARE_INHERITED_CLASS",         0},
 		{"DECLARE_FUNCTION",                0},
-		{"???",                             0},
+		{"YIELD_FROM",                      0},
 		{"DECLARE_CONST",                   0},
 		{"ADD_INTERFACE",                   0},
 		{"DECLARE_INHERITED_CLASS_DELAYED", 0},
@@ -650,8 +650,8 @@ void zend_jit_dump_ssa_line(zend_op_array *op_array, uint32_t line)
 		{"ADD_TRAIT",                       0},
 		{"BIND_TRAITS",                     0},
 		{"SEPARATE",                        0},
-		{"???",                             0},
-		{"???",                             0},
+		{"FETCH_CLASS_NAME",                0}, //???
+		{"CALL_TRAMPOLINE",                 0}, //???
 		{"DISCARD_EXCEPTION",               0},
 		{"YIELD",                           0},
 		{"GENERATOR_RETURN",                0},
@@ -663,7 +663,9 @@ void zend_jit_dump_ssa_line(zend_op_array *op_array, uint32_t line)
 		{"ASSIGN_POW",                      0}, //???
 		{"BIND_GLOBAL",                     0}, //???
 		{"COALESCE",                        0}, //???
-		{"SPACESHIP",                       0}
+		{"SPACESHIP",                       0},
+		{"DECLARE_ANON_CLASS",              0}, //???
+		{"DECLARE_ANON_INHERITED_CLASS",    0}  //???
 	};
 	zend_jit_func_info *info = JIT_DATA(op_array);
 	int *block_map = info->block_map;
@@ -1181,8 +1183,8 @@ int zend_jit_build_cfg(zend_jit_context *ctx, zend_op_array *op_array)
 				break;
 			case ZEND_FE_FETCH_R:
 			case ZEND_FE_FETCH_RW:
-				TARGET_BLOCK(OP_JMP_ADDR(opline, opline->op2) - op_array->opcodes);
-				FOLLOW_BLOCK(i + 2);
+				TARGET_BLOCK((zend_op*)(((char*)opline) + (int)opline->extended_value) - op_array->opcodes);
+				FOLLOW_BLOCK(i + 1);
 				break;
 			case ZEND_FE_RESET_R:
 			case ZEND_FE_RESET_RW:
@@ -1353,13 +1355,10 @@ int zend_jit_build_cfg(zend_jit_context *ctx, zend_op_array *op_array)
 				record_successor(block, j, 0, block_map[opline->extended_value]);
 				record_successor(block, j, 1, j + 1);
 				break;
-			case ZEND_OP_DATA:
-				if ((opline-1)->opcode == ZEND_FE_FETCH_R || (opline-1)->opcode == ZEND_FE_FETCH_RW) {
-					record_successor(block, j, 0, block_map[OP_JMP_ADDR(opline-1, (opline-1)->op2) - op_array->opcodes]);
-					record_successor(block, j, 1, j + 1);
-				} else {
-					record_successor(block, j, 0, j + 1);
-				}
+			case ZEND_FE_FETCH_R:
+			case ZEND_FE_FETCH_RW:
+				record_successor(block, j, 0, block_map[(zend_op*)(((char*)opline) + (int)opline->extended_value) - op_array->opcodes]);
+				record_successor(block, j, 1, j + 1);
 				break;
 			case ZEND_FE_RESET_R:
 			case ZEND_FE_RESET_RW:
@@ -1752,6 +1751,8 @@ static int zend_jit_compute_dfg(zend_jit_dfg *dfg, zend_op_array *op_array)
 					switch (opline->opcode) {
 						case ZEND_ASSIGN:
 						case ZEND_ASSIGN_REF:
+						case ZEND_FE_FETCH_R:
+						case ZEND_FE_FETCH_RW:
 							if (!zend_bitset_in(use + (j * set_size), EX_VAR_TO_NUM(opline->op2.var))) {
 								// FIXME: include into "use" to ...?
 								zend_bitset_incl(use + (j * set_size), EX_VAR_TO_NUM(opline->op2.var));
@@ -1767,8 +1768,15 @@ static int zend_jit_compute_dfg(zend_jit_dfg *dfg, zend_op_array *op_array)
 					}
 				} else if (opline->op2_type == IS_VAR ||
 						   opline->op2_type == IS_TMP_VAR) {
-					if (!zend_bitset_in(def + (j * set_size), EX_VAR_TO_NUM(opline->op2.var))) {
-						zend_bitset_incl(use + (j * set_size), EX_VAR_TO_NUM(opline->op2.var));
+					if (opline->opcode == ZEND_FE_FETCH_R || opline->opcode == ZEND_FE_FETCH_RW) {
+						if (!zend_bitset_in(use + (j * set_size), EX_VAR_TO_NUM(opline->op2.var))) {
+							zend_bitset_incl(def + (j * set_size), EX_VAR_TO_NUM(opline->op2.var));
+						}
+						zend_bitset_incl(gen + (j * set_size), EX_VAR_TO_NUM(opline->op2.var));
+					} else {
+						if (!zend_bitset_in(def + (j * set_size), EX_VAR_TO_NUM(opline->op2.var))) {
+							zend_bitset_incl(use + (j * set_size), EX_VAR_TO_NUM(opline->op2.var));
+						}
 					}
 				}
 				if (opline->result_type == IS_CV) {
@@ -1783,7 +1791,7 @@ static int zend_jit_compute_dfg(zend_jit_dfg *dfg, zend_op_array *op_array)
 					}
 					zend_bitset_incl(gen + (j * set_size), EX_VAR_TO_NUM(opline->result.var));
 				}
-				if ((opline->opcode == ZEND_FE_FETCH_R || opline->opcode == ZEND_FE_FETCH_RW) && opline->extended_value) {
+				if ((opline->opcode == ZEND_FE_FETCH_R || opline->opcode == ZEND_FE_FETCH_RW) && opline->result_type == IS_TMP_VAR) {
 					if (!zend_bitset_in(use + (j * set_size), EX_VAR_TO_NUM(next->result.var))) {
 						zend_bitset_incl(def + (j * set_size), EX_VAR_TO_NUM(next->result.var));
 					}
@@ -1910,7 +1918,15 @@ static int zend_jit_ssa_rename(zend_op_array *op_array, int *var, int n)
 				ssa[k].op1_use = var[EX_VAR_TO_NUM(opline->op1.var)];
 				//USE_SSA_VAR(op_array->last_var + opline->op1.var)
 			}
-			if (opline->op2_type & (IS_CV|IS_VAR|IS_TMP_VAR)) {
+			if (opline->opcode == ZEND_FE_FETCH_R || opline->opcode == ZEND_FE_FETCH_RW) {
+				if (opline->op2_type == IS_CV) {
+					ssa[k].op2_use = var[EX_VAR_TO_NUM(opline->op2.var)];
+				}
+				ssa[k].op2_def = ssa_var;
+				var[EX_VAR_TO_NUM(opline->op2.var)] = ssa_var;
+				ssa_var++;
+				//NEW_SSA_VAR(opline->op2.var)
+			} else if (opline->op2_type & (IS_CV|IS_VAR|IS_TMP_VAR)) {
 				ssa[k].op2_use = var[EX_VAR_TO_NUM(opline->op2.var)];
 				//USE_SSA_VAR(op_array->last_var + opline->op2.var)
 			}
@@ -2046,12 +2062,6 @@ static int zend_jit_ssa_rename(zend_op_array *op_array, int *var, int n)
 				var[EX_VAR_TO_NUM(opline->result.var)] = ssa_var;
 				ssa_var++;
 				//NEW_SSA_VAR(op_array->last_var + opline->result.var)
-			}
-			if ((opline->opcode == ZEND_FE_FETCH_R || opline->opcode == ZEND_FE_FETCH_RW) && opline->extended_value) {
-				ssa[k + 1].result_def = ssa_var;
-				var[EX_VAR_TO_NUM(next->result.var)] = ssa_var;
-				ssa_var++;
-				//NEW_SSA_VAR(op_array->last_var + next->result.var)
 			}
 		}
 	}

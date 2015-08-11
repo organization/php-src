@@ -3704,10 +3704,14 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 				UPDATE_SSA_TYPE(tmp, ssa[i].op1_def);
 			}
 			break;
+		case ZEND_FAST_CONCAT:
+		case ZEND_ROPE_INIT:
+		case ZEND_ROPE_ADD:
+		case ZEND_ROPE_END:
+			UPDATE_SSA_TYPE(MAY_BE_DEF|MAY_BE_RC1|MAY_BE_STRING, ssa[i].result_def);
+			break;
 		case ZEND_CONCAT:
-		case ZEND_ADD_CHAR:
-		case ZEND_ADD_STRING:
-		case ZEND_ADD_VAR:
+			/* TODO: +MAY_BE_OBJECT ??? */
 			UPDATE_SSA_TYPE(MAY_BE_DEF|MAY_BE_RC1|MAY_BE_STRING, ssa[i].result_def);
 			break;
 		case ZEND_RECV:
@@ -3984,9 +3988,9 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 					tmp = MAY_BE_DEF | MAY_BE_RCN;
 				}					
 			}
-			UPDATE_SSA_TYPE(tmp, ssa[i].result_def);
-			if ((opline+1)->opcode == ZEND_OP_DATA) {
-				if (ssa[i+1].result_def >= 0) {
+			UPDATE_SSA_TYPE(tmp, ssa[i].op2_def);
+			if (opline->result_type == IS_TMP_VAR) {
+				if (ssa[i].result_def >= 0) {
 					tmp = MAY_BE_DEF | MAY_BE_RC1;
 					if (t1 & MAY_BE_OBJECT) {
 						tmp |= MAY_BE_RCN | MAY_BE_ANY | MAY_BE_ARRAY_KEY_ANY | MAY_BE_ARRAY_OF_ANY | MAY_BE_ARRAY_OF_REF;
@@ -4001,7 +4005,7 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 							tmp |= MAY_BE_NULL;
 						}
 					}
-					UPDATE_SSA_TYPE(tmp, ssa[i+1].result_def);
+					UPDATE_SSA_TYPE(tmp, ssa[i].result_def);
 				}
 			}
 			break;
@@ -4912,8 +4916,6 @@ static void zend_jit_check_no_symtab(zend_op_array *op_array)
 			switch (opline->opcode) {
 				case ZEND_NOP:
 				case ZEND_JMP:
-				case ZEND_ADD_CHAR:
-				case ZEND_ADD_STRING:
 					break;
 				case ZEND_ASSIGN_ADD:
 				case ZEND_ASSIGN_SUB:
@@ -4975,6 +4977,7 @@ static void zend_jit_check_no_symtab(zend_op_array *op_array)
 					if (opline->extended_value) {
 						return;
 					}
+				case ZEND_FAST_CONCAT:
 				case ZEND_CONCAT:
 					if (OP1_MAY_BE(MAY_BE_ARRAY|MAY_BE_OBJECT|MAY_BE_RESOURCE)) {
 						return;
@@ -5013,7 +5016,9 @@ static void zend_jit_check_no_symtab(zend_op_array *op_array)
 						return;
 					}
 					goto check_op1;
-				case ZEND_ADD_VAR:
+				case ZEND_ROPE_INIT:
+				case ZEND_ROPE_ADD:
+				case ZEND_ROPE_END:
 					if (OP2_MAY_BE(MAY_BE_OBJECT|MAY_BE_ARRAY)) {
 						return;
 					}

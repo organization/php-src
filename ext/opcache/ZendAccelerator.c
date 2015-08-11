@@ -2619,6 +2619,7 @@ static int accel_startup(zend_extension *extension)
 		ini_entry->on_modify = accel_include_path_on_modify;
 	}
 
+	SHM_UNPROTECT();
 	zend_shared_alloc_lock();
 
 #ifdef PHP_JIT
