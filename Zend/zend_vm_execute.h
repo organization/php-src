@@ -503,9 +503,8 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL zend_leave_helper_SPEC(ZEND_OPCODE_
 		ZEND_VM_LEAVE();
 	} else if (ZEND_CALL_KIND_EX(call_info) == ZEND_CALL_NESTED_CODE) {
 		zend_detach_symbol_table(execute_data);
-		if (EXPECTED(destroy_op_array(&EX(func)->op_array) != 0)) {
-			efree_size(EX(func), sizeof(zend_op_array));
-		}
+		destroy_op_array(&EX(func)->op_array);
+		efree_size(EX(func), sizeof(zend_op_array));
 		old_execute_data = execute_data;
 		execute_data = EG(current_execute_data) = EX(prev_execute_data);
 		zend_vm_stack_free_call_frame_ex(call_info, old_execute_data);
@@ -1481,6 +1480,19 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_HANDLE_EXCEPTION_SPEC_HANDLER(
 	int in_finally = 0;
 
 	ZEND_VM_INTERRUPT_CHECK();
+
+	{
+		const zend_op *exc_opline = EG(opline_before_exception);
+		if ((exc_opline->opcode == ZEND_FREE || exc_opline->opcode == ZEND_FE_FREE)
+			&& exc_opline->extended_value & ZEND_FREE_ON_RETURN) {
+			/* exceptions thrown because of loop var destruction on return/break/...
+			 * are logically thrown at the end of the foreach loop, so adjust the
+			 * op_num.
+			 */
+			op_num = EX(func)->op_array.brk_cont_array[exc_opline->op2.num].brk;
+		}
+	}
+
 	for (i = 0; i < EX(func)->op_array.last_try_catch; i++) {
 		if (EX(func)->op_array.try_catch_array[i].try_op > op_num) {
 			/* further blocks will not be relevant... */
@@ -1498,18 +1510,6 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_HANDLE_EXCEPTION_SPEC_HANDLER(
 				op_num < EX(func)->op_array.try_catch_array[i].finally_end) {
 			finally_op_end = EX(func)->op_array.try_catch_array[i].finally_end;
 			in_finally = 1;
-		}
-	}
-
-	if (catch_op_num) {
-		if ((EX(func)->op_array.opcodes[op_num].opcode == ZEND_FREE && (EX(func)->op_array.opcodes[op_num].extended_value & ZEND_FREE_ON_RETURN))
-		 || (EX(func)->op_array.opcodes[op_num].opcode == ZEND_FE_FREE && (EX(func)->op_array.opcodes[op_num].extended_value & ZEND_FREE_ON_RETURN))
-		) {
-			/* exceptions thrown because of TMP variable destruction on "return"
-			 * statement should't be caught in the same function.
-			 * See: Zend/tests/try_finally_012.phpt
-			 */
-			catch_op_num = 0;
 		}
 	}
 
@@ -2019,6 +2019,9 @@ try_function_name:
 			ZEND_ASSERT(GC_TYPE(fbc->common.prototype) == IS_OBJECT);
 			GC_REFCOUNT(fbc->common.prototype)++;
 			call_info |= ZEND_CALL_CLOSURE;
+		} else if (object) {
+			call_info |= ZEND_CALL_RELEASE_THIS;
+			GC_REFCOUNT(object)++; /* For $this pointer */
 		}
 
 	} else if (EXPECTED(Z_TYPE_P(function_name) == IS_ARRAY) &&
@@ -2438,6 +2441,9 @@ try_function_name:
 			ZEND_ASSERT(GC_TYPE(fbc->common.prototype) == IS_OBJECT);
 			GC_REFCOUNT(fbc->common.prototype)++;
 			call_info |= ZEND_CALL_CLOSURE;
+		} else if (object) {
+			call_info |= ZEND_CALL_RELEASE_THIS;
+			GC_REFCOUNT(object)++; /* For $this pointer */
 		}
 
 	} else if (EXPECTED(Z_TYPE_P(function_name) == IS_ARRAY) &&
@@ -2690,6 +2696,9 @@ try_function_name:
 			ZEND_ASSERT(GC_TYPE(fbc->common.prototype) == IS_OBJECT);
 			GC_REFCOUNT(fbc->common.prototype)++;
 			call_info |= ZEND_CALL_CLOSURE;
+		} else if (object) {
+			call_info |= ZEND_CALL_RELEASE_THIS;
+			GC_REFCOUNT(object)++; /* For $this pointer */
 		}
 		zval_ptr_dtor_nogc(free_op2);
 	} else if (EXPECTED(Z_TYPE_P(function_name) == IS_ARRAY) &&
@@ -3661,7 +3670,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_INCLUDE_OR_EVAL_SPEC_CONST_HAN
 		}
 
 		call->prev_execute_data = execute_data;
-		i_init_code_execute_data(call, new_op_array, return_value);
+	    i_init_code_execute_data(call, new_op_array, return_value);
 		if (EXPECTED(zend_execute_ex == execute_ex)) {
 			ZEND_VM_ENTER();
 		} else {
@@ -3670,9 +3679,8 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_INCLUDE_OR_EVAL_SPEC_CONST_HAN
 			zend_vm_stack_free_call_frame(call);
 		}
 
-		if (EXPECTED(destroy_op_array(new_op_array) != 0)) {
-			efree_size(new_op_array, sizeof(zend_op_array));
-		}
+		destroy_op_array(new_op_array);
+		efree_size(new_op_array, sizeof(zend_op_array));
 		if (UNEXPECTED(EG(exception) != NULL)) {
 			zend_throw_exception_internal(NULL);
 			HANDLE_EXCEPTION();
@@ -15240,6 +15248,8 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_SEND_REF_SPEC_VAR_HANDLER(ZEND
 
 	if (IS_VAR == IS_VAR && UNEXPECTED(varptr == NULL)) {
 		zend_throw_error(NULL, "Only variables can be passed by reference");
+		arg = ZEND_CALL_VAR(EX(call), opline->result.var);
+		ZVAL_UNDEF(arg);
 		HANDLE_EXCEPTION();
 	}
 
@@ -28622,6 +28632,8 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_SEND_REF_SPEC_CV_HANDLER(ZEND_
 
 	if (IS_CV == IS_VAR && UNEXPECTED(varptr == NULL)) {
 		zend_throw_error(NULL, "Only variables can be passed by reference");
+		arg = ZEND_CALL_VAR(EX(call), opline->result.var);
+		ZVAL_UNDEF(arg);
 		HANDLE_EXCEPTION();
 	}
 
@@ -29059,7 +29071,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_INCLUDE_OR_EVAL_SPEC_CV_HANDLE
 		}
 
 		call->prev_execute_data = execute_data;
-		i_init_code_execute_data(call, new_op_array, return_value);
+	    i_init_code_execute_data(call, new_op_array, return_value);
 		if (EXPECTED(zend_execute_ex == execute_ex)) {
 			ZEND_VM_ENTER();
 		} else {
@@ -29068,9 +29080,8 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_INCLUDE_OR_EVAL_SPEC_CV_HANDLE
 			zend_vm_stack_free_call_frame(call);
 		}
 
-		if (EXPECTED(destroy_op_array(new_op_array) != 0)) {
-			efree_size(new_op_array, sizeof(zend_op_array));
-		}
+		destroy_op_array(new_op_array);
+		efree_size(new_op_array, sizeof(zend_op_array));
 		if (UNEXPECTED(EG(exception) != NULL)) {
 			zend_throw_exception_internal(NULL);
 			HANDLE_EXCEPTION();
@@ -40233,13 +40244,10 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_JMPNZ_EX_SPEC_TMPVAR_HANDLER(Z
 
 static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FREE_SPEC_TMPVAR_HANDLER(ZEND_OPCODE_HANDLER_ARGS)
 {
-	zval *var;
 	USE_OPLINE
 
 	SAVE_OPLINE();
-	var = EX_VAR(opline->op1.var);
-	zval_ptr_dtor_nogc(var);
-	ZVAL_NULL(var);
+	zval_ptr_dtor_nogc(EX_VAR(opline->op1.var));
 	ZEND_VM_NEXT_OPCODE_CHECK_EXCEPTION();
 }
 
@@ -40252,10 +40260,8 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FE_FREE_SPEC_TMPVAR_HANDLER(ZE
 	var = EX_VAR(opline->op1.var);
 	if (Z_TYPE_P(var) != IS_ARRAY && Z_FE_ITER_P(var) != (uint32_t)-1) {
 		zend_hash_iterator_del(Z_FE_ITER_P(var));
-		Z_FE_ITER_P(var) = (uint32_t)-1;
 	}
 	zval_ptr_dtor_nogc(var);
-	ZVAL_NULL(var);
 	ZEND_VM_NEXT_OPCODE_CHECK_EXCEPTION();
 }
 
@@ -40471,7 +40477,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_INCLUDE_OR_EVAL_SPEC_TMPVAR_HA
 		}
 
 		call->prev_execute_data = execute_data;
-		i_init_code_execute_data(call, new_op_array, return_value);
+	    i_init_code_execute_data(call, new_op_array, return_value);
 		if (EXPECTED(zend_execute_ex == execute_ex)) {
 			ZEND_VM_ENTER();
 		} else {
@@ -40480,9 +40486,8 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_INCLUDE_OR_EVAL_SPEC_TMPVAR_HA
 			zend_vm_stack_free_call_frame(call);
 		}
 
-		if (EXPECTED(destroy_op_array(new_op_array) != 0)) {
-			efree_size(new_op_array, sizeof(zend_op_array));
-		}
+		destroy_op_array(new_op_array);
+		efree_size(new_op_array, sizeof(zend_op_array));
 		if (UNEXPECTED(EG(exception) != NULL)) {
 			zend_throw_exception_internal(NULL);
 			HANDLE_EXCEPTION();

@@ -112,9 +112,8 @@ typedef union _zend_value {
 	zend_class_entry *ce;
 	zend_function    *func;
 	struct {
-		ZEND_ENDIAN_LOHI(
-			uint32_t w1,
-			uint32_t w2)
+		uint32_t w1;
+		uint32_t w2;
 	} ww;
 } zend_value;
 
