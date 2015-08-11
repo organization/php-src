@@ -53,7 +53,7 @@ zend_ulong zend_jit_helper_dval_to_lval(double dval);
 ZEND_FASTCALL int zend_jit_helper_slow_fetch_address_obj(zval *container, zval *retval, zval *result);
 ZEND_FASTCALL void zend_jit_helper_new_ref(zval *ref, zval* val);
 ZEND_FASTCALL void zend_jit_helper_init_array(zval *zv, uint32_t size);
-ZEND_FASTCALL int zend_jit_helper_slow_strlen_obj(zval *obj, size_t *len);
+ZEND_FASTCALL int zend_jit_helper_slow_strlen(zend_execute_data *execute_data, zval *obj, zval *ret);
 ZEND_FASTCALL void zend_jit_helper_assign_to_string_offset(zval *str, zend_long offset, zval *value, zval *result);
 ZEND_FASTCALL zval* zend_jit_obj_proxy_add(zval *var_ptr, zval *value);
 ZEND_FASTCALL zval* zend_jit_obj_proxy_sub(zval *var_ptr, zval *value);

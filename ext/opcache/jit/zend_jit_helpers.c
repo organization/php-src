@@ -142,19 +142,24 @@ ZEND_FASTCALL void zend_jit_helper_init_array(zval *zv, uint32_t size) {
 	zend_hash_init(Z_ARRVAL_P(zv), size, NULL, ZVAL_PTR_DTOR, 0);
 }
 
-ZEND_FASTCALL int zend_jit_helper_slow_strlen_obj(zval *obj, size_t *len) {
-	zend_string *str;
-	zval tmp;
+ZEND_FASTCALL int zend_jit_helper_slow_strlen(zend_execute_data *execute_data, zval *value, zval *ret) {
+	zend_bool strict = EX_USES_STRICT_TYPES();
 
-	ZVAL_COPY(&tmp, obj);
-	if (!zend_parse_arg_str_weak(&tmp, &str)) {
-		zend_error(E_WARNING, "strlen() expects parameter 1 to be string, %s given", zend_get_type_by_const(Z_TYPE_P(obj)));
-		return 0;
+	if (EXPECTED(!strict)) {
+		zend_string *str;
+		zval tmp;
+
+		ZVAL_COPY(&tmp, value);
+		if (zend_parse_arg_str_weak(&tmp, &str)) {
+			ZVAL_LONG(ret, ZSTR_LEN(str));
+			zval_ptr_dtor(&tmp);
+			return 1;
+		}
+		zval_ptr_dtor(&tmp);
 	}
-	*len = str->len;
-	zval_dtor(&tmp);
-
-	return 1;
+	zend_internal_type_error(strict, "strlen() expects parameter 1 to be string, %s given", zend_get_type_by_const(Z_TYPE_P(value)));
+	ZVAL_NULL(ret);
+	return 0;
 }
 
 ZEND_FASTCALL void zend_jit_helper_assign_to_string_offset(zval *str, zend_long offset, zval *value, zval *result) {
