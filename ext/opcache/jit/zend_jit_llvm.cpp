@@ -15920,7 +15920,7 @@ static int zend_jit_check_internal_type_hint(zend_llvm_ctx    &llvm_ctx,
 /* }}} */
 
 /* {{{ static int zend_jit_check_type_hint */
-static int zend_jit_check_type_hint(zend_llvm_ctx    &llvm_ctx,
+static Value* zend_jit_check_type_hint(zend_llvm_ctx    &llvm_ctx,
                                     Value            *func,
                                     Value            *arg_num,
                                     Value            *arg,
@@ -15932,7 +15932,7 @@ static int zend_jit_check_type_hint(zend_llvm_ctx    &llvm_ctx,
 			(void*)zend_check_arg_type,
 			ZEND_JIT_SYM("zend_check_arg_type"),
 			ZEND_JIT_HELPER_FAST_CALL,
-			Type::getVoidTy(llvm_ctx.context),
+			Type::getInt32Ty(llvm_ctx.context),
 			PointerType::getUnqual(llvm_ctx.zend_function_type),
 			Type::getInt32Ty(llvm_ctx.context),
 			llvm_ctx.zval_ptr_type,
@@ -15942,12 +15942,12 @@ static int zend_jit_check_type_hint(zend_llvm_ctx    &llvm_ctx,
 	CallInst *call = llvm_ctx.builder.CreateCall5(_helper,
 		func, arg_num, arg, default_value, cache_slot);
 	call->setCallingConv(CallingConv::X86_FastCall);
-	return 1;
+	return call;
 }
 /* }}} */
 
 /* {{{ static int zend_jit_check_missing_arg */
-static int zend_jit_check_missing_arg(zend_llvm_ctx    &llvm_ctx,
+static Value* zend_jit_check_missing_arg(zend_llvm_ctx    &llvm_ctx,
                                       uint32_t          arg_num,
                                       Value            *cache_slot)
 {
@@ -15956,7 +15956,7 @@ static int zend_jit_check_missing_arg(zend_llvm_ctx    &llvm_ctx,
 			(void*)zend_check_missing_arg,
 			ZEND_JIT_SYM("zend_check_missing_arg"),
 			ZEND_JIT_HELPER_FAST_CALL,
-			Type::getVoidTy(llvm_ctx.context),
+			Type::getInt32Ty(llvm_ctx.context),
 			PointerType::getUnqual(llvm_ctx.zend_execute_data_type),
 			Type::getInt32Ty(llvm_ctx.context),
 			PointerType::getUnqual(PointerType::getUnqual(LLVM_GET_LONG_TY(llvm_ctx.context))),
@@ -15968,31 +15968,34 @@ static int zend_jit_check_missing_arg(zend_llvm_ctx    &llvm_ctx,
 		llvm_ctx.builder.getInt32(arg_num),
 		cache_slot);
 	call->setCallingConv(CallingConv::X86_FastCall);
-	return 1;
+	return call;
 }
 /* }}} */
 
 /* {{{ static int zend_jit_update_constant */
-static int zend_jit_update_constant(zend_llvm_ctx    &llvm_ctx,
-                                    Value            *val,
-                                    uint32_t          inline_change)
+static Value *zend_jit_update_constant(zend_llvm_ctx    &llvm_ctx,
+                                       Value            *val,
+                                       uint32_t          inline_change)
 {
 	Function *_helper = zend_jit_get_helper(
 			llvm_ctx,
-			(void*)zval_update_constant,
-			ZEND_JIT_SYM("zval_update_constant"),
+			(void*)zval_update_constant_ex,
+			ZEND_JIT_SYM("zval_update_constant_ex"),
 			0,
 			Type::getInt32Ty(llvm_ctx.context),
 			llvm_ctx.zval_ptr_type,
 			Type::getInt8Ty(llvm_ctx.context),
-			NULL,
+			PointerType::getUnqual(llvm_ctx.zend_class_entry_type),
 			NULL,
 			NULL);
 
-	CallInst *call = llvm_ctx.builder.CreateCall2(_helper,
+	CallInst *call = llvm_ctx.builder.CreateCall3(_helper,
 		val,
-		llvm_ctx.builder.getInt8(inline_change));
-	return 1;
+		llvm_ctx.builder.getInt8(inline_change),
+		llvm_ctx.builder.CreateIntToPtr(
+			LLVM_GET_LONG(0),
+			PointerType::getUnqual(llvm_ctx.zend_class_entry_type)));
+	return call;
 }
 /* }}} */
 
@@ -17225,6 +17228,9 @@ static int zend_jit_recv(zend_llvm_ctx    &llvm_ctx,
   	BasicBlock *bb_check = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
 	BasicBlock *bb_end = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
 		
+	//JIT: param = _get_zval_ptr_cv_undef_BP_VAR_W(execute_data, RES_OP()->var TSRMLS_CC);
+	Value *param = zend_jit_load_slot(llvm_ctx, RES_OP()->var);
+
 	//JIT: if (UNEXPECTED(arg_num > EX_NUM_ARGS())) {
 	Value *num_args = llvm_ctx.builder.CreateAlignedLoad(
 		zend_jit_GEP(
@@ -17242,8 +17248,6 @@ static int zend_jit_recv(zend_llvm_ctx    &llvm_ctx,
 	llvm_ctx.builder.SetInsertPoint(bb_miss);
 
 	if (opline->opcode == ZEND_RECV_INIT) {
-		//JIT: param = _get_zval_ptr_cv_undef_BP_VAR_W(execute_data, RES_OP()->var TSRMLS_CC);
-		Value *param = zend_jit_load_slot(llvm_ctx, RES_OP()->var);
 		//JIT: ZVAL_COPY_VALUE(param, OP2_OP()->zv);
 		zend_jit_copy_value(llvm_ctx, param, 0, -1, MAY_BE_ANY,
 			llvm_ctx.builder.CreateIntToPtr(
@@ -17255,8 +17259,27 @@ static int zend_jit_recv(zend_llvm_ctx    &llvm_ctx,
 			OP2_SSA_VAR(),
 			OP2_INFO());
 		if (Z_OPT_CONSTANT_P(RT_CONSTANT(llvm_ctx.op_array, *OP2_OP()))) {
-			//JIT: zval_update_constant(param, 0 TSRMLS_CC);
-			zend_jit_update_constant(llvm_ctx, param, 0);
+			BasicBlock *bb_error = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
+		  	BasicBlock *bb_follow = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
+
+			//JIT: SAVE_OPLINE();
+			if (!llvm_ctx.valid_opline) {
+				JIT_CHECK(zend_jit_store_opline(llvm_ctx, opline, false));
+			}
+			//JIT: if (UNEXPECTED(zval_update_constant_ex(param, 0, NULL) != SUCCESS)) {
+			Value *ret = zend_jit_update_constant(llvm_ctx, param, 0);
+			zend_jit_unexpected_br(
+					llvm_ctx,
+					llvm_ctx.builder.CreateICmpNE(ret, llvm_ctx.builder.getInt32(SUCCESS)),
+					bb_error,
+					bb_follow);
+
+			llvm_ctx.builder.SetInsertPoint(bb_error);
+			//JIT: ZVAL_UNDEF(param);
+			zend_jit_save_zval_type_info(llvm_ctx, param, -1, MAY_BE_ANY, llvm_ctx.builder.getInt32(IS_UNDEF));
+			//JIT: HANDLE_EXCEPTION();
+			llvm_ctx.builder.CreateBr(zend_jit_find_exception_bb(llvm_ctx, opline));
+			llvm_ctx.builder.SetInsertPoint(bb_follow);
 		} else {
 			/* IS_CONST can't be IS_OBJECT, IS_RESOURCE or IS_REFERENCE */
 			if (Z_OPT_COPYABLE_P(RT_CONSTANT(llvm_ctx.op_array, *OP2_OP()))) {
@@ -17266,16 +17289,27 @@ static int zend_jit_recv(zend_llvm_ctx    &llvm_ctx,
 		}
 		llvm_ctx.builder.CreateBr(bb_check);
 	} else if (opline->opcode == ZEND_RECV) {
-		//JIT: zend_verify_missing_arg(execute_data, arg_num TSRMLS_CC);
-		zend_jit_check_missing_arg(llvm_ctx,
+		BasicBlock *bb_error = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
+
+		//JIT: SAVE_OPLINE();
+		if (!llvm_ctx.valid_opline) {
+			JIT_CHECK(zend_jit_store_opline(llvm_ctx, opline, false));
+		}
+		//JIT: if (UNEXPECTED(!zend_verify_missing_arg(execute_data, arg_num, CACHE_ADDR(opline->op2.num))))
+		Value *ret = zend_jit_check_missing_arg(llvm_ctx,
 			OP1_OP()->num,
 			zend_jit_cache_slot_addr(
 				llvm_ctx,
 				opline->op2.num,
 				PointerType::getUnqual(LLVM_GET_LONG_TY(llvm_ctx.context))));
-		//JIT: CHECK_EXCEPTION();
-		zend_jit_check_exception(llvm_ctx, opline);
-		llvm_ctx.builder.CreateBr(bb_end);
+		zend_jit_unexpected_br(
+				llvm_ctx,
+				llvm_ctx.builder.CreateICmpEQ(ret, llvm_ctx.builder.getInt32(0)),
+				bb_error,
+				bb_end);
+		llvm_ctx.builder.SetInsertPoint(bb_error);
+		//JIT: HANDLE_EXCEPTION();
+		llvm_ctx.builder.CreateBr(zend_jit_find_exception_bb(llvm_ctx, opline));
 	} else {
 		ASSERT_NOT_REACHED();
 	}
@@ -17292,10 +17326,12 @@ static int zend_jit_recv(zend_llvm_ctx    &llvm_ctx,
 				break;
 			}
 			if (cur_arg_info->class_name || cur_arg_info->type_hint) {
-				//JIT: zval *param = _get_zval_ptr_cv_undef_BP_VAR_W(execute_data, RES_OP()->var TSRMLS_CC);
-				Value *param = zend_jit_load_slot(llvm_ctx, RES_OP()->var);
-				//JIT: zend_verify_arg_type(EX(func), arg_num, param TSRMLS_CC);
-				zend_jit_check_type_hint(
+				//JIT: SAVE_OPLINE();
+				if (!llvm_ctx.valid_opline) {
+					JIT_CHECK(zend_jit_store_opline(llvm_ctx, opline, false));
+				}
+				//JIT: if (UNEXPECTED(!zend_verify_arg_type(EX(func), arg_num, param, default_value, CACHE_ADDR(Z_CACHE_SLOT_P(default_value))))) {
+				Value *ret = zend_jit_check_type_hint(
 					llvm_ctx,
 					llvm_ctx.builder.CreateIntToPtr(
 						LLVM_GET_LONG((zend_uintptr_t)op_array),
@@ -17313,8 +17349,17 @@ static int zend_jit_recv(zend_llvm_ctx    &llvm_ctx,
 							Z_CACHE_SLOT_P(RT_CONSTANT(llvm_ctx.op_array, *OP2_OP())) :
 							opline->op2.num,
 						PointerType::getUnqual(LLVM_GET_LONG_TY(llvm_ctx.context))));
-				//JIT: CHECK_EXCEPTION();
-				zend_jit_check_exception(llvm_ctx, opline);
+				BasicBlock *bb_error = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
+				BasicBlock *bb_follow = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
+				zend_jit_unexpected_br(
+					llvm_ctx,
+					llvm_ctx.builder.CreateICmpEQ(ret, llvm_ctx.builder.getInt32(0)),
+					bb_error,
+					bb_end);
+				llvm_ctx.builder.SetInsertPoint(bb_error);
+				//JIT: HANDLE_EXCEPTION();
+				llvm_ctx.builder.CreateBr(zend_jit_find_exception_bb(llvm_ctx, opline));
+				llvm_ctx.builder.SetInsertPoint(bb_follow);
 			}
 		} while (0);
 	}
