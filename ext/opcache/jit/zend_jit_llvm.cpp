@@ -10430,6 +10430,11 @@ static int zend_jit_assign(zend_llvm_ctx    &llvm_ctx,
 		llvm_ctx.builder.SetInsertPoint(bb_finish);
 	}
 	
+	//JIT: CHECK_EXCEPTION
+	if (OP1_INFO() & (MAY_BE_ARRAY|MAY_BE_OBJECT|MAY_BE_RESOURCE)) {
+		JIT_CHECK(zend_jit_check_exception(llvm_ctx, opline));
+	}
+
 	llvm_ctx.valid_opline = 0;
 	return 1;
 }
