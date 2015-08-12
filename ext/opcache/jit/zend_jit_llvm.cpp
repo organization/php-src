@@ -5663,7 +5663,7 @@ numeric_dim:
 
 		switch (fetch_type) {
 			case BP_VAR_R:
-				zend_jit_error(llvm_ctx, opline, E_NOTICE, "Undefined offset: " ZEND_ULONG_FMT, num_idx);
+				zend_jit_error(llvm_ctx, opline, E_NOTICE, "Undefined offset: " ZEND_LONG_FMT, num_idx);
 			case BP_VAR_UNSET:
 			case BP_VAR_IS:
 				{
@@ -5674,7 +5674,7 @@ numeric_dim:
 				}
 				break;
 			case BP_VAR_RW:
-				zend_jit_error(llvm_ctx, opline, E_NOTICE, "Undefined offset: " ZEND_ULONG_FMT, num_idx);
+				zend_jit_error(llvm_ctx, opline, E_NOTICE, "Undefined offset: " ZEND_LONG_FMT, num_idx);
 			case BP_VAR_W: 
 				{
 					Value *zv = zend_jit_hash_index_update(
@@ -18243,6 +18243,11 @@ static int zend_jit_codegen_ex(zend_jit_context *ctx,
 						if (!zend_jit_check_exception(llvm_ctx, opline)) return 0;
 					}
 					if (!zend_jit_cond_jmp(llvm_ctx, opline, op_array->opcodes + opline->extended_value, TARGET_BB(opline->extended_value), TARGET_BB(block[b + 1].start))) return 0;
+					break;
+				case ZEND_DECLARE_ANON_CLASS:
+				case ZEND_DECLARE_ANON_INHERITED_CLASS:
+					if (!zend_jit_handler(llvm_ctx, opline)) return 0;
+					if (!zend_jit_cond_jmp(llvm_ctx, opline, OP_JMP_ADDR(opline, *OP1_OP()), TARGET_BB(OP_JMP_ADDR(opline, *OP1_OP()) - op_array->opcodes), TARGET_BB(block[b + 1].start))) return 0;
 					break;
 				case ZEND_BIND_GLOBAL:
 					if (!zend_jit_bind_global(llvm_ctx, op_array, opline)) return 0;

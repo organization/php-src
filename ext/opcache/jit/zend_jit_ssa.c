@@ -664,8 +664,8 @@ void zend_jit_dump_ssa_line(zend_op_array *op_array, uint32_t line)
 		{"BIND_GLOBAL",                     0}, //???
 		{"COALESCE",                        OP2_ADDR},
 		{"SPACESHIP",                       0},
-		{"DECLARE_ANON_CLASS",              0}, //???
-		{"DECLARE_ANON_INHERITED_CLASS",    0}  //???
+		{"DECLARE_ANON_CLASS",              OP1_ADDR},
+		{"DECLARE_ANON_INHERITED_CLASS",    OP1_ADDR}
 	};
 	zend_jit_func_info *info = JIT_DATA(op_array);
 	int *block_map = info->block_map;
@@ -1152,6 +1152,11 @@ int zend_jit_build_cfg(zend_jit_context *ctx, zend_op_array *op_array)
 					TARGET_BLOCK(i + 1);
 				}
 				break;
+			case ZEND_DECLARE_ANON_CLASS:
+			case ZEND_DECLARE_ANON_INHERITED_CLASS:
+				TARGET_BLOCK(OP_JMP_ADDR(opline, opline->op1) - op_array->opcodes);
+				TARGET_BLOCK(i + 1);
+				break;
 			case ZEND_GOTO:
 			case ZEND_JMP:
 				TARGET_BLOCK(OP_JMP_ADDR(opline, opline->op1) - op_array->opcodes);
@@ -1333,6 +1338,11 @@ int zend_jit_build_cfg(zend_jit_context *ctx, zend_op_array *op_array)
 				record_successor(block, j, 0, j + 1);
 				break;
 #endif
+			case ZEND_DECLARE_ANON_CLASS:
+			case ZEND_DECLARE_ANON_INHERITED_CLASS:
+				record_successor(block, j, 0, block_map[OP_JMP_ADDR(opline, opline->op1) - op_array->opcodes]);
+				record_successor(block, j, 1, j + 1);
+				break;
 			case ZEND_GOTO:
 			case ZEND_JMP:
 				record_successor(block, j, 0, block_map[OP_JMP_ADDR(opline, opline->op1) - op_array->opcodes]);
