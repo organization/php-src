@@ -5483,7 +5483,7 @@ numeric_dim:
 			handle = zend_jit_load_res_handle(llvm_ctx, res);
 			zend_jit_error(llvm_ctx, 
 				opline,
-				E_STRICT, 
+				E_NOTICE,
 				"Resource ID#%ld used as offset, casting to integer (%ld)",
 				handle, handle);
 
@@ -11684,8 +11684,8 @@ static int zend_jit_send_var_no_ref(zend_llvm_ctx    &llvm_ctx,
 
 	if (opline->extended_value & ZEND_ARG_COMPILE_TIME_BOUND) {
 		if (!(opline->extended_value & ZEND_ARG_SEND_SILENT)) {
-			//JIT: zend_error(E_STRICT, "Only variables should be passed by reference");
-			zend_jit_error(llvm_ctx, opline, E_STRICT, "Only variables should be passed by reference");
+			//JIT: zend_error(E_NOTICE, "Only variables should be passed by reference");
+			zend_jit_error(llvm_ctx, opline, E_NOTICE, "Only variables should be passed by reference");
 		}
 	} else {
 		//JIT: !ARG_MAY_BE_SENT_BY_REF(EX(call)->func, opline->op2.num)) {
@@ -11701,8 +11701,8 @@ static int zend_jit_send_var_no_ref(zend_llvm_ctx    &llvm_ctx,
 			bb_no_ref);
 
 		llvm_ctx.builder.SetInsertPoint(bb_no_ref);
-		//JIT: zend_error(E_STRICT, "Only variables should be passed by reference");
-		zend_jit_error(llvm_ctx, opline, E_STRICT, "Only variables should be passed by reference");
+		//JIT: zend_error(E_NOTICE, "Only variables should be passed by reference");
+		zend_jit_error(llvm_ctx, opline, E_NOTICE, "Only variables should be passed by reference");
 		llvm_ctx.builder.CreateBr(bb_ref);
 		llvm_ctx.builder.SetInsertPoint(bb_ref);
 	}
