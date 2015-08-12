@@ -3902,18 +3902,6 @@ static Value* zend_jit_load_operand(zend_llvm_ctx &llvm_ctx,
 			llvm_ctx._execute_data,
 			offsetof(zend_execute_data, This),
 			llvm_ctx.zval_ptr_type);
-		if (zend_jit_needs_check_for_this(llvm_ctx, opline)) {
-			BasicBlock *bb_fatal = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
-			BasicBlock *bb_follow = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
-			zend_jit_unexpected_br(llvm_ctx,
-					llvm_ctx.builder.CreateIsNull(zend_jit_load_obj(llvm_ctx, this_ptr, -1, MAY_BE_OBJECT)),
-					bb_fatal,
-					bb_follow);
-			llvm_ctx.builder.SetInsertPoint(bb_fatal);
-			zend_jit_error_noreturn(llvm_ctx, opline, E_ERROR,
-					"Using $this when not in object context");
-			llvm_ctx.builder.SetInsertPoint(bb_follow);
-		}
 		return this_ptr;
 	} else {
 		ASSERT_NOT_REACHED();
@@ -12622,6 +12610,31 @@ static int zend_jit_assign_obj(zend_llvm_ctx     &llvm_ctx,
 	op1_addr = zend_jit_load_operand(llvm_ctx,
 			OP1_OP_TYPE(), OP1_OP(), OP1_SSA_VAR(), OP1_INFO(), 0, opline, 1, BP_VAR_W);
 
+	if (opline->op1_type == IS_UNUSED && zend_jit_needs_check_for_this(llvm_ctx, opline)) {
+		BasicBlock *bb_error = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
+		BasicBlock *bb_follow = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
+		zend_jit_unexpected_br(llvm_ctx,
+			llvm_ctx.builder.CreateIsNull(zend_jit_load_obj(llvm_ctx, op1_addr, -1, MAY_BE_OBJECT)),
+			bb_error,
+			bb_follow);
+		llvm_ctx.builder.SetInsertPoint(bb_error);
+
+		//JIT: zend_throw_error(NULL, "Using $this when not in object context");
+		zend_jit_throw_error(llvm_ctx, opline, NULL,
+					"Using $this when not in object context");
+
+		//JIT: FREE_UNFETCHED_OP2();
+		if (opline->op2_type & (IS_VAR|IS_TMP_VAR)) {
+			Value *op2_addr = zend_jit_load_operand(llvm_ctx,
+				OP2_OP_TYPE(), OP2_OP(), OP2_SSA_VAR(), OP2_INFO(), 0, opline);
+			zend_jit_zval_ptr_dtor_ex(llvm_ctx, op2_addr, NULL, OP2_SSA_VAR(), OP2_INFO(), opline->lineno, 0);
+		}
+
+		llvm_ctx.builder.CreateBr(zend_jit_find_exception_bb(llvm_ctx, opline));
+
+		llvm_ctx.builder.SetInsertPoint(bb_follow);
+	}
+
 	property = zend_jit_load_operand(llvm_ctx,
 			OP2_OP_TYPE(), OP2_OP(), OP2_SSA_VAR(), OP2_INFO(), 0, opline);
 
@@ -13072,6 +13085,32 @@ static int zend_jit_isset_isempty_dim_obj(zend_llvm_ctx     &llvm_ctx,
 	op1_addr = zend_jit_load_operand_addr(llvm_ctx,
  		OP1_OP_TYPE(), OP1_OP(), OP1_SSA_VAR(), OP1_INFO(), 0, opline, 1, BP_VAR_IS,
  		&should_free);
+
+	if (opline->op1_type == IS_UNUSED && zend_jit_needs_check_for_this(llvm_ctx, opline)) {
+		BasicBlock *bb_error = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
+		BasicBlock *bb_follow = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
+		zend_jit_unexpected_br(llvm_ctx,
+			llvm_ctx.builder.CreateIsNull(zend_jit_load_obj(llvm_ctx, op1_addr, -1, MAY_BE_OBJECT)),
+			bb_error,
+			bb_follow);
+		llvm_ctx.builder.SetInsertPoint(bb_error);
+
+		//JIT: zend_throw_error(NULL, "Using $this when not in object context");
+		zend_jit_throw_error(llvm_ctx, opline, NULL,
+					"Using $this when not in object context");
+
+		//JIT: FREE_UNFETCHED_OP2();
+		if (opline->op2_type & (IS_VAR|IS_TMP_VAR)) {
+			Value *op2_addr = zend_jit_load_operand(llvm_ctx,
+				OP2_OP_TYPE(), OP2_OP(), OP2_SSA_VAR(), OP2_INFO(), 0, opline);
+			zend_jit_zval_ptr_dtor_ex(llvm_ctx, op2_addr, NULL, OP2_SSA_VAR(), OP2_INFO(), opline->lineno, 0);
+		}
+
+		llvm_ctx.builder.CreateBr(zend_jit_find_exception_bb(llvm_ctx, opline));
+
+		llvm_ctx.builder.SetInsertPoint(bb_follow);
+	}
+
 	container = zend_jit_deref(llvm_ctx, op1_addr, OP1_SSA_VAR(), OP1_INFO());
 
 	op2_addr = zend_jit_load_operand(llvm_ctx, OP2_OP_TYPE(), OP2_OP(), OP2_SSA_VAR(), OP2_INFO(), 0, opline);
