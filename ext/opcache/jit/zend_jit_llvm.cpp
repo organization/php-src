@@ -1632,6 +1632,61 @@ static void zend_jit_error_noreturn(zend_llvm_ctx    &llvm_ctx,
 }
 /* }}} */
 
+/* {{{ static void zend_jit_throw_error */
+static void zend_jit_throw_error(zend_llvm_ctx    &llvm_ctx,
+                                 zend_op          *opline,
+                                 zend_class_entry *ce,
+                                 const char       *format,
+                                 Value            *arg1 = NULL,
+                                 Value            *arg2 = NULL,
+                                 Value            *arg3 = NULL)
+{
+	if (opline && !llvm_ctx.valid_opline) {
+		zend_jit_store_opline(llvm_ctx, opline, false);
+	}
+
+	Function *_helper = zend_jit_get_helper(
+		llvm_ctx,
+		(void*)zend_throw_error,
+		ZEND_JIT_SYM("zend_throw_error"),
+		ZEND_JIT_HELPER_VAR_ARGS,
+		Type::getVoidTy(llvm_ctx.context),
+		PointerType::getUnqual(llvm_ctx.zend_class_entry_type),
+		PointerType::getUnqual(Type::getInt8Ty(llvm_ctx.context)),
+		NULL,
+		NULL,
+		NULL);
+	if (arg3) {
+		llvm_ctx.builder.CreateCall5(_helper,
+			llvm_ctx.builder.CreateIntToPtr(
+				LLVM_GET_LONG((zend_uintptr_t)ce),
+				PointerType::getUnqual(llvm_ctx.zend_class_entry_type)),
+			LLVM_GET_CONST_STRING(format),
+			arg1, arg2, arg3);
+	} else if (arg2) {
+		llvm_ctx.builder.CreateCall4(_helper,
+			llvm_ctx.builder.CreateIntToPtr(
+				LLVM_GET_LONG((zend_uintptr_t)ce),
+				PointerType::getUnqual(llvm_ctx.zend_class_entry_type)),
+			LLVM_GET_CONST_STRING(format),
+			arg1, arg2);
+	} else if (arg1) {
+		llvm_ctx.builder.CreateCall3(_helper,
+			llvm_ctx.builder.CreateIntToPtr(
+				LLVM_GET_LONG((zend_uintptr_t)ce),
+				PointerType::getUnqual(llvm_ctx.zend_class_entry_type)),
+			LLVM_GET_CONST_STRING(format),
+			arg1);
+	} else {
+		llvm_ctx.builder.CreateCall2(_helper,
+			llvm_ctx.builder.CreateIntToPtr(
+				LLVM_GET_LONG((zend_uintptr_t)ce),
+				PointerType::getUnqual(llvm_ctx.zend_class_entry_type)),
+			LLVM_GET_CONST_STRING(format));
+	}
+}
+/* }}} */
+
 /* {{{ static Value *zend_jit_long_to_str */
 static Value* zend_jit_long_to_str(zend_llvm_ctx &llvm_ctx,
                                    Value         *num)
@@ -11167,13 +11222,29 @@ static int zend_jit_send_val(zend_llvm_ctx    &llvm_ctx,
 		                             
 		//JIT: zend_error_noreturn(E_ERROR, "Cannot pass parameter %d by reference", OP2_OP()->num);
 		llvm_ctx.builder.SetInsertPoint(bb_error);
-		zend_jit_error_noreturn(
-			llvm_ctx,
-			opline,
-			E_ERROR,
-			"Cannot pass parameter %d by reference",
-			llvm_ctx.builder.getInt32(OP2_OP()->opline_num));
+		//JIT: SAVE_OPLINE()
+		if (!llvm_ctx.valid_opline) {
+			JIT_CHECK(zend_jit_store_opline(llvm_ctx, opline, false));
+		}
+		//JIT: zend_throw_error(NULL, "Cannot pass parameter %d by reference", opline->op2.num);
+		zend_jit_throw_error(llvm_ctx, opline, NULL, "Cannot pass parameter %d by reference", llvm_ctx.builder.getInt32(OP2_OP()->num));
+		//JIT: FREE_UNFETCHED_OP1();
+		if (opline->op1_type & (IS_VAR|IS_TMP_VAR)) {
+			Value *op1_addr = zend_jit_load_operand(llvm_ctx,
+				OP1_OP_TYPE(), OP1_OP(), OP1_SSA_VAR(), OP1_INFO(), 0, opline);
+			zend_jit_zval_ptr_dtor_ex(llvm_ctx, op1_addr, NULL, OP1_SSA_VAR(), OP1_INFO(), opline->lineno, 0);
+		}
 
+		//JIT: arg = ZEND_CALL_VAR(EX(call), opline->result.var);
+		Value *arg_addr = zend_jit_GEP(
+						llvm_ctx,
+						call,
+						sizeof(zval) * (OP2_OP()->num + ZEND_CALL_FRAME_SLOT - 1),
+						llvm_ctx.zval_ptr_type);
+		//JIT: ZVAL_UNDEF(arg);
+		zend_jit_save_zval_type_info(llvm_ctx, arg_addr, -1, MAY_BE_ANY, llvm_ctx.builder.getInt32(IS_UNDEF));
+		//JIT: HANDLE_EXCEPTION();
+		llvm_ctx.builder.CreateBr(zend_jit_find_exception_bb(llvm_ctx, opline));
 		llvm_ctx.builder.SetInsertPoint(bb_follow);
 //???	} else if (zend_jit_pass_unused_arg(llvm_ctx, op_array, opline)) {
 //???		return 1;
