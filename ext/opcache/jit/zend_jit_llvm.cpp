@@ -18127,10 +18127,19 @@ static int zend_jit_codegen_ex(zend_jit_context *ctx,
 				case ZEND_ISSET_ISEMPTY_DIM_OBJ:
 					if (!zend_jit_isset_isempty_dim_obj(llvm_ctx, ctx, op_array, opline)) return 0;
 					break;
-#if 0
+				/* Support for ZEND_VM_SMART_BRANCH */
+				case ZEND_ISSET_ISEMPTY_VAR:
 				case ZEND_ISSET_ISEMPTY_PROP_OBJ:
-					if (!zend_jit_isset_isempty_dim_prop_obj(llvm_ctx, ctx, op_array, opline)) return 0;
+				case ZEND_INSTANCEOF:
+				case ZEND_DEFINED:
+					if (!zend_jit_handler(llvm_ctx, opline)) return 0;
+					if ((opline+1)->opcode == ZEND_JMPZ || (opline+1)->opcode == ZEND_JMPNZ) {
+						opline++;
+						i++;
+						if (!zend_jit_cond_jmp(llvm_ctx, opline, OP_JMP_ADDR(opline, *OP2_OP()), TARGET_BB(OP_JMP_ADDR(opline, *OP2_OP()) - op_array->opcodes), TARGET_BB(block[b + 1].start))) return 0;
+					}
 					break;
+#if 0
 				case ZEND_FE_FETCH_R:
 				case ZEND_FE_FETCH_RW:
 					if (!zend_jit_fe_fetch(llvm_ctx, op_array, ctx, opline)) return 0;
