@@ -14646,7 +14646,9 @@ static int zend_jit_init_fcall(zend_llvm_ctx    &llvm_ctx,
 			llvm_ctx.builder.CreateAlignedLoad(
 				llvm_ctx._EG_function_table, 4),
 			llvm_ctx.builder.CreateIntToPtr(
-				LLVM_GET_LONG((zend_uintptr_t)(Z_STR_P(RT_CONSTANT(llvm_ctx.op_array, *OP2_OP())))),
+				(opline->opcode == ZEND_INIT_FCALL) ?
+					LLVM_GET_LONG((zend_uintptr_t)(Z_STR_P(RT_CONSTANT(llvm_ctx.op_array, *OP2_OP())))) :
+					LLVM_GET_LONG((zend_uintptr_t)(Z_STR_P(RT_CONSTANT(llvm_ctx.op_array, *OP2_OP()) + 1))),
 				PointerType::getUnqual(llvm_ctx.zend_string_type)));
 
 		if (!func) {
@@ -14662,13 +14664,15 @@ static int zend_jit_init_fcall(zend_llvm_ctx    &llvm_ctx,
 			if (!llvm_ctx.valid_opline) {
 				JIT_CHECK(zend_jit_store_opline(llvm_ctx, opline, false));
 			}
-			//JIT: zend_error_noreturn(E_ERROR, "Call to undefined function %s()", Z_STRVAL_P(fname));
-			zend_jit_error_noreturn(
+			//JIT: zend_throw_error(NULL, "Call to undefined function %s()", Z_STRVAL_P(fname));
+			zend_jit_throw_error(
 				llvm_ctx,
 				opline,
-				E_ERROR,
+				NULL,
 				"Call to undefined function %s()",
 				LLVM_GET_CONST_STRING(Z_STRVAL_P(RT_CONSTANT(llvm_ctx.op_array, *OP2_OP()))));
+			//JIT: HANDLE_EXCEPTION();
+			llvm_ctx.builder.CreateBr(zend_jit_find_exception_bb(llvm_ctx, opline));
 			//JIT: } else {
 			llvm_ctx.builder.SetInsertPoint(bb_found);
 		}
@@ -16298,19 +16302,6 @@ static int zend_jit_do_fcall(zend_llvm_ctx    &llvm_ctx,
 						call,
 						offsetof(zend_execute_data, called_scope),
 						PointerType::getUnqual(PointerType::getUnqual(llvm_ctx.zend_class_entry_type))), 4);
-				//JIT: Z_OBJ(call->This) = Z_OBJ(EX(This));
-				llvm_ctx.builder.CreateAlignedStore(
-					llvm_ctx.builder.CreateAlignedLoad(
-						zend_jit_GEP(
-							llvm_ctx,
-							llvm_ctx._execute_data,
-							offsetof(zend_execute_data, This.value.obj),
-							PointerType::getUnqual(PointerType::getUnqual(llvm_ctx.zend_object_type))), 4),
-					zend_jit_GEP(
-						llvm_ctx,
-						call,
-						offsetof(zend_execute_data, This.value.obj),
-						PointerType::getUnqual(PointerType::getUnqual(llvm_ctx.zend_object_type))), 4);
 				if (bb_common) {
 					llvm_ctx.builder.CreateBr(bb_common);
 				}
@@ -18095,6 +18086,7 @@ static int zend_jit_codegen_ex(zend_jit_context *ctx,
 					llvm_ctx.call_level--;
 					break;
 				case ZEND_INIT_FCALL:
+//				case ZEND_INIT_FCALL_BY_NAME:
 					llvm_ctx.call_level++;
 					if (!zend_jit_init_fcall(llvm_ctx, ctx, op_array, opline)) return 0;
 					break;
