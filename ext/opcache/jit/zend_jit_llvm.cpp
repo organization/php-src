@@ -5731,6 +5731,8 @@ static Value* zend_jit_str_offset_index(zend_llvm_ctx &llvm_ctx,
 	if (dim_op_type == IS_CONST) {
 		zval tmp;
 		int is_long;
+		int convert = 1;
+		zend_long lval = 0;
 
 		switch (Z_TYPE_P(RT_CONSTANT(llvm_ctx.op_array, *dim_op))) {
 			case IS_STRING:
@@ -5746,6 +5748,9 @@ static Value* zend_jit_str_offset_index(zend_llvm_ctx &llvm_ctx,
 				} else if (fetch_type != BP_VAR_IS) {
 					zend_jit_error(llvm_ctx, opline, E_WARNING, "Illegal string offset '%s'",
 						   LLVM_GET_CONST_STRING(Z_STRVAL_P(RT_CONSTANT(llvm_ctx.op_array, *dim_op))));
+				} else {
+					convert = 0;
+					lval = -1;
 				}
 				break;
 			case IS_DOUBLE:
@@ -5772,7 +5777,10 @@ static Value* zend_jit_str_offset_index(zend_llvm_ctx &llvm_ctx,
 						LLVM_GET_CONST_STRING("Illegal offset type"));
 				break;
 		}
-		PHI_ADD(index, LLVM_GET_LONG(zval_get_long(RT_CONSTANT(llvm_ctx.op_array, *dim_op))));
+		if (convert) {
+			lval = zval_get_long(RT_CONSTANT(llvm_ctx.op_array, *dim_op));
+		}
+		PHI_ADD(index, LLVM_GET_LONG(lval));
 	} else {
 		BasicBlock *bb_dim_long = NULL;
 		BasicBlock *bb_dim_else = NULL;
@@ -6040,10 +6048,12 @@ static Value* zend_jit_fetch_dimension_address_read(zend_llvm_ctx     &llvm_ctx,
 				E_NOTICE,
 				"Uninitialized string offset: %ld", 
 				index);
-		}
 
-		zend_jit_save_zval_str(llvm_ctx, tmp, -1, MAY_BE_ANY, llvm_ctx._CG_empty_string);
-		zend_jit_save_zval_type_info(llvm_ctx, tmp, -1, MAY_BE_ANY, llvm_ctx.builder.getInt32(IS_INTERNED_STRING_EX));
+			zend_jit_save_zval_str(llvm_ctx, tmp, -1, MAY_BE_ANY, llvm_ctx._CG_empty_string);
+			zend_jit_save_zval_type_info(llvm_ctx, tmp, -1, MAY_BE_ANY, llvm_ctx.builder.getInt32(IS_INTERNED_STRING_EX));
+		} else {
+			zend_jit_save_zval_type_info(llvm_ctx, tmp, -1, MAY_BE_ANY, llvm_ctx.builder.getInt32(IS_NULL));
+		}
 
 		PHI_ADD(ret, tmp);
 		if (!bb_finish) {

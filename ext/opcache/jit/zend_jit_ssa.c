@@ -662,7 +662,7 @@ void zend_jit_dump_ssa_line(zend_op_array *op_array, uint32_t line)
 		{"POW",                             0}, //???
 		{"ASSIGN_POW",                      0}, //???
 		{"BIND_GLOBAL",                     0}, //???
-		{"COALESCE",                        0}, //???
+		{"COALESCE",                        OP2_ADDR},
 		{"SPACESHIP",                       0},
 		{"DECLARE_ANON_CLASS",              0}, //???
 		{"DECLARE_ANON_INHERITED_CLASS",    0}  //???
