@@ -8840,7 +8840,8 @@ static int zend_jit_math(zend_llvm_ctx    &llvm_ctx,
 						 zend_bool         same_cvs,
 						 uint32_t          lineno,
 						 zend_uchar        opcode,
-						 zend_op          *opline)
+						 zend_op          *opline,
+						 int               check_exception)
 {
 	Value *op1_val = NULL;
 	Value *op2_val = NULL;
@@ -8944,16 +8945,6 @@ static int zend_jit_math(zend_llvm_ctx    &llvm_ctx,
 				zend_jit_save_zval_type_info(llvm_ctx,
 					result, result_ssa_var, result_info,
 					llvm_ctx.builder.getInt32(IS_FALSE));
-				if (orig_op1_addr && op1_op_type == IS_VAR && op1_addr != result_addr) {
-					if (!zend_jit_free_operand(llvm_ctx, op1_op_type, orig_op1_addr, NULL, op1_ssa_var, op1_info, lineno)) {
-					   	return 0;
-					}
-				}
-				if (orig_op2_addr && op2_op_type == IS_VAR) {
-					if (!zend_jit_free_operand(llvm_ctx, op2_op_type, orig_op2_addr, NULL, op2_ssa_var, op2_info, lineno)) {
-						return 0;
-					}
-				}
 				if (!bb_finish) {
 					bb_finish = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
 				}
@@ -8990,16 +8981,6 @@ static int zend_jit_math(zend_llvm_ctx    &llvm_ctx,
 				}
 				zend_jit_save_zval_type_info(llvm_ctx, result, result_ssa_var, result_info, llvm_ctx.builder.getInt32(IS_DOUBLE));
 				zend_jit_save_zval_dval(llvm_ctx, result, result_ssa_var, result_info, ConstantFP::get(Type::getDoubleTy(llvm_ctx.context), (double) LONG_MIN / -1.0));
-				if (orig_op1_addr && op1_op_type == IS_VAR && op1_addr != result_addr) {
-					if (!zend_jit_free_operand(llvm_ctx, op1_op_type, orig_op1_addr, NULL, op1_ssa_var, op1_info, lineno)) {
-					   	return 0;
-					}
-				}
-				if (orig_op2_addr && op2_op_type == IS_VAR) {
-					if (!zend_jit_free_operand(llvm_ctx, op2_op_type, orig_op2_addr, NULL, op2_ssa_var, op2_info, lineno)) {
-						return 0;
-					}
-				}
 				if (!bb_finish) {
 					bb_finish = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
 				}
@@ -9032,16 +9013,6 @@ static int zend_jit_math(zend_llvm_ctx    &llvm_ctx,
 			}
 			zend_jit_save_zval_type_info(llvm_ctx, result, result_ssa_var, result_info, llvm_ctx.builder.getInt32(IS_DOUBLE));
 			zend_jit_save_zval_dval(llvm_ctx, result, result_ssa_var, result_info, fres);
-			if (orig_op1_addr && op1_op_type == IS_VAR && op1_addr != result_addr) {
-				if (!zend_jit_free_operand(llvm_ctx, op1_op_type, orig_op1_addr, NULL, op1_ssa_var, op1_info, lineno)) {
-					return 0;
-				}
-			}
-			if (orig_op2_addr && op2_op_type == IS_VAR) {
-				if (!zend_jit_free_operand(llvm_ctx, op2_op_type, orig_op2_addr, NULL, op2_ssa_var, op2_info, lineno)) {
-				   	return 0;
-				}
-			}
 			if (!bb_finish) {
 				bb_finish = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
 			}
@@ -9108,16 +9079,6 @@ static int zend_jit_math(zend_llvm_ctx    &llvm_ctx,
 		zend_jit_save_zval_type_info(llvm_ctx, result, result_ssa_var, result_info, llvm_ctx.builder.getInt32(IS_LONG));
 		zend_jit_save_zval_lval(llvm_ctx, result, result_ssa_var, result_info, res);
 
-		if (orig_op1_addr && op1_op_type == IS_VAR && op1_addr != result_addr) {
-			if (!zend_jit_free_operand(llvm_ctx, op1_op_type, orig_op1_addr, NULL, op1_ssa_var, op1_info, lineno)) {
-				return 0;
-			}
-		}
-		if (orig_op2_addr && op2_op_type == IS_VAR) {
-			if (!zend_jit_free_operand(llvm_ctx, op2_op_type, orig_op2_addr, NULL, op2_ssa_var, op2_info, lineno)) {
-				return 0;
-			}
-		}
 		if (bb_finish) {
 			llvm_ctx.builder.CreateBr(bb_finish);
 		}
@@ -9300,16 +9261,6 @@ static int zend_jit_math(zend_llvm_ctx    &llvm_ctx,
 		zend_jit_save_zval_type_info(llvm_ctx, result, result_ssa_var, result_info, llvm_ctx.builder.getInt32(IS_DOUBLE));
 		zend_jit_save_zval_dval(llvm_ctx, result, result_ssa_var, result_info, res);
 
-		if (orig_op1_addr && op1_op_type == IS_VAR && op1_addr != result_addr) {
-			if (!zend_jit_free_operand(llvm_ctx, op1_op_type, orig_op1_addr, NULL, op1_ssa_var, op1_info, lineno)) {
-				return 0;
-			}
-		}
-		if (orig_op2_addr && op2_op_type == IS_VAR) {
-			if (!zend_jit_free_operand(llvm_ctx, op2_op_type, orig_op2_addr, NULL, op2_ssa_var, op2_info, lineno)) {
-			   	return 0;
-			}
-		}
 		if (bb_finish) {
 			llvm_ctx.builder.CreateBr(bb_finish);
 		}
@@ -9351,6 +9302,10 @@ static int zend_jit_math(zend_llvm_ctx    &llvm_ctx,
 			NULL,
 			NULL);
 
+		//JIT: SAVE_OPLINE();
+		if (!llvm_ctx.valid_opline) {
+			JIT_CHECK(zend_jit_store_opline(llvm_ctx, opline, false));
+		}
 		if (op1_info & (MAY_BE_IN_REG)) {
 			op1_addr = zend_jit_reload_from_reg(llvm_ctx, op1_ssa_var, op1_info);
 		}
@@ -9376,6 +9331,14 @@ static int zend_jit_math(zend_llvm_ctx    &llvm_ctx,
 		}
 		if (orig_op2_addr && !zend_jit_free_operand(llvm_ctx, op2_op_type, orig_op2_addr, NULL, op2_ssa_var, op2_info, lineno)) {
 			return 0;
+		}
+
+		if (check_exception) {
+			//JIT: CHECK_EXCEPTION
+			if ((op1_info & (MAY_BE_ARRAY|MAY_BE_OBJECT|MAY_BE_RESOURCE)) ||
+			    (op2_info & (MAY_BE_ARRAY|MAY_BE_OBJECT|MAY_BE_RESOURCE))) {
+				JIT_CHECK(zend_jit_check_exception(llvm_ctx, opline));
+			}
 		}
 
 		if (bb_finish) {
@@ -9725,7 +9688,8 @@ static int zend_jit_math_op(zend_llvm_ctx    &llvm_ctx,
 			SAME_CVs(opline),
 			opline->lineno,
 			opline->opcode,
-			opline);
+			opline,
+			1);
 }
 /* }}} */
 
@@ -12943,7 +12907,8 @@ static int zend_jit_assign_op(zend_llvm_ctx     &llvm_ctx,
 						same_cvs,
 						opline->lineno,
 						assign_type,
-						opline);
+						opline,
+						0);
 				break;
 			case ZEND_CONCAT:
 				zend_jit_concat_function(
