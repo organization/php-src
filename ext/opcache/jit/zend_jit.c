@@ -24,7 +24,7 @@
 #include "jit/zend_jit.h"
 #include "jit/zend_jit_context.h"
 #include "jit/zend_jit_codegen.h"
-#include "jit/zend_bitset.h"
+#include "zend_bitset.h"
 
 #if HAVE_VALGRIND
 # include "valgrind/callgrind.h"

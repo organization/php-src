@@ -29,7 +29,7 @@
 #include <zend_constants.h>
 #include <zend_exceptions.h>
 #include "zend_arena.h"
-#include "jit/zend_bitset.h"
+#include "zend_bitset.h"
 
 typedef struct _zend_jit_basic_block zend_jit_basic_block;
 typedef struct _zend_jit_ssa_phi zend_jit_ssa_phi;

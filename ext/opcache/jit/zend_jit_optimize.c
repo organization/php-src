@@ -25,7 +25,6 @@
 #include "jit/zend_jit_config.h"
 #include "jit/zend_jit_context.h"
 #include "jit/zend_jit_codegen.h"
-#include "jit/zend_bitset.h"
 #include "jit/zend_worklist.h"
 
 #include "zend_generators.h"

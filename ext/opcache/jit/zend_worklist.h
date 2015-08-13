@@ -22,8 +22,7 @@
 #define _ZEND_WORKLIST_H_
 
 #include "zend_arena.h"
-#include "jit/zend_bitset.h"
-//???#include "zend_jit_common.h"
+#include "zend_bitset.h"
 
 typedef struct _zend_worklist_stack {
 	int *buf;
