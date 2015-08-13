@@ -3142,7 +3142,7 @@ static Value* zend_jit_refcount_addr(zend_llvm_ctx &llvm_ctx, Value *counted)
 	return zend_jit_GEP(
 			llvm_ctx,
 			counted,
-			offsetof(zend_refcounted, refcount),
+			offsetof(zend_refcounted, gc.refcount),
 			PointerType::getUnqual(Type::getInt32Ty(llvm_ctx.context)));
 }
 /* }}} */
@@ -4362,7 +4362,7 @@ static int zend_jit_object_release(zend_llvm_ctx &llvm_ctx,
 				zend_jit_GEP(
 					llvm_ctx,
 					counted,
-					offsetof(zend_refcounted, u.v.gc_info),
+					offsetof(zend_refcounted, gc.u.v.gc_info),
 					PointerType::getUnqual(Type::getInt16Ty(llvm_ctx.context))), 2),
 			llvm_ctx.builder.getInt16(0)),
 		bb_gc,
@@ -4458,7 +4458,7 @@ static int zend_jit_zval_ptr_dtor_ex(zend_llvm_ctx &llvm_ctx,
 						zend_jit_GEP(
 							llvm_ctx,
 							counted,
-							offsetof(zend_refcounted, u.v.gc_info),
+							offsetof(zend_refcounted, gc.u.v.gc_info),
 							PointerType::getUnqual(Type::getInt16Ty(llvm_ctx.context))), 2),
 					llvm_ctx.builder.getInt16(0)),
 				bb_gc,
@@ -10231,7 +10231,7 @@ static int zend_jit_assign_to_variable(zend_llvm_ctx    &llvm_ctx,
 							zend_jit_GEP(
 								llvm_ctx,
 								garbage,
-								offsetof(zend_refcounted, u.v.gc_info),
+								offsetof(zend_refcounted, gc.u.v.gc_info),
 								PointerType::getUnqual(Type::getInt16Ty(llvm_ctx.context))), 2),
 						llvm_ctx.builder.getInt16(0)),
 					bb_follow,
@@ -11302,7 +11302,7 @@ static Value* zend_jit_new_ref_ex(zend_llvm_ctx    &llvm_ctx,
 		zend_jit_GEP(
 			llvm_ctx,
 			reference,
-			offsetof(zend_refcounted, u.type_info),
+			offsetof(zend_refcounted, gc.u.type_info),
 			PointerType::getUnqual(Type::getInt32Ty(llvm_ctx.context))), 4);
 	
 	//JIT: ZVAL_COPY_VALUE(&_ref->val, r);
