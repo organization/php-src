@@ -3,6 +3,9 @@ PHP                                                                        NEWS
 20 Aug 2015, PHP 7.0.0 RC 1
 
 - Core:
+  . Fixed bug #70258 (Segfault if do_resize fails to allocated memory).
+    (Laruence)
+  . Fixed bug #70253 (segfault at _efree () in zend_alloc.c:1389). (Laruence)
   . Fixed bug #70240 (Segfault when doing unset($var());). (Laruence)
   . Fixed bug #70223 (Incrementing value returned by magic getter). (Laruence)
   . Fixed bug #70215 (Segfault when __invoke is static). (Bob)
@@ -17,6 +20,10 @@ PHP                                                                        NEWS
 - CLI server:
   . Fixed bug #66606 (Sets HTTP_CONTENT_TYPE but not CONTENT_TYPE).
     (wusuopu, cmb)
+
+- Date:
+  . Fixed bug #70245 (strtotime does not emit warning when 2nd parameter is
+    object or string). (cmb)
 
 - MCrypt:
   . Fixed bug #69833 (mcrypt fd caching not working). (Anatol)
@@ -33,6 +40,8 @@ PHP                                                                        NEWS
   . Fixed bug #70214 (FASYNC not defined, needs sys/file.h include). (Bob)
 
 - Standard:
+  . Fixed bug #70250 (extract() turns array elements to references).
+    (Laruence)
   . Fixed bug #70211 (php 7 ZEND_HASH_IF_FULL_DO_RESIZE use after free).
     (Laruence)
   . Fixed bug #70208 (Assert breaking access on objects). (Bob)
@@ -362,6 +371,7 @@ PHP                                                                        NEWS
   . Improved zend_qsort(using hybrid sorting algo) for better performance, 
     and also renamed zend_qsort to zend_sort. (Laruence)
   . Added stable sorting algo zend_insert_sort. (Laruence)
+  . Improved zend_memnchr(using sunday algo) for better performance. (Laruence)
   . Implemented the RFC `Scalar Type Decalarations v0.5`. (Anthony)
   . Implemented the RFC `Group Use Declarations`. (Marcio)
   . Implemented the RFC `Continue Output Buffering`. (Mike)

@@ -97,7 +97,11 @@ static uint32_t zend_always_inline zend_hash_check_size(uint32_t nSize)
 
 	/* Use big enough power of 2 */
 	/* size should be between HT_MIN_SIZE and HT_MAX_SIZE */
-	nSize = (nSize <= HT_MIN_SIZE ? HT_MIN_SIZE : (nSize >= HT_MAX_SIZE ? HT_MAX_SIZE : nSize));
+	if (nSize < HT_MIN_SIZE) {
+		nSize = HT_MIN_SIZE;
+	} else if (UNEXPECTED(nSize >= HT_MAX_SIZE)) {
+		zend_error_noreturn(E_ERROR, "Possible integer overflow in memory allocation (%zu * %zu + %zu)", nSize, sizeof(Bucket), sizeof(Bucket));
+	}
 
 #if defined(ZEND_WIN32)
 	if (BitScanReverse(&index, nSize - 1)) {
@@ -246,13 +250,14 @@ ZEND_API void ZEND_FASTCALL zend_hash_extend(HashTable *ht, uint32_t nSize, zend
 		} else {
 			ZEND_ASSERT(!(ht->u.flags & HASH_FLAG_PACKED));
 			if (nSize > ht->nTableSize) {
-				void *old_data = HT_GET_DATA_ADDR(ht);
+				void *new_data, *old_data = HT_GET_DATA_ADDR(ht);
 				Bucket *old_buckets = ht->arData;
-
+				nSize = zend_hash_check_size(nSize);
 				HANDLE_BLOCK_INTERRUPTIONS();
-				ht->nTableSize = zend_hash_check_size(nSize);
+				new_data = pemalloc(HT_DATA_SIZE_EX(nSize) + HT_HASH_SIZE_EX(-nSize), ht->u.flags & HASH_FLAG_PERSISTENT);
+				ht->nTableSize = nSize;
 				ht->nTableMask = -ht->nTableSize;
-				HT_SET_DATA_ADDR(ht, pemalloc(HT_SIZE(ht), ht->u.flags & HASH_FLAG_PERSISTENT));
+				HT_SET_DATA_ADDR(ht, new_data);
 				memcpy(ht->arData, old_buckets, sizeof(Bucket) * ht->nNumUsed);
 				pefree(old_data, ht->u.flags & HASH_FLAG_PERSISTENT);
 				zend_hash_rehash(ht);
@@ -791,37 +796,21 @@ static void ZEND_FASTCALL zend_hash_do_resize(HashTable *ht)
 		zend_hash_rehash(ht);
 		HANDLE_UNBLOCK_INTERRUPTIONS();
 	} else if (ht->nTableSize < HT_MAX_SIZE) {	/* Let's double the table size */
-		void *old_data = HT_GET_DATA_ADDR(ht);
+		void *new_data, *old_data = HT_GET_DATA_ADDR(ht);
+		uint32_t nSize = ht->nTableSize + ht->nTableSize;
 		Bucket *old_buckets = ht->arData;
 
 		HANDLE_BLOCK_INTERRUPTIONS();
-		ht->nTableSize += ht->nTableSize;
+		new_data = pemalloc(HT_DATA_SIZE_EX(nSize) + HT_HASH_SIZE_EX(-nSize), ht->u.flags & HASH_FLAG_PERSISTENT);
+		ht->nTableSize = nSize;
 		ht->nTableMask = -ht->nTableSize;
-		HT_SET_DATA_ADDR(ht, pemalloc(HT_SIZE(ht), ht->u.flags & HASH_FLAG_PERSISTENT));
+		HT_SET_DATA_ADDR(ht, new_data);
 		memcpy(ht->arData, old_buckets, sizeof(Bucket) * ht->nNumUsed);
 		pefree(old_data, ht->u.flags & HASH_FLAG_PERSISTENT);
 		zend_hash_rehash(ht);
 		HANDLE_UNBLOCK_INTERRUPTIONS();
 	} else {
 		zend_error_noreturn(E_ERROR, "Possible integer overflow in memory allocation (%zu * %zu + %zu)", ht->nTableSize * 2, sizeof(Bucket) + sizeof(uint32_t), sizeof(Bucket));
-	}
-}
-
-ZEND_API void ZEND_FASTCALL zend_hash_resize(HashTable *ht, uint32_t nSize) {
-	void *old_data = HT_GET_DATA_ADDR(ht);
-	if (ht->u.flags & HASH_FLAG_INITIALIZED) {
-		Bucket *old_buckets = ht->arData;
-
-		HANDLE_BLOCK_INTERRUPTIONS();
-		ht->nTableSize = zend_hash_check_size(nSize);
-		ht->nTableMask = -ht->nTableSize;
-		HT_SET_DATA_ADDR(ht, pemalloc(HT_SIZE(ht), ht->u.flags & HASH_FLAG_PERSISTENT));
-		memcpy(ht->arData, old_buckets, sizeof(Bucket) * ht->nNumUsed);
-		pefree(old_data, ht->u.flags & HASH_FLAG_PERSISTENT);
-		zend_hash_rehash(ht);
-		HANDLE_UNBLOCK_INTERRUPTIONS();
-	} else {
-		ht->nTableSize = zend_hash_check_size(nSize);
 	}
 }
 
