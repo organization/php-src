@@ -210,7 +210,7 @@ static zend_object *zend_default_exception_new_ex(zend_class_entry *class_type, 
 		zend_update_property_string(base_ce, &obj, "file", sizeof("file")-1, zend_get_executed_filename());
 		zend_update_property_long(base_ce, &obj, "line", sizeof("line")-1, zend_get_executed_lineno());
 	} else {
-		zend_update_property_string(base_ce, &obj, "file", sizeof("file")-1, ZSTR_VAL(filename));
+		zend_update_property_str(base_ce, &obj, "file", sizeof("file")-1, filename);
 		zend_update_property_long(base_ce, &obj, "line", sizeof("line")-1, zend_get_compiled_lineno());
 	}
 	zend_update_property(base_ce, &obj, "trace", sizeof("trace")-1, &trace);
@@ -442,7 +442,7 @@ ZEND_METHOD(error_exception, getSeverity)
 				zend_error(E_WARNING, "Value for %s is no string", key);    \
 				smart_str_appends(str, "[unknown]");                        \
 			} else {                                                        \
-				smart_str_append(str, Z_STR_P(tmp));   \
+				smart_str_appends(str, Z_STRVAL_P(tmp));   \
 			}                                                               \
 		} \
 	} while (0)
@@ -556,7 +556,7 @@ static void _build_trace_args(zval *arg, smart_str *str) /* {{{ */
 			break;
 		case IS_OBJECT:
 			smart_str_appends(str, "Object(");
-			smart_str_append(str, Z_OBJCE_P(arg)->name);
+			smart_str_appends(str, ZSTR_VAL(Z_OBJCE_P(arg)->name));
 			smart_str_appends(str, "), ");
 			break;
 	}
@@ -1007,7 +1007,7 @@ ZEND_API void zend_exception_error(zend_object *ex, int severity) /* {{{ */
 			if (Z_TYPE(tmp) != IS_STRING) {
 				zend_error(E_WARNING, "%s::__toString() must return a string", ZSTR_VAL(ce_exception->name));
 			} else {
-				zend_update_property_string(i_get_exception_base(&exception), &exception, "string", sizeof("string")-1, EG(exception) ? ZSTR_VAL(ce_exception->name) : Z_STRVAL(tmp));
+				zend_update_property(i_get_exception_base(&exception), &exception, "string", sizeof("string")-1, &tmp);
 			}
 		}
 		zval_ptr_dtor(&tmp);
