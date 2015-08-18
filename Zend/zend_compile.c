@@ -1197,6 +1197,7 @@ static zend_always_inline size_t zend_strnlen(const char* s, size_t maxlen) /* {
 ZEND_API int zend_unmangle_property_name_ex(const zend_string *name, const char **class_name, const char **prop_name, size_t *prop_len) /* {{{ */
 {
 	size_t class_name_len;
+	size_t anonclass_src_len;
 
 	*class_name = NULL;
 
@@ -1227,6 +1228,10 @@ ZEND_API int zend_unmangle_property_name_ex(const zend_string *name, const char 
 	}
 
 	*class_name = ZSTR_VAL(name) + 1;
+	anonclass_src_len = zend_strnlen(*class_name + class_name_len + 1, ZSTR_LEN(name) - class_name_len - 2);
+	if (class_name_len + anonclass_src_len + 2 != ZSTR_LEN(name)) {
+		class_name_len += anonclass_src_len + 1;
+	}
 	*prop_name = ZSTR_VAL(name) + class_name_len + 2;
 	if (prop_len) {
 		*prop_len = ZSTR_LEN(name) - class_name_len - 2;
@@ -3074,10 +3079,12 @@ static void zend_compile_assert_side_effects(zend_ast *ast) /* {{{ */
 
 	for (i = 0; i < children; i++) {
 		zend_ast *child = (zend_ast_is_list(ast) ? zend_ast_get_list(ast)->child : ast->child)[i];
-		if (child->kind == ZEND_AST_YIELD) {
-			zend_mark_function_as_generator();
-		} else if (ast->kind >= ZEND_AST_IS_LIST_SHIFT) {
-			zend_compile_assert_side_effects(child);
+		if (child) {
+			if (child->kind == ZEND_AST_YIELD) {
+				zend_mark_function_as_generator();
+			} else if (ast->kind >= ZEND_AST_IS_LIST_SHIFT) {
+				zend_compile_assert_side_effects(child);
+			}
 		}
 	}
 }
