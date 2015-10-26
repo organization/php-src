@@ -303,6 +303,11 @@ ZEND_INI_BEGIN()
 	STD_PHP_INI_ENTRY("opcache.mmap_base", NULL, PHP_INI_SYSTEM,	OnUpdateString,	                             accel_directives.mmap_base,                 zend_accel_globals, accel_globals)
 #endif
 
+#ifdef PHP_JIT
+	STD_PHP_INI_ENTRY("opcache.jit_buffer_size",  "0", PHP_INI_SYSTEM, OnUpdateLong, accel_directives.jit_buffer_size, zend_accel_globals, accel_globals)
+	STD_PHP_INI_ENTRY("opcache.jit_debug"      ,  "0", PHP_INI_SYSTEM, OnUpdateLong, accel_directives.jit_debug,       zend_accel_globals, accel_globals)
+	STD_PHP_INI_ENTRY("opcache.jit_opt"        , "-1", PHP_INI_SYSTEM, OnUpdateLong, accel_directives.jit_opt,         zend_accel_globals, accel_globals)
+#endif
 #ifdef HAVE_OPCACHE_FILE_CACHE
 	STD_PHP_INI_ENTRY("opcache.file_cache"                    , NULL  , PHP_INI_SYSTEM, OnUpdateFileCache, accel_directives.file_cache,                    zend_accel_globals, accel_globals)
 	STD_PHP_INI_ENTRY("opcache.file_cache_only"               , "0"   , PHP_INI_SYSTEM, OnUpdateBool,	   accel_directives.file_cache_only,               zend_accel_globals, accel_globals)

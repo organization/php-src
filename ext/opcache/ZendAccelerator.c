@@ -46,6 +46,10 @@
 # include "ext/standard/md5.h"
 #endif
 
+#ifdef PHP_JIT
+# include "jit/zend_jit.h"
+#endif
+
 #ifndef ZEND_WIN32
 #include  <netdb.h>
 #endif
@@ -2734,6 +2738,20 @@ file_cache_fallback:
 		ini_entry->on_modify = accel_include_path_on_modify;
 	}
 
+	SHM_UNPROTECT();
+	zend_shared_alloc_lock();
+
+#ifdef PHP_JIT
+	if (ZCG(accel_directives).jit_buffer_size) {
+		zend_jit_startup(ZCG(accel_directives).jit_buffer_size);
+	}
+#endif
+	
+	zend_shared_alloc_save_state();
+	zend_shared_alloc_unlock();
+
+	SHM_PROTECT();
+
 	accel_startup_ok = 1;
 
 	/* Override file_exists(), is_file() and is_readable() */
@@ -2764,6 +2782,12 @@ void accel_shutdown(void)
 {
 	zend_ini_entry *ini_entry;
 	zend_bool file_cache_only = 0;
+
+#ifdef PHP_JIT
+	if (ZCG(accel_directives).jit_buffer_size) {
+		zend_jit_shutdown();
+	}
+#endif
 
 	zend_accel_blacklist_shutdown(&accel_blacklist);
 

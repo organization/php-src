@@ -5,6 +5,18 @@ dnl
 PHP_ARG_ENABLE(opcache, whether to enable Zend OPcache support,
 [  --disable-opcache       Disable Zend OPcache support], yes)
 
+PHP_ARG_ENABLE(jit, whether to enable Zend OPcache JIT support,
+[  --enable-jit Enable Zend OPcache JIT support], no, no)
+
+PHP_ARG_WITH(llvm, with llvm support,
+[  --with-llvm=[DIR]  specific llvm installed location ])
+
+PHP_ARG_WITH(valgrind, with valgrind support,
+[  --with-valgrind=[DIR]  specific valgrind installed location ], no, no)
+
+PHP_ARG_WITH(oprofile, with oprofile support,
+[  --with-oprofile=[DIR]  specific oprofile installed location ], no, no)
+
 PHP_ARG_ENABLE(opcache-file, whether to enable file based caching,
 [  --disable-opcache-file  Disable file based caching], yes)
 
@@ -378,6 +390,73 @@ if test "$flock_type" == "unknown"; then
 	AC_MSG_ERROR([Don't know how to define struct flock on this system[,] set --enable-opcache=no])
 fi
 
+  if test "$PHP_JIT" != "no"; then
+    AC_DEFINE(PHP_JIT, 1, [ ])
+	dnl LLVM configuration
+	AC_MSG_CHECKING(for llvm)
+    if test "$PHP_LLVM" != "yes" && test "$PHP_LLVM" != "no" && test -r $PHP_LLVM"/bin/llvm-config"; then
+	  llvm_config=$PHP_LLVM"/bin/llvm-config"
+	else
+	  for i in /usr/local /usr/; do
+		if test -r $i"/bin/llvm-config"; then
+		  llvm_config=$i"/bin/llvm-config"
+		  break
+		fi
+	  done
+	fi
+	if test -z "$llvm_config"; then
+	  AC_MSG_RESULT(not found)
+	  AC_MSG_ERROR([could not find llvm-config, please specific the llvm installed location by --with-llvm])
+    else
+      AC_MSG_RESULT(found $llvm_config)
+	fi
+	dnl  LLVM_LDFLAGS=`${llvm_config} --ldflags --libs core jit native bitwriter bitreader scalaropts ipo target analysis executionengine support`
+	LLVM_LDFLAGS=`${llvm_config} --ldflags --libs core native jit mcjit executionengine support`
+	LLVM_CXXFLAGS=`${llvm_config} --cxxflags`
+	JIT_LDFLAGS="$LLVM_LDFLAGS -lstdc++"
+	if test "$PHP_OPROFILE" != "no"; then
+	    AC_DEFINE(HAVE_OPROFILE, 1, [ ])
+		OPROFILE_LDFLAGS=`${llvm_config} --libs oprofilejit`
+		JIT_LDFLAGS="$JIT_LDFLAGS $OPROFILE_LDFLAGS"
+	fi
+	if test "$PHP_VALGRIND" != "no"; then
+		SEARCH_PATH="/usr/local /usr"
+		SEARCH_FOR="/include/valgrind/valgrind.h"
+		if test -r $PHP_VALGRIND/$SEARCH_FOR; then
+			VALGRIND_DIR=$PHP_VALGRIND
+		else
+			AC_MSG_CHECKING([for valgrind files in default path])
+			for i in $SEARCH_PATH ; do
+				if test -r $i/$SEARCH_FOR; then
+					VALGRIND_DIR=$i
+					AC_MSG_RESULT(found in $i)
+				fi
+			done
+		fi 
+		if test -z "$VALGRIND_DIR"; then
+			AC_MSG_RESULT([not found])
+			AC_MSG_ERROR([Please reinstall the valgrind distribution])
+		else
+			AC_DEFINE(HAVE_VALGRIND, 1, [ ])
+			PHP_ADD_INCLUDE($VALGRIND_DIR/include)
+		fi
+	fi
+    PHP_REQUIRE_CXX()
+    OPCACHE_SHARED_LIBADD="$JIT_LDFLAGS"
+    PHP_SUBST(OPCACHE_SHARED_LIBADD)
+    PHP_ADD_SOURCES_X(PHP_EXT_DIR(opcache),
+    	jit/zend_jit.c \
+    	jit/zend_jit_ssa.c \
+    	jit/zend_jit_optimize.c \
+    	jit/zend_jit_func_info.c \
+    	jit/zend_jit_helpers.c,,
+    	shared_objects_opcache, yes)
+    PHP_ADD_SOURCES_X(PHP_EXT_DIR(opcache),
+    	jit/zend_jit_llvm.cpp,
+    	$LLVM_CXXFLAGS,
+    	shared_objects_opcache, yes)
+  fi
+
   PHP_NEW_EXTENSION(opcache,
 	ZendAccelerator.c \
 	zend_accelerator_blacklist.c \
@@ -404,5 +483,10 @@ fi
 	shared,,-DZEND_ENABLE_STATIC_TSRMLS_CACHE=1,,yes)
 
   PHP_ADD_BUILD_DIR([$ext_builddir/Optimizer], 1)
+
+  if test "$PHP_JIT" != "no"; then
+	PHP_ADD_BUILD_DIR([$ext_builddir/jit], 1)
+  fi
+
   PHP_ADD_EXTENSION_DEP(opcache, pcre)
 fi
