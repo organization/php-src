@@ -2930,6 +2930,7 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 		case ZEND_ISSET_ISEMPTY_VAR:
 		case ZEND_ISSET_ISEMPTY_DIM_OBJ:
 		case ZEND_ISSET_ISEMPTY_PROP_OBJ:
+		case ZEND_ISSET_ISEMPTY_STATIC_PROP:
 		case ZEND_ASSERT_CHECK:
 			UPDATE_SSA_TYPE(MAY_BE_DEF|MAY_BE_RC1|MAY_BE_FALSE|MAY_BE_TRUE, ssa[i].result_def);
 			break;
@@ -4189,6 +4190,7 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 			}
 			break;
 		case ZEND_FETCH_CONSTANT:
+		case ZEND_FETCH_CLASS_CONSTANT:
 			UPDATE_SSA_TYPE(MAY_BE_DEF|MAY_BE_RC1|MAY_BE_NULL|MAY_BE_FALSE|MAY_BE_TRUE|MAY_BE_LONG|MAY_BE_DOUBLE|MAY_BE_STRING|MAY_BE_RESOURCE|MAY_BE_ARRAY|MAY_BE_ARRAY_KEY_ANY|MAY_BE_ARRAY_OF_ANY, ssa[i].result_def);
 			break;
 		case ZEND_STRLEN:

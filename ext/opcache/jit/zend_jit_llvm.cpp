@@ -1132,7 +1132,16 @@ static int zend_jit_call_handler(zend_llvm_ctx &llvm_ctx,
         		{"COALESCE",                        1},
 				{"SPACESHIP",                       3},
 				{"DECLARE_ANON_CLASS",              0},
-				{"DECLARE_ANON_INHERITED_CLASS",    0}
+				{"DECLARE_ANON_INHERITED_CLASS",    0},
+				{"FETCH_STATIC_PROP_R",             3},
+				{"FETCH_STATIC_PROP_W",             3},
+				{"FETCH_STATIC_PROP_RW",            3},
+				{"FETCH_STATIC_PROP_IS",            3},
+				{"FETCH_STATIC_PROP_FUNC_ARG",      3},
+				{"FETCH_STATIC_PROP_UNSET",         3},
+				{"UNSET_STATIC_PROP",               3},
+				{"ISSET_ISEMPTY_STATIC_PROP",       3},
+				{"FETCH_CLASS_CONSTANT",            3}
 			};
 			typedef struct _zend_jit_op_type_desc {
 				const char *name;
@@ -18132,6 +18141,7 @@ static int zend_jit_codegen_ex(zend_jit_context *ctx,
 				/* Support for ZEND_VM_SMART_BRANCH */
 				case ZEND_ISSET_ISEMPTY_VAR:
 				case ZEND_ISSET_ISEMPTY_PROP_OBJ:
+				case ZEND_ISSET_ISEMPTY_STATIC_PROP:
 				case ZEND_INSTANCEOF:
 				case ZEND_DEFINED:
 					if (!zend_jit_handler(llvm_ctx, opline)) return 0;

@@ -665,7 +665,16 @@ void zend_jit_dump_ssa_line(zend_op_array *op_array, uint32_t line)
 		{"COALESCE",                        OP2_ADDR},
 		{"SPACESHIP",                       0},
 		{"DECLARE_ANON_CLASS",              OP1_ADDR},
-		{"DECLARE_ANON_INHERITED_CLASS",    OP1_ADDR}
+		{"DECLARE_ANON_INHERITED_CLASS",    OP1_ADDR},
+		{"FETCH_STATIC_PROP_R",             0},
+		{"FETCH_STATIC_PROP_W",             0},
+		{"FETCH_STATIC_PROP_RW",            0},
+		{"FETCH_STATIC_PROP_IS",            0},
+		{"FETCH_STATIC_PROP_FUNC_ARG",      0},
+		{"FETCH_STATIC_PROP_UNSET",         0},
+		{"UNSET_STATIC_PROP",               0},
+		{"ISSET_ISEMPTY_STATIC_PROP",       0},
+		{"FETCH_CLASS_CONSTANT",            0}
 	};
 	zend_jit_func_info *info = JIT_DATA(op_array);
 	int *block_map = info->block_map;
@@ -1225,14 +1234,12 @@ int zend_jit_build_cfg(zend_jit_context *ctx, zend_op_array *op_array)
 			case ZEND_FETCH_FUNC_ARG:
 			case ZEND_FETCH_IS:
 			case ZEND_FETCH_UNSET:
-				if (opline->op2_type == IS_UNUSED) {
-					if ((opline->extended_value & ZEND_FETCH_TYPE_MASK) == ZEND_FETCH_LOCAL) {
-						info->flags |= ZEND_JIT_FUNC_TOO_DYNAMIC;
-					} else if (((opline->extended_value & ZEND_FETCH_TYPE_MASK) == ZEND_FETCH_GLOBAL ||
-					            (opline->extended_value & ZEND_FETCH_TYPE_MASK) == ZEND_FETCH_GLOBAL_LOCK) &&
-					           !op_array->function_name) {
-						info->flags |= ZEND_JIT_FUNC_TOO_DYNAMIC;
-					}
+				if ((opline->extended_value & ZEND_FETCH_TYPE_MASK) == ZEND_FETCH_LOCAL) {
+					info->flags |= ZEND_JIT_FUNC_TOO_DYNAMIC;
+				} else if (((opline->extended_value & ZEND_FETCH_TYPE_MASK) == ZEND_FETCH_GLOBAL ||
+				            (opline->extended_value & ZEND_FETCH_TYPE_MASK) == ZEND_FETCH_GLOBAL_LOCK) &&
+				           !op_array->function_name) {
+					info->flags |= ZEND_JIT_FUNC_TOO_DYNAMIC;
 				}
 				break;
 		}
