@@ -1134,6 +1134,10 @@ int zend_jit_build_cfg(zend_jit_context *ctx, zend_op_array *op_array)
 				record_successor(block, j, 0, block_map[OP_JMP_ADDR(opline, opline->op2) - op_array->opcodes]);
 				record_successor(block, j, 1, j + 1);
 				break;
+			case ZEND_FAST_CALL:
+				record_successor(block, j, 0, block_map[OP_JMP_ADDR(opline, opline->op1) - op_array->opcodes]);
+				record_successor(block, j, 1, j + 1);
+				break;
 			default:
 				block[j + 1].flags |= ZEND_BB_FOLLOW;
 				record_successor(block, j, 0, j + 1);
