@@ -225,11 +225,6 @@ static int zend_jit_sort_blocks(zend_jit_context *ctx, zend_op_array *op_array)
 		zend_op *op = &op_array->opcodes[bb->end];
 
 		switch (op->opcode) {
-			case ZEND_BRK:
-			case ZEND_CONT:
-			case ZEND_GOTO:
-				block[bb->successors[0]].flags |= ZEND_BB_TARGET;
-				break;
 			case ZEND_JMP:
 				if (bb->successors[0] == i + 1 && bb->end > bb->start) {
 					bb->end--;

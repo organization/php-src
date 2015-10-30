@@ -18000,46 +18000,6 @@ static int zend_jit_codegen_ex(zend_jit_context *ctx,
 //					if (!zend_jit_fast_ret(ctx, asm_buf, opline, labels)) return 0;
 //					break;
 #endif
-				case ZEND_GOTO:
-					if (!zend_jit_handler(llvm_ctx, opline)) return 0;
-					llvm_ctx.builder.CreateBr(TARGET_BB(OP_JMP_ADDR(opline, *OP1_OP()) - op_array->opcodes));
-					break;
-				case ZEND_BRK:
-				case ZEND_CONT:
-					if (!zend_jit_handler(llvm_ctx, opline)) return 0;
-					if (OP2_OP_TYPE() == IS_CONST &&
-					    Z_TYPE_P(RT_CONSTANT(llvm_ctx.op_array, *OP2_OP())) == IS_LONG &&
-					    (int)OP1_OP()->num >= 0) {
-						int array_offset = OP1_OP()->num;
-						int nest_levels = Z_LVAL_P(RT_CONSTANT(llvm_ctx.op_array, *OP2_OP()));
-						zend_brk_cont_element *jmp_to;
-
-						do {
-							if (array_offset == -1) {
-								nest_levels = -1;
-								break;
-							}
-							jmp_to = &op_array->brk_cont_array[array_offset];
-							array_offset = jmp_to->parent;
-						} while (--nest_levels > 0);
-						if (nest_levels >= 0) {
-							if (opline->opcode == ZEND_BRK) {
-								llvm_ctx.builder.CreateBr(TARGET_BB(jmp_to->brk));
-							} else {
-								llvm_ctx.builder.CreateBr(TARGET_BB(jmp_to->cont));
-							}
-						} else {
-							int level = Z_LVAL_P(RT_CONSTANT(llvm_ctx.op_array, *OP2_OP()));
-							if (level == 1) {
-								zend_jit_error_noreturn(llvm_ctx, opline, E_ERROR,
-									"Cannot break/continue 1 level");
-							} else {
-								zend_jit_error_noreturn(llvm_ctx, opline, E_ERROR,
-									"Cannot break/continue %d levels", llvm_ctx.builder.getInt32(level));
-							}
-						}
-					}
-					break;
 				case ZEND_GENERATOR_RETURN:
 				case ZEND_RETURN_BY_REF:
 				case ZEND_EXIT:
@@ -18123,9 +18083,6 @@ static int zend_jit_codegen_ex(zend_jit_context *ctx,
 		    block[b].successors[0] != i + 1) {
 			switch (op_array->opcodes[block[b].end].opcode) {
 				case ZEND_JMP:
-				case ZEND_BRK:
-				case ZEND_CONT:
-				case ZEND_GOTO:
 					break;
 				default:
 					llvm_ctx.builder.CreateBr(TARGET_BB(block[block[b].successors[0]].start));

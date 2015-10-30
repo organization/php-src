@@ -686,9 +686,6 @@ static void zend_jit_dump_ssa(zend_op_array *op_array)
 		    info->block[k].successors[0] != k + 1) {
 			switch (op_array->opcodes[info->block[k].end].opcode) {
 				case ZEND_JMP:
-				case ZEND_BRK:
-				case ZEND_CONT:
-				case ZEND_GOTO:
 					break;
 				default:
 					fprintf(stderr, "    JMP BB%d [implicit]\n", info->block[k].successors[0]);
@@ -854,38 +851,6 @@ int zend_jit_build_cfg(zend_jit_context *ctx, zend_op_array *op_array)
 	for (i = 0; i < op_array->last; i++) {
 		zend_op *opline = op_array->opcodes + i;
 		switch(opline->opcode) {
-			case ZEND_BRK:
-			case ZEND_CONT:
-				if (opline->op2_type == IS_CONST &&
-				    Z_TYPE_P(RT_CONSTANT(op_array, opline->op2)) == IS_LONG &&
-				    (int)opline->op1.num >= 0) {
-					int array_offset = opline->op1.num;
-					int nest_levels = Z_LVAL_P(RT_CONSTANT(op_array, opline->op2));
-					zend_brk_cont_element *jmp_to;
-
-					do {
-						if (array_offset == -1) {
-							nest_levels = -1;
-							break;
-						}
-						jmp_to = &op_array->brk_cont_array[array_offset];
-						array_offset = jmp_to->parent;
-					} while (--nest_levels > 0);
-					if (nest_levels >= 0) {
-						if (opline->opcode == ZEND_BRK) {
-							TARGET_BLOCK(jmp_to->brk);
-						} else {
-							TARGET_BLOCK(jmp_to->cont);
-						}
-					}
-				} else {
-					has_indirect_jmp = 1;
-					info->flags |= ZEND_JIT_FUNC_TOO_DYNAMIC;
-				}
-				if (i + 1 < op_array->last) {
-					TARGET_BLOCK(i + 1);
-				}
-				break;
 			case ZEND_RETURN:
 			case ZEND_RETURN_BY_REF:
 			case ZEND_GENERATOR_RETURN:
@@ -972,7 +937,6 @@ int zend_jit_build_cfg(zend_jit_context *ctx, zend_op_array *op_array)
 				TARGET_BLOCK(OP_JMP_ADDR(opline, opline->op1) - op_array->opcodes);
 				TARGET_BLOCK(i + 1);
 				break;
-			case ZEND_GOTO:
 			case ZEND_JMP:
 				TARGET_BLOCK(OP_JMP_ADDR(opline, opline->op1) - op_array->opcodes);
 				if (i + 1 < op_array->last) {
@@ -1110,30 +1074,6 @@ int zend_jit_build_cfg(zend_jit_context *ctx, zend_op_array *op_array)
 	for (j = 0; j < blocks; j++) {
 		zend_op *opline = op_array->opcodes + block[j].end;
 		switch(opline->opcode) {
-			case ZEND_BRK:
-			case ZEND_CONT:
-				if (opline->op2_type == IS_CONST &&
-				    Z_TYPE_P(RT_CONSTANT(op_array, opline->op2)) == IS_LONG &&
-				    (int)opline->op1.num >= 0) {
-					int array_offset = opline->op1.num;
-					int nest_levels = Z_LVAL_P(RT_CONSTANT(op_array, opline->op2));
-					zend_brk_cont_element *jmp_to;
-
-					do {
-						if (array_offset == -1) {
-							nest_levels = -1;
-							break;
-						}
-						jmp_to = &op_array->brk_cont_array[array_offset];
-						array_offset = jmp_to->parent;
-					} while (--nest_levels > 0);
-					if (nest_levels >= 0) {
-						record_successor(block, j, 0,
-									 block_map[(opline->opcode == ZEND_BRK)
-											   ? jmp_to->brk : jmp_to->cont]);
-					}
-				}
-				break;
 			case ZEND_RETURN:
 			case ZEND_RETURN_BY_REF:
 			case ZEND_GENERATOR_RETURN:
@@ -1156,7 +1096,6 @@ int zend_jit_build_cfg(zend_jit_context *ctx, zend_op_array *op_array)
 				record_successor(block, j, 0, block_map[OP_JMP_ADDR(opline, opline->op1) - op_array->opcodes]);
 				record_successor(block, j, 1, j + 1);
 				break;
-			case ZEND_GOTO:
 			case ZEND_JMP:
 				record_successor(block, j, 0, block_map[OP_JMP_ADDR(opline, opline->op1) - op_array->opcodes]);
 				break;
