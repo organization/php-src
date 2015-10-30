@@ -15906,6 +15906,7 @@ static int zend_jit_may_be_used_as_returned_reference(zend_op_array *op_array,
 					case ZEND_RETURN_BY_REF:
 					case ZEND_SEND_VAR_NO_REF:
 					case ZEND_YIELD:
+					case ZEND_YIELD_FROM:
 						if (info->ssa[j].op1_use == i) {
 							return 1;
 						}
@@ -18017,6 +18018,7 @@ static int zend_jit_codegen_ex(zend_jit_context *ctx,
 //				case ZEND_DO_FCALL_BY_NAME:
 //				case ZEND_INCLUDE_OR_EVAL:
 //				case ZEND_YIELD:
+//				case ZEND_YIELD_FROM:
 //					if (!zend_jit_tail_handler(asm_buf, opline)) return 0;
 //					ASSERT(IS_ENTRY_BLOCK(i+1));
 //					break;

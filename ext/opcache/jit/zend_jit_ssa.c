@@ -388,6 +388,21 @@ static void zend_jit_dump_block_info(
 	if (block[n].flags & ZEND_BB_ENTRY) {
 		fprintf(stderr, "    ; entry block\n");
 	}
+	if (block[n].flags & ZEND_BB_TRY) {
+		fprintf(stderr, "    ; try\n");
+	}
+	if (block[n].flags & ZEND_BB_CATCH) {
+		fprintf(stderr, "    ; catch\n");
+	}
+	if (block[n].flags & ZEND_BB_FINALLY) {
+		fprintf(stderr, "    ; fnally\n");
+	}
+	if (block[n].flags & ZEND_BB_GEN_VAR) {
+		fprintf(stderr, "    ; gen var\n");
+	}
+	if (block[n].flags & ZEND_BB_KILL_VAR) {
+		fprintf(stderr, "    ; kill var\n");
+	}
 	if (block[n].flags & ZEND_BB_LOOP_HEADER) {
 		fprintf(stderr, "    ; loop header\n");
 	}
@@ -820,6 +835,11 @@ static void record_successor(zend_jit_basic_block *block, int pred, int n, int s
 	block[succ].predecessors_count++;
 }
 
+#define BB_START(i, flag) do { \
+		if (!block_flags[i]) { blocks++;} \
+		block_flags[i] |= (flag); \
+	} while (0)
+
 int zend_jit_build_cfg(zend_jit_context *ctx, zend_op_array *op_array)
 {
 	zend_jit_func_info *info = JIT_DATA(op_array);
@@ -831,19 +851,15 @@ int zend_jit_build_cfg(zend_jit_context *ctx, zend_op_array *op_array)
 	int *block_map;
 	int edges, *edge;
 	zend_jit_basic_block *block;
-	int has_indirect_jmp = 0;
 
 	block_flags = alloca(sizeof(uint32_t) * op_array->last);
-	if (!block_flags)
+	if (!block_flags) {
 		return FAILURE;
+	}
 	memset(block_flags, 0, sizeof(uint32_t) * op_array->last);
 
-#define TARGET_BLOCK(i)      do { if (!block_flags[i]) { blocks++;} block_flags[i] |= ZEND_BB_TARGET; } while (0)
-#define FOLLOW_BLOCK(i)      do { if (!block_flags[i]) { blocks++;} block_flags[i] |= ZEND_BB_FOLLOW; } while (0)
-#define ENTRY_BLOCK(i)       do { if (!block_flags[i]) { blocks++;} block_flags[i] |= ZEND_BB_ENTRY; } while (0)
-
 	/* Build CFG, Step 1: Find basic blocks starts, calculate number of blocks */
-	ENTRY_BLOCK(0);
+	BB_START(0, ZEND_BB_ENTRY);
 	if ((op_array->fn_flags & ZEND_ACC_CLOSURE) && op_array->static_variables) {
 		// FIXME: Really we should try to perform variable initialization
 		info->flags |= ZEND_JIT_FUNC_TOO_DYNAMIC;
@@ -857,19 +873,26 @@ int zend_jit_build_cfg(zend_jit_context *ctx, zend_op_array *op_array)
 			case ZEND_EXIT:
 			case ZEND_THROW:
 				if (i + 1 < op_array->last) {
-					TARGET_BLOCK(i + 1);
+					BB_START(i + 1, ZEND_BB_TARGET);
 				}
 				break;
 			case ZEND_INCLUDE_OR_EVAL:
 			case ZEND_YIELD:
+			case ZEND_YIELD_FROM:
 				info->flags |= ZEND_JIT_FUNC_TOO_DYNAMIC;
-				/* fall through */
-//???			case ZEND_DO_FCALL:
-//???			case ZEND_DO_UCALL:
-//???			case ZEND_DO_FCALL_BY_NAME:
 #if 0 // LLVM backend doesn't support generators and stackless VM
-				ENTRY_BLOCK(i + 1);
+				BB_START(i + 1, ZEND_BB_ENTRY);
 #endif
+				break;
+			case ZEND_DO_FCALL:
+			case ZEND_DO_UCALL:
+			case ZEND_DO_FCALL_BY_NAME:
+				info->flags |= ZEND_JIT_FUNC_HAS_CALLS;
+#if 0 // LLVM backend doesn't support stackless VM
+				BB_START(i + 1, ZEND_BB_ENTRY);
+#endif
+				break;
+			case ZEND_DO_ICALL:
 				info->flags |= ZEND_JIT_FUNC_HAS_CALLS;
 				break;
 			case ZEND_INIT_FCALL:
@@ -903,51 +926,39 @@ int zend_jit_build_cfg(zend_jit_context *ctx, zend_op_array *op_array)
 					}
 				}
 				break;
-			case ZEND_DO_FCALL:
-			case ZEND_DO_ICALL:
-			case ZEND_DO_UCALL:
-			case ZEND_DO_FCALL_BY_NAME:
-				info->flags |= ZEND_JIT_FUNC_HAS_CALLS;
-#if 0 // LLVM backend doesn't support stackless VM
-				if ((fn = zend_hash_find_ptr(EG(function_table), Z_STR_P(RT_CONSTANT(op_array, opline->op1)))) != NULL &&
-                    fn->type != ZEND_INTERNAL_FUNCTION) {
-					ENTRY_BLOCK(i + 1);
-				}
-#endif
-				break;
 			case ZEND_FAST_CALL:
 				info->flags |= ZEND_JIT_FUNC_TOO_DYNAMIC;
-				TARGET_BLOCK(OP_JMP_ADDR(opline, opline->op1) - op_array->opcodes);
+				BB_START(OP_JMP_ADDR(opline, opline->op1) - op_array->opcodes, ZEND_BB_TARGET);
 				if (opline->extended_value) {
-					TARGET_BLOCK(opline->op2.opline_num);
+					BB_START(opline->op2.opline_num, ZEND_BB_TARGET);
 				}
-				FOLLOW_BLOCK(i + 1);
+				BB_START(i + 1, ZEND_BB_FOLLOW);
 				break;
 			case ZEND_FAST_RET:
 				info->flags |= ZEND_JIT_FUNC_TOO_DYNAMIC;
 				if (opline->extended_value) {
-					TARGET_BLOCK(opline->op2.opline_num);
+					BB_START(opline->op2.opline_num, ZEND_BB_TARGET);
 				}
 				if (i + 1 < op_array->last) {
-					TARGET_BLOCK(i + 1);
+					BB_START(i + 1, ZEND_BB_TARGET);
 				}
 				break;
 			case ZEND_DECLARE_ANON_CLASS:
 			case ZEND_DECLARE_ANON_INHERITED_CLASS:
-				TARGET_BLOCK(OP_JMP_ADDR(opline, opline->op1) - op_array->opcodes);
-				TARGET_BLOCK(i + 1);
+				BB_START(OP_JMP_ADDR(opline, opline->op1) - op_array->opcodes, ZEND_BB_TARGET);
+				BB_START(i + 1, ZEND_BB_FOLLOW);
 				break;
 			case ZEND_JMP:
-				TARGET_BLOCK(OP_JMP_ADDR(opline, opline->op1) - op_array->opcodes);
+				BB_START(OP_JMP_ADDR(opline, opline->op1) - op_array->opcodes, ZEND_BB_TARGET);
 				if (i + 1 < op_array->last) {
-					TARGET_BLOCK(i + 1);
+					BB_START(i + 1, ZEND_BB_TARGET);
 				}
 				break;
 			case ZEND_JMPZNZ:
-				TARGET_BLOCK((zend_op*)(((char*)opline) + (int)opline->extended_value) - op_array->opcodes);
-				TARGET_BLOCK(OP_JMP_ADDR(opline, opline->op2) - op_array->opcodes);
+				BB_START((zend_op*)(((char*)opline) + (int)opline->extended_value) - op_array->opcodes, ZEND_BB_TARGET);
+				BB_START(OP_JMP_ADDR(opline, opline->op2) - op_array->opcodes, ZEND_BB_TARGET);
 				if (i + 1 < op_array->last) {
-					TARGET_BLOCK(i + 1);
+					BB_START(i + 1, ZEND_BB_TARGET);
 				}
 				break;
 			case ZEND_JMPZ:
@@ -957,24 +968,24 @@ int zend_jit_build_cfg(zend_jit_context *ctx, zend_op_array *op_array)
 			case ZEND_JMP_SET:
 			case ZEND_COALESCE:
 			case ZEND_ASSERT_CHECK:
-				TARGET_BLOCK(OP_JMP_ADDR(opline, opline->op2) - op_array->opcodes);
-				FOLLOW_BLOCK(i + 1);
+				BB_START(OP_JMP_ADDR(opline, opline->op2) - op_array->opcodes, ZEND_BB_TARGET);
+				BB_START(i + 1, ZEND_BB_FOLLOW);
 				break;
 			case ZEND_CATCH:
 				info->flags |= ZEND_JIT_FUNC_TOO_DYNAMIC;
-				TARGET_BLOCK(opline->extended_value);
-				FOLLOW_BLOCK(i + 1);
+				BB_START(opline->extended_value, ZEND_BB_TARGET);
+				BB_START(i + 1, ZEND_BB_FOLLOW);
 				break;
 			case ZEND_FE_FETCH_R:
 			case ZEND_FE_FETCH_RW:
-				TARGET_BLOCK((zend_op*)(((char*)opline) + (int)opline->extended_value) - op_array->opcodes);
-				FOLLOW_BLOCK(i + 1);
+				BB_START((zend_op*)(((char*)opline) + (int)opline->extended_value) - op_array->opcodes, ZEND_BB_TARGET);
+				BB_START(i + 1, ZEND_BB_FOLLOW);
 				break;
 			case ZEND_FE_RESET_R:
 			case ZEND_FE_RESET_RW:
 			case ZEND_NEW:
-				TARGET_BLOCK(OP_JMP_ADDR(opline, opline->op2) - op_array->opcodes);
-				FOLLOW_BLOCK(i + 1);
+				BB_START(OP_JMP_ADDR(opline, opline->op2) - op_array->opcodes, ZEND_BB_TARGET);
+				BB_START(i + 1, ZEND_BB_FOLLOW);
 				break;
 			case ZEND_DECLARE_LAMBDA_FUNCTION: {
 					zend_op_array *lambda_op_array;
@@ -1014,36 +1025,33 @@ int zend_jit_build_cfg(zend_jit_context *ctx, zend_op_array *op_array)
 				break;
 		}
 	}
-	if (has_indirect_jmp) {
-		for (j = 0; j < op_array->last_brk_cont; j++) {
-			/* op_array->brk_cont_array[j].start */
-			TARGET_BLOCK(op_array->brk_cont_array[j].cont);
-			TARGET_BLOCK(op_array->brk_cont_array[j].brk);
-		}
+	for (j = 0; j < op_array->last_brk_cont; j++) {
+		BB_START(op_array->brk_cont_array[j].start, ZEND_BB_GEN_VAR);
+		BB_START(op_array->brk_cont_array[j].brk, ZEND_BB_KILL_VAR);
 	}
 	if (op_array->last_try_catch) {
 		for (j = 0; j < op_array->last_try_catch; j++) {
-			/* op_array->try_catch_array[j].try_op */
-			TARGET_BLOCK(op_array->try_catch_array[j].catch_op);
-			TARGET_BLOCK(op_array->try_catch_array[j].finally_op);
-			/* op_array->try_catch_array[j].finally_end */
+			BB_START(op_array->try_catch_array[j].try_op, ZEND_BB_TRY);
+			BB_START(op_array->try_catch_array[j].catch_op, ZEND_BB_TARGET | ZEND_BB_CATCH);
+			BB_START(op_array->try_catch_array[j].finally_op, ZEND_BB_TARGET | ZEND_BB_FINALLY);
+			if (op_array->try_catch_array[j].finally_end + 1 < op_array->last) {
+				BB_START(op_array->try_catch_array[j].finally_end + 1, ZEND_BB_TARGET);
+			}
 		}
 	}
 
 	info->blocks = blocks;
 
-#undef TARGET_BLOCK
-#undef FOLLOW_BLOCK
-#undef ENTRY_BLOCK
-
 	/* Build CFG, Step 2: Build Array of Basic Blocks */
 	info->block_map = block_map = zend_jit_context_calloc(ctx, sizeof(int), op_array->last);
-	if (!block_map)
+	if (!block_map) {
 		return FAILURE;
+	}
 
 	info->block = block = zend_jit_context_calloc(ctx, sizeof(zend_jit_basic_block), info->blocks);
-	if (!block)
+	if (!block) {
 		return FAILURE;
+	}
 
 	for (i = 0, blocks = -1; i < op_array->last; i++) {
 		if (block_flags[i]) {
@@ -1053,10 +1061,10 @@ int zend_jit_build_cfg(zend_jit_context *ctx, zend_op_array *op_array)
 			blocks++;
 			block[blocks].flags = block_flags[i];
 			block[blocks].start = i;
-			block[blocks].predecessors_count = 0;
-			block[blocks].predecessors = NULL;
 			block[blocks].successors[0] = -1;
 			block[blocks].successors[1] = -1;
+			block[blocks].predecessors_count = 0;
+			block[blocks].predecessors = NULL;
 			block[blocks].idom = -1;
 			block[blocks].loop_header = -1;
 			block[blocks].level = -1;
@@ -1079,7 +1087,6 @@ int zend_jit_build_cfg(zend_jit_context *ctx, zend_op_array *op_array)
 			case ZEND_GENERATOR_RETURN:
 			case ZEND_EXIT:
 			case ZEND_THROW:
-				block_flags[block[j].start] |= ZEND_BB_EXIT;
 				block[j].flags |= ZEND_BB_EXIT;
 				break;
 #if 0 // LLVM backend doesn't support generators and stackless VM
@@ -1088,6 +1095,7 @@ int zend_jit_build_cfg(zend_jit_context *ctx, zend_op_array *op_array)
 			case ZEND_DO_FCALL_BY_NAME:
 			case ZEND_INCLUDE_OR_EVAL:
 			case ZEND_YIELD:
+			case ZEND_YIELD_FROM:
 				record_successor(block, j, 0, j + 1);
 				break;
 #endif
@@ -1129,6 +1137,7 @@ int zend_jit_build_cfg(zend_jit_context *ctx, zend_op_array *op_array)
 				record_successor(block, j, 1, j + 1);
 				break;
 			default:
+				block[j + 1].flags |= ZEND_BB_FOLLOW;
 				record_successor(block, j, 0, j + 1);
 				break;
 		}
@@ -1138,10 +1147,10 @@ int zend_jit_build_cfg(zend_jit_context *ctx, zend_op_array *op_array)
 	zend_jit_mark_reachable(block, 0);
 	if (op_array->last_try_catch) {
 		for (j = 0; j < op_array->last_try_catch; j++) {
-			/* op_array->try_catch_array[j].try_op */
-			zend_jit_mark_reachable(block, block_map[op_array->try_catch_array[j].catch_op]);
-			zend_jit_mark_reachable(block, block_map[op_array->try_catch_array[j].finally_op]);
-			/* op_array->try_catch_array[j].finally_end */
+			if (block[block_map[op_array->try_catch_array[j].try_op]].flags  & ZEND_BB_REACHABLE) {
+				zend_jit_mark_reachable(block, block_map[op_array->try_catch_array[j].catch_op]);
+				zend_jit_mark_reachable(block, block_map[op_array->try_catch_array[j].finally_op]);
+			}
 		}
 	}
 
@@ -1159,8 +1168,9 @@ int zend_jit_build_cfg(zend_jit_context *ctx, zend_op_array *op_array)
 
 	edge = zend_jit_context_calloc(ctx, sizeof(int), edges);
 
-	if (!edge)
+	if (!edge) {
 		return FAILURE;
+	}
 
 	for (j = 0; j < blocks; j++) {
 		if (block[j].flags & ZEND_BB_REACHABLE) {
@@ -1171,13 +1181,12 @@ int zend_jit_build_cfg(zend_jit_context *ctx, zend_op_array *op_array)
 	}
 
 	for (j = 0; j < blocks; j++) {
-		if ((block[j].flags & ZEND_BB_REACHABLE) == 0) {
-			continue;
-		}
-		for (i = 0; i < 2; i++) {
-			if (block[j].successors[i] >= 0) {
-				zend_jit_basic_block *b = &block[block[j].successors[i]];
-				b->predecessors[b->predecessors_count++] = j;
+		if ((block[j].flags & ZEND_BB_REACHABLE)) {
+			for (i = 0; i < 2; i++) {
+				if (block[j].successors[i] >= 0) {
+					zend_jit_basic_block *b = &block[block[j].successors[i]];
+					b->predecessors[b->predecessors_count++] = j;
+				}
 			}
 		}
 	}

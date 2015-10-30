@@ -82,11 +82,17 @@ struct _zend_jit_ssa_phi {
 #define ZEND_BB_FOLLOW           (1<<1)
 #define ZEND_BB_ENTRY            (1<<2)
 #define ZEND_BB_EXIT             (1<<3)
-#define ZEND_BB_LOOP_HEADER      (1<<4)
-#define ZEND_BB_IRREDUCIBLE_LOOP (1<<5)
+#define ZEND_BB_TRY              (1<<4)
+#define ZEND_BB_CATCH            (1<<5)
+#define ZEND_BB_FINALLY          (1<<6)
+#define ZEND_BB_GEN_VAR          (1<<7)
+#define ZEND_BB_KILL_VAR         (1<<8)
 
-#define ZEND_BB_REACHABLE        (1<<6)
-#define ZEND_BB_PROTECTED        (1<<7)
+
+#define ZEND_BB_LOOP_HEADER      (1<<15)
+#define ZEND_BB_IRREDUCIBLE_LOOP (1<<16)
+
+#define ZEND_BB_REACHABLE        (1<<31)
 
 struct _zend_jit_basic_block {
 	uint32_t               flags;
