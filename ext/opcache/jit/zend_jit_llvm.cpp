@@ -18044,7 +18044,7 @@ static int zend_jit_codegen_ex(zend_jit_context *ctx,
 				case ZEND_FE_FETCH_R:
 				case ZEND_FE_FETCH_RW:
 					if (!zend_jit_handler(llvm_ctx, opline)) return 0;
-					if (!zend_jit_cond_jmp(llvm_ctx, opline, (zend_op*)(((char*)opline) + (int)opline->extended_value), TARGET_BB(block[b].successors[0]), TARGET_BB(block[b].successors[1]))) return 0;
+					if (!zend_jit_cond_jmp(llvm_ctx, opline, ZEND_OFFSET_TO_OPLINE(opline, opline->extended_value), TARGET_BB(block[b].successors[0]), TARGET_BB(block[b].successors[1]))) return 0;
 					break;
 				case ZEND_THROW:
 					if (!zend_jit_store_opline(llvm_ctx, opline)) return 0;
@@ -18057,7 +18057,7 @@ static int zend_jit_codegen_ex(zend_jit_context *ctx,
 					if (opline->result.num) {
 						if (!zend_jit_check_exception(llvm_ctx, opline)) return 0;
 					}
-					if (!zend_jit_cond_jmp(llvm_ctx, opline, (zend_op*)(((char*)opline) + (int)opline->extended_value), TARGET_BB(block[b].successors[0]), TARGET_BB(block[b].successors[1]))) return 0;
+					if (!zend_jit_cond_jmp(llvm_ctx, opline, ZEND_OFFSET_TO_OPLINE(opline, opline->extended_value), TARGET_BB(block[b].successors[0]), TARGET_BB(block[b].successors[1]))) return 0;
 					break;
 				case ZEND_DECLARE_ANON_CLASS:
 				case ZEND_DECLARE_ANON_INHERITED_CLASS:

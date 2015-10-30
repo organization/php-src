@@ -522,7 +522,7 @@ void zend_jit_dump_ssa_line(zend_op_array *op_array, const zend_jit_basic_block 
 		if (b) {
 			fprintf(stderr, " BB%d", b->successors[n++]);
 		} else {
-			fprintf(stderr, " .OP_" ZEND_LONG_FMT, (zend_op*)(((char*)opline) + (int)opline->extended_value) - op_array->opcodes);
+			fprintf(stderr, " .OP_" ZEND_LONG_FMT, ZEND_OFFSET_TO_OPLINE_NUM(op_array, opline, opline->extended_value));
 		}
 	}
 	if (ZEND_VM_OP1_JMP_ABS & flags) {
@@ -950,7 +950,7 @@ int zend_jit_build_cfg(zend_jit_context *ctx, zend_op_array *op_array)
 				}
 				break;
 			case ZEND_JMPZNZ:
-				BB_START((zend_op*)(((char*)opline) + (int)opline->extended_value) - op_array->opcodes, ZEND_BB_TARGET);
+				BB_START(ZEND_OFFSET_TO_OPLINE_NUM(op_array, opline, opline->extended_value), ZEND_BB_TARGET);
 				BB_START(OP_JMP_ADDR(opline, opline->op2) - op_array->opcodes, ZEND_BB_TARGET);
 				if (i + 1 < op_array->last) {
 					BB_START(i + 1, ZEND_BB_TARGET);
@@ -968,12 +968,12 @@ int zend_jit_build_cfg(zend_jit_context *ctx, zend_op_array *op_array)
 				break;
 			case ZEND_CATCH:
 				info->flags |= ZEND_JIT_FUNC_TOO_DYNAMIC;
-				BB_START((zend_op*)(((char*)opline) + (int)opline->extended_value) - op_array->opcodes, ZEND_BB_TARGET);
+				BB_START(ZEND_OFFSET_TO_OPLINE_NUM(op_array, opline, opline->extended_value), ZEND_BB_TARGET);
 				BB_START(i + 1, ZEND_BB_FOLLOW);
 				break;
 			case ZEND_FE_FETCH_R:
 			case ZEND_FE_FETCH_RW:
-				BB_START((zend_op*)(((char*)opline) + (int)opline->extended_value) - op_array->opcodes, ZEND_BB_TARGET);
+				BB_START(ZEND_OFFSET_TO_OPLINE_NUM(op_array, opline, opline->extended_value), ZEND_BB_TARGET);
 				BB_START(i + 1, ZEND_BB_FOLLOW);
 				break;
 			case ZEND_FE_RESET_R:
@@ -1100,7 +1100,7 @@ int zend_jit_build_cfg(zend_jit_context *ctx, zend_op_array *op_array)
 				record_successor(block, j, 0, block_map[OP_JMP_ADDR(opline, opline->op1) - op_array->opcodes]);
 				break;
 			case ZEND_JMPZNZ:
-				record_successor(block, j, 0, block_map[(zend_op*)(((char*)opline) + (int)opline->extended_value) - op_array->opcodes]);
+				record_successor(block, j, 0, block_map[ZEND_OFFSET_TO_OPLINE_NUM(op_array, opline, opline->extended_value)]);
 				record_successor(block, j, 1, block_map[OP_JMP_ADDR(opline, opline->op2) - op_array->opcodes]);
 				break;
 			case ZEND_JMPZ:
@@ -1114,12 +1114,12 @@ int zend_jit_build_cfg(zend_jit_context *ctx, zend_op_array *op_array)
 				record_successor(block, j, 1, j + 1);
 				break;
 			case ZEND_CATCH:
-				record_successor(block, j, 0, block_map[(zend_op*)(((char*)opline) + (int)opline->extended_value) - op_array->opcodes]);
+				record_successor(block, j, 0, block_map[ZEND_OFFSET_TO_OPLINE_NUM(op_array, opline, opline->extended_value)]);
 				record_successor(block, j, 1, j + 1);
 				break;
 			case ZEND_FE_FETCH_R:
 			case ZEND_FE_FETCH_RW:
-				record_successor(block, j, 0, block_map[(zend_op*)(((char*)opline) + (int)opline->extended_value) - op_array->opcodes]);
+				record_successor(block, j, 0, block_map[ZEND_OFFSET_TO_OPLINE_NUM(op_array, opline, opline->extended_value)]);
 				record_successor(block, j, 1, j + 1);
 				break;
 			case ZEND_FE_RESET_R:
