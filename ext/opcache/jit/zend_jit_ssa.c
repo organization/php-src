@@ -493,14 +493,14 @@ void zend_jit_dump_ssa_bb_header(zend_op_array *op_array, uint32_t line)
 	}
 }
 
-void zend_jit_dump_ssa_line(zend_op_array *op_array, uint32_t line)
+void zend_jit_dump_ssa_line(zend_op_array *op_array, const zend_jit_basic_block *b, uint32_t line)
 {
 	zend_jit_func_info *info = JIT_DATA(op_array);
-	int *block_map = info->block_map;
 	zend_jit_ssa_op *ssa = info->ssa;
 	zend_op *opline = op_array->opcodes + line;
 	const char *name = zend_get_opcode_name(opline->opcode);
 	uint32_t flags = zend_get_opcode_flags(opline->opcode);
+	int n = 0;
 
 	fprintf(stderr, "    ");
 	if (ssa) {
@@ -518,15 +518,28 @@ void zend_jit_dump_ssa_line(zend_op_array *op_array, uint32_t line)
 	}
 	fprintf(stderr, "%s", name ? (name + 5) : "???");
 
+	if (ZEND_VM_EXT_JMP_ABS & flags) {
+		if (b) {
+			fprintf(stderr, " BB%d", b->successors[n++]);
+		} else {
+			fprintf(stderr, " .OP_" ZEND_LONG_FMT, opline->extended_value);
+		}
+	} else if (ZEND_VM_EXT_JMP_REL & flags) {
+		if (b) {
+			fprintf(stderr, " BB%d", b->successors[n++]);
+		} else {
+			fprintf(stderr, " .OP_" ZEND_LONG_FMT, (zend_op*)(((char*)opline) + (int)opline->extended_value) - op_array->opcodes);
+		}
+	}
 	if (ZEND_VM_OP1_JMP_ABS & flags) {
-		if (block_map) {
-			fprintf(stderr, " BB%d", block_map[opline->op1.opline_num]);
+		if (b) {
+			fprintf(stderr, " BB%d", b->successors[n++]);
 		} else {
 			fprintf(stderr, " .OP_%d", opline->op1.opline_num);
 		}
 	} else if (ZEND_VM_OP1_JMP_ADDR & flags) {
-		if (block_map) {
-			fprintf(stderr, " BB%d", block_map[OP_JMP_ADDR(opline, opline->op1) - op_array->opcodes]);
+		if (b) {
+			fprintf(stderr, " BB%d", b->successors[n++]);
 		} else {
 			fprintf(stderr, " .OP_%u", (uint32_t)(OP_JMP_ADDR(opline, opline->op1) - op_array->opcodes));
 		}
@@ -547,14 +560,14 @@ void zend_jit_dump_ssa_line(zend_op_array *op_array, uint32_t line)
 		}
 	}
 	if (ZEND_VM_OP2_JMP_ABS & flags) {
-		if (block_map) {
-			fprintf(stderr, " BB%d", block_map[opline->op2.opline_num]);
+		if (b) {
+			fprintf(stderr, " BB%d", b->successors[n]);
 		} else {
 			fprintf(stderr, " .OP_%d", opline->op2.opline_num);
 		}
 	} else if (ZEND_VM_OP2_JMP_ADDR & flags) {
-		if (block_map) {
-			fprintf(stderr, " BB%d", block_map[OP_JMP_ADDR(opline, opline->op2) - op_array->opcodes]);
+		if (b) {
+			fprintf(stderr, " BB%d", b->successors[n]);
 		} else {
 			fprintf(stderr, " .OP_%u", (uint32_t)(OP_JMP_ADDR(opline, opline->op2) - op_array->opcodes));
 		}
@@ -572,19 +585,6 @@ void zend_jit_dump_ssa_line(zend_op_array *op_array, uint32_t line)
 			}
 		} else {
 			zend_jit_dump_var(op_array, EX_VAR_TO_NUM(opline->op2.var));
-		}
-	}
-	if (ZEND_VM_EXT_JMP_ABS & flags) {
-		if (block_map) {
-			fprintf(stderr, " BB%d", block_map[opline->extended_value]);
-		} else {
-			fprintf(stderr, " .OP_" ZEND_LONG_FMT, opline->extended_value);
-		}
-	} else if (ZEND_VM_EXT_JMP_REL & flags) {
-		if (block_map) {
-			fprintf(stderr, " BB%d", block_map[(zend_op*)(((char*)opline) + (int)opline->extended_value) - op_array->opcodes]);
-		} else {
-			fprintf(stderr, " .OP_" ZEND_LONG_FMT, (zend_op*)(((char*)opline) + (int)opline->extended_value) - op_array->opcodes);
 		}
 	}
 	fprintf(stderr, "\n");
@@ -691,15 +691,17 @@ static void zend_jit_dump_ssa(zend_op_array *op_array)
 	}
 #endif
 	for (k = 0; k < info->blocks; k++) {
-		zend_jit_dump_ssa_bb_header(op_array, info->block[k].start);
-		for (j = info->block[k].start; j <= info->block[k].end; j++) {
-			zend_jit_dump_ssa_line(op_array, j);
+		const zend_jit_basic_block *b = info->block + k;
+
+		zend_jit_dump_ssa_bb_header(op_array,  b->start);
+		for (j = b->start; j <= b->end; j++) {
+			zend_jit_dump_ssa_line(op_array, b, j);
 		}
 		/* Insert implicit JMP, introduced by block sorter, if necessary */
-		if (info->block[k].successors[0] >= 0 &&
-		    info->block[k].successors[1] < 0 &&
-		    info->block[k].successors[0] != k + 1) {
-			switch (op_array->opcodes[info->block[k].end].opcode) {
+		if (b->successors[0] >= 0 &&
+		    b->successors[1] < 0 &&
+		    b->successors[0] != k + 1) {
+			switch (op_array->opcodes[b->end].opcode) {
 				case ZEND_JMP:
 					break;
 				default:
@@ -836,8 +838,8 @@ static void record_successor(zend_jit_basic_block *block, int pred, int n, int s
 }
 
 #define BB_START(i, flag) do { \
-		if (!block_flags[i]) { blocks++;} \
-		block_flags[i] |= (flag); \
+		if (!block_map[i]) { blocks++;} \
+		block_map[i] |= (flag); \
 	} while (0)
 
 int zend_jit_build_cfg(zend_jit_context *ctx, zend_op_array *op_array)
@@ -845,18 +847,17 @@ int zend_jit_build_cfg(zend_jit_context *ctx, zend_op_array *op_array)
 	zend_jit_func_info *info = JIT_DATA(op_array);
 	uint i;
 	int j;
-	uint32_t *block_flags;
+	uint32_t *block_map;
 	zend_function *fn;
 	int blocks = 0;
-	int *block_map;
 	int edges, *edge;
 	zend_jit_basic_block *block;
 
-	block_flags = alloca(sizeof(uint32_t) * op_array->last);
-	if (!block_flags) {
+	block_map = alloca(sizeof(uint32_t) * op_array->last);
+	if (!block_map) {
 		return FAILURE;
 	}
-	memset(block_flags, 0, sizeof(uint32_t) * op_array->last);
+	memset(block_map, 0, sizeof(uint32_t) * op_array->last);
 
 	/* Build CFG, Step 1: Find basic blocks starts, calculate number of blocks */
 	BB_START(0, ZEND_BB_ENTRY);
@@ -1043,23 +1044,18 @@ int zend_jit_build_cfg(zend_jit_context *ctx, zend_op_array *op_array)
 	info->blocks = blocks;
 
 	/* Build CFG, Step 2: Build Array of Basic Blocks */
-	info->block_map = block_map = zend_jit_context_calloc(ctx, sizeof(int), op_array->last);
-	if (!block_map) {
-		return FAILURE;
-	}
-
 	info->block = block = zend_jit_context_calloc(ctx, sizeof(zend_jit_basic_block), info->blocks);
 	if (!block) {
 		return FAILURE;
 	}
 
 	for (i = 0, blocks = -1; i < op_array->last; i++) {
-		if (block_flags[i]) {
+		if (block_map[i]) {
 			if (blocks >= 0) {
 				block[blocks].end = i - 1;
 			}
 			blocks++;
-			block[blocks].flags = block_flags[i];
+			block[blocks].flags = block_map[i];
 			block[blocks].start = i;
 			block[blocks].successors[0] = -1;
 			block[blocks].successors[1] = -1;
@@ -1071,8 +1067,10 @@ int zend_jit_build_cfg(zend_jit_context *ctx, zend_op_array *op_array)
 			block[blocks].children = -1;
 			block[blocks].next_child = -1;
 			block[blocks].phis = NULL;
+			block_map[i] = blocks;
+		} else {
+			block_map[i] = (uint32_t)-1;
 		}
-		block_map[i] = blocks;
 	}
 
 	block[blocks].end = i - 1;

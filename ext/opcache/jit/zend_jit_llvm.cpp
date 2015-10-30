@@ -1210,8 +1210,15 @@ static BasicBlock *zend_jit_find_exception_bb(zend_llvm_ctx &ctx, zend_op *oplin
 			ctx.builder.SetInsertPoint(ctx.bb_exceptions[catch_bb_num]);
 			// Call HANDLE_EXCEPTION handler (non-tail call)
 			JIT_CHECK(zend_jit_call_handler(ctx, EG(exception_op), 0));
-			ctx.builder.CreateBr(ctx.bb_labels[catch_op_num]);
 
+			const zend_jit_func_info *info = JIT_DATA(ctx.op_array);
+			for (int i = 0; i < info->blocks; i++) {
+				if (info->block[i].start == catch_op_num) {
+					ctx.builder.CreateBr(ctx.bb_labels[i]);
+					break;
+				}
+			}
+			
 			ctx.builder.SetInsertPoint(bb);
 		}
 		return ctx.bb_exceptions[catch_bb_num];
@@ -3661,21 +3668,19 @@ static Value* zend_jit_load_cv(zend_llvm_ctx &llvm_ctx,
 /* }}} */
 
 /* {{{ static int zend_jit_needs_check_for_this */
-static int zend_jit_needs_check_for_this(zend_llvm_ctx &llvm_ctx,
-                                         zend_op       *opline)
+static int zend_jit_needs_check_for_this(zend_llvm_ctx &llvm_ctx, int bb)
 {
 	zend_op_array *op_array = llvm_ctx.op_array;
 	zend_jit_func_info *info = JIT_DATA(op_array);
-	int b = info->block_map[opline - op_array->opcodes];
 
-	ZEND_ASSERT(b >= 0 && b < info->blocks);
-	if (!zend_bitset_in(llvm_ctx.this_checked, b)) {
-		zend_bitset_incl(llvm_ctx.this_checked, b);
-		while (b != info->block[b].idom) {
-			b = info->block[b].idom;
-			if (b < 0) {
+	ZEND_ASSERT(bb >= 0 && bb < info->blocks);
+	if (!zend_bitset_in(llvm_ctx.this_checked, bb)) {
+		zend_bitset_incl(llvm_ctx.this_checked, bb);
+		while (bb != info->block[bb].idom) {
+			bb = info->block[bb].idom;
+			if (bb < 0) {
 				return 1;
-			} else if (zend_bitset_in(llvm_ctx.this_checked, b)) {
+			} else if (zend_bitset_in(llvm_ctx.this_checked, bb)) {
 				return 0;
 			}
 		}
@@ -12452,6 +12457,7 @@ static int zend_jit_assign_dim(zend_llvm_ctx     &llvm_ctx,
 static int zend_jit_assign_obj(zend_llvm_ctx     &llvm_ctx,
                                zend_jit_context  *ctx,
                                zend_op_array     *op_array,
+                               int                bb,
                                zend_op           *opline)
 {
 	Value *property;
@@ -12466,7 +12472,7 @@ static int zend_jit_assign_obj(zend_llvm_ctx     &llvm_ctx,
 	op1_addr = zend_jit_load_operand(llvm_ctx,
 			OP1_OP_TYPE(), OP1_OP(), OP1_SSA_VAR(), OP1_INFO(), 0, opline, 1, BP_VAR_W);
 
-	if (opline->op1_type == IS_UNUSED && zend_jit_needs_check_for_this(llvm_ctx, opline)) {
+	if (opline->op1_type == IS_UNUSED && zend_jit_needs_check_for_this(llvm_ctx, bb)) {
 		BasicBlock *bb_error = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
 		BasicBlock *bb_follow = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
 		zend_jit_unexpected_br(llvm_ctx,
@@ -12924,6 +12930,7 @@ static int zend_jit_assign_op(zend_llvm_ctx     &llvm_ctx,
 static int zend_jit_isset_isempty_dim_obj(zend_llvm_ctx     &llvm_ctx,
                                           zend_jit_context  *ctx,
                                           zend_op_array     *op_array,
+                                          int                bb,
                                           zend_op           *opline)
 {
 	Value *container;
@@ -12942,7 +12949,7 @@ static int zend_jit_isset_isempty_dim_obj(zend_llvm_ctx     &llvm_ctx,
  		OP1_OP_TYPE(), OP1_OP(), OP1_SSA_VAR(), OP1_INFO(), 0, opline, 1, BP_VAR_IS,
  		&should_free);
 
-	if (opline->op1_type == IS_UNUSED && zend_jit_needs_check_for_this(llvm_ctx, opline)) {
+	if (opline->op1_type == IS_UNUSED && zend_jit_needs_check_for_this(llvm_ctx, bb)) {
 		BasicBlock *bb_error = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
 		BasicBlock *bb_follow = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
 		zend_jit_unexpected_br(llvm_ctx,
@@ -17490,14 +17497,14 @@ static int zend_jit_assign_regs(zend_llvm_ctx    &llvm_ctx,
 /* {{{ static BasicBlock *zend_jit_ssa_target */
 static BasicBlock *zend_jit_ssa_target(zend_llvm_ctx    &llvm_ctx,
                                        int               from_block,
-                                       uint32_t          to_opline)
+                                       int               to_block)
 {
-	BasicBlock *target = llvm_ctx.bb_labels[to_opline];
+	BasicBlock *target = llvm_ctx.bb_labels[to_block];
 	zend_jit_func_info *info = JIT_DATA(llvm_ctx.op_array);
 
 	if (info && info->ssa_var_info) {
 		BasicBlock *bb_start = NULL;
-		zend_jit_basic_block *b = info->block + info->block_map[to_opline];
+		zend_jit_basic_block *b = info->block + to_block;
 		zend_jit_ssa_phi *p;
 		int to_var, from_var;
 		uint32_t to_info, from_info;
@@ -17601,7 +17608,6 @@ static int zend_jit_codegen_ex(zend_jit_context *ctx,
 	int b, from_b;
 	zend_jit_func_info *info = JIT_DATA(op_array);
 	zend_jit_basic_block *block = info->block;
-	int *block_map = info->block_map;
 	zend_op *opline;
 
 #if JIT_STAT
@@ -17641,7 +17647,7 @@ static int zend_jit_codegen_ex(zend_jit_context *ctx,
 	llvm_ctx.bb_leave = NULL;
 	llvm_ctx.call_level = 0;
 	
-	llvm_ctx.bb_labels = (BasicBlock**)zend_jit_context_calloc(ctx, sizeof(BasicBlock*), op_array->last + 1);
+	llvm_ctx.bb_labels = (BasicBlock**)zend_jit_context_calloc(ctx, sizeof(BasicBlock*), info->blocks);
 	if (!llvm_ctx.bb_labels) return 0;
 
 	if (op_array->last_try_catch) {
@@ -17677,11 +17683,11 @@ static int zend_jit_codegen_ex(zend_jit_context *ctx,
 //???	if (!zend_jit_preallocate_cvs(llvm_ctx, op_array)) return 0;
 
 	if (block[0].flags & ZEND_BB_TARGET) {
-		llvm_ctx.bb_labels[block[0].start] = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
+		llvm_ctx.bb_labels[0] = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
 	}
 	for (b = 1; b < info->blocks; b++) {
 		if (block[b].flags & ZEND_BB_REACHABLE) {
-			llvm_ctx.bb_labels[block[b].start] = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
+			llvm_ctx.bb_labels[b] = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
 		}
 	}
 
@@ -17696,10 +17702,10 @@ static int zend_jit_codegen_ex(zend_jit_context *ctx,
 		}
 		if (b > 0 || (block[b].flags & ZEND_BB_TARGET)) {
 			BasicBlock *bb = llvm_ctx.builder.GetInsertBlock();
-			if (bb && !bb->getTerminator()) {
-				llvm_ctx.builder.CreateBr(TARGET_BB(block[b].start));
+			if (bb && !bb->getTerminator()) {			
+				llvm_ctx.builder.CreateBr(TARGET_BB(b));
 			}
-			llvm_ctx.builder.SetInsertPoint(llvm_ctx.bb_labels[block[b].start]);
+			llvm_ctx.builder.SetInsertPoint(llvm_ctx.bb_labels[b]);
 		}
 		if (block[b].flags & ZEND_BB_TARGET) {
 			llvm_ctx.valid_opline = 0;
@@ -17723,7 +17729,7 @@ static int zend_jit_codegen_ex(zend_jit_context *ctx,
 					llvm_ctx.valid_opline = 0;
 					break;
 				case ZEND_JMP:
-					llvm_ctx.builder.CreateBr(TARGET_BB(OP_JMP_ADDR(opline, *OP1_OP()) - op_array->opcodes));
+					llvm_ctx.builder.CreateBr(TARGET_BB(block[b].successors[0]));
 					llvm_ctx.valid_opline = 0;
 					break;
 				case ZEND_JMPZ:
@@ -17731,8 +17737,8 @@ static int zend_jit_codegen_ex(zend_jit_context *ctx,
 							llvm_ctx,
 							op_array,
 							opline,
-							TARGET_BB(OP_JMP_ADDR(opline, *OP2_OP()) - op_array->opcodes),
-							TARGET_BB(block[b + 1].start),
+							TARGET_BB(block[b].successors[0]),
+							TARGET_BB(block[b].successors[1]),
 							1)) return 0;
 					llvm_ctx.valid_opline = 0;
 					break;
@@ -17741,8 +17747,8 @@ static int zend_jit_codegen_ex(zend_jit_context *ctx,
 							llvm_ctx,
 							op_array,
 							opline,
-							TARGET_BB(block[b + 1].start),
-							TARGET_BB(OP_JMP_ADDR(opline, *OP2_OP()) - op_array->opcodes),
+							TARGET_BB(block[b].successors[1]),
+							TARGET_BB(block[b].successors[0]),
 							0)) return 0;
 					llvm_ctx.valid_opline = 0;
 					break;
@@ -17751,8 +17757,8 @@ static int zend_jit_codegen_ex(zend_jit_context *ctx,
 							llvm_ctx,
 							op_array,
 							opline,
-							TARGET_BB(OP_JMP_ADDR(opline, *OP2_OP()) - op_array->opcodes),
-							TARGET_BB((zend_op*)(((char*)opline) + (int)opline->extended_value) - op_array->opcodes),
+							TARGET_BB(block[b].successors[1]),
+							TARGET_BB(block[b].successors[0]),
 							-1)) return 0;
 					llvm_ctx.valid_opline = 0;
 					break;
@@ -17805,31 +17811,31 @@ static int zend_jit_codegen_ex(zend_jit_context *ctx,
 				case ZEND_IS_SMALLER:
 				case ZEND_IS_SMALLER_OR_EQUAL:
 				case ZEND_CASE:
-					if ((opline+1)->opcode == ZEND_JMPZ &&
-					    block_map[i+1] == block_map[i] &&
+					if (i != block[b].end &&
+					    (opline+1)->opcode == ZEND_JMPZ &&
 					    (opline+1)->op1_type == IS_TMP_VAR &&
 					    (opline+1)->op1.var == RES_OP()->var) {
 						if (!zend_jit_cmp(llvm_ctx, op_array, opline,
-							TARGET_BB(OP_JMP_ADDR(opline+1, (opline+1)->op2) - op_array->opcodes),
-							TARGET_BB(block[b + 1].start),
+							TARGET_BB(block[b].successors[0]),
+							TARGET_BB(block[b].successors[1]),
 							1)) return 0;
 						i++;
-					} else if ((opline+1)->opcode == ZEND_JMPNZ &&
-					    block_map[i+1] == block_map[i] &&
+					} else if (i != block[b].end &&
+					    (opline+1)->opcode == ZEND_JMPNZ &&
 					    (opline+1)->op1_type == IS_TMP_VAR &&
 					    (opline+1)->op1.var == RES_OP()->var) {
 						if (!zend_jit_cmp(llvm_ctx, op_array, opline,
-							TARGET_BB(block[b + 1].start),
-							TARGET_BB(OP_JMP_ADDR(opline+1, (opline+1)->op2) - op_array->opcodes),
+							TARGET_BB(block[b].successors[1]),
+							TARGET_BB(block[b].successors[0]),
 							0)) return 0;
 						i++;
-					} else if ((opline+1)->opcode == ZEND_JMPZNZ &&
-					    block_map[i+1] == block_map[i] &&
+					} else if (i != block[b].end &&
+					    (opline+1)->opcode == ZEND_JMPZNZ &&
 					    (opline+1)->op1_type == IS_TMP_VAR &&
 					    (opline+1)->op1.var == RES_OP()->var) {
 						if (!zend_jit_cmp(llvm_ctx, op_array, opline,
-							TARGET_BB(OP_JMP_ADDR(opline+1, (opline+1)->op2) - op_array->opcodes),
-							TARGET_BB((zend_op*)(((char*)(opline+1)) + (int)(opline+1)->extended_value) - op_array->opcodes),
+							TARGET_BB(block[b].successors[1]),
+							TARGET_BB(block[b].successors[0]),
 							-1)) return 0;
 						i++;
 					} else {
@@ -17847,7 +17853,7 @@ static int zend_jit_codegen_ex(zend_jit_context *ctx,
 					if (!zend_jit_assign_dim(llvm_ctx, ctx, op_array, opline)) return 0;
 					break;
 				case ZEND_ASSIGN_OBJ:
-					if (!zend_jit_assign_obj(llvm_ctx, ctx, op_array, opline)) return 0;
+					if (!zend_jit_assign_obj(llvm_ctx, ctx, op_array, b, opline)) return 0;
 					break;
 				case ZEND_PRE_INC:
 				case ZEND_PRE_DEC:
@@ -17974,7 +17980,7 @@ static int zend_jit_codegen_ex(zend_jit_context *ctx,
 					break;
 #endif
 				case ZEND_ISSET_ISEMPTY_DIM_OBJ:
-					if (!zend_jit_isset_isempty_dim_obj(llvm_ctx, ctx, op_array, opline)) return 0;
+					if (!zend_jit_isset_isempty_dim_obj(llvm_ctx, ctx, op_array, b, opline)) return 0;
 					break;
 				/* Support for ZEND_VM_SMART_BRANCH */
 				case ZEND_ISSET_ISEMPTY_VAR:
@@ -17986,7 +17992,7 @@ static int zend_jit_codegen_ex(zend_jit_context *ctx,
 					if ((opline+1)->opcode == ZEND_JMPZ || (opline+1)->opcode == ZEND_JMPNZ) {
 						opline++;
 						i++;
-						if (!zend_jit_cond_jmp(llvm_ctx, opline, OP_JMP_ADDR(opline, *OP2_OP()), TARGET_BB(OP_JMP_ADDR(opline, *OP2_OP()) - op_array->opcodes), TARGET_BB(block[b + 1].start))) return 0;
+						if (!zend_jit_cond_jmp(llvm_ctx, opline, OP_JMP_ADDR(opline, *OP2_OP()), TARGET_BB(block[b].successors[0]), TARGET_BB(block[b].successors[1]))) return 0;
 					}
 					break;
 #if 0
@@ -18033,12 +18039,12 @@ static int zend_jit_codegen_ex(zend_jit_context *ctx,
 				case ZEND_FE_RESET_RW:
 				case ZEND_ASSERT_CHECK:
 					if (!zend_jit_handler(llvm_ctx, opline)) return 0;
-					if (!zend_jit_cond_jmp(llvm_ctx, opline, OP_JMP_ADDR(opline, *OP2_OP()), TARGET_BB(OP_JMP_ADDR(opline, *OP2_OP()) - op_array->opcodes), TARGET_BB(block[b + 1].start))) return 0;
+					if (!zend_jit_cond_jmp(llvm_ctx, opline, OP_JMP_ADDR(opline, *OP2_OP()), TARGET_BB(block[b].successors[0]), TARGET_BB(block[b].successors[1]))) return 0;
 					break;
 				case ZEND_FE_FETCH_R:
 				case ZEND_FE_FETCH_RW:
 					if (!zend_jit_handler(llvm_ctx, opline)) return 0;
-					if (!zend_jit_cond_jmp(llvm_ctx, opline, (zend_op*)(((char*)opline) + (int)opline->extended_value), TARGET_BB((zend_op*)(((char*)opline) + (int)opline->extended_value) - op_array->opcodes), TARGET_BB(block[b + 1].start))) return 0;
+					if (!zend_jit_cond_jmp(llvm_ctx, opline, (zend_op*)(((char*)opline) + (int)opline->extended_value), TARGET_BB(block[b].successors[0]), TARGET_BB(block[b].successors[1]))) return 0;
 					break;
 				case ZEND_THROW:
 					if (!zend_jit_store_opline(llvm_ctx, opline)) return 0;
@@ -18051,12 +18057,12 @@ static int zend_jit_codegen_ex(zend_jit_context *ctx,
 					if (opline->result.num) {
 						if (!zend_jit_check_exception(llvm_ctx, opline)) return 0;
 					}
-					if (!zend_jit_cond_jmp(llvm_ctx, opline, op_array->opcodes + opline->extended_value, TARGET_BB(opline->extended_value), TARGET_BB(block[b + 1].start))) return 0;
+					if (!zend_jit_cond_jmp(llvm_ctx, opline, op_array->opcodes + opline->extended_value, TARGET_BB(block[b].successors[0]), TARGET_BB(block[b].successors[1]))) return 0;
 					break;
 				case ZEND_DECLARE_ANON_CLASS:
 				case ZEND_DECLARE_ANON_INHERITED_CLASS:
 					if (!zend_jit_handler(llvm_ctx, opline)) return 0;
-					if (!zend_jit_cond_jmp(llvm_ctx, opline, OP_JMP_ADDR(opline, *OP1_OP()), TARGET_BB(OP_JMP_ADDR(opline, *OP1_OP()) - op_array->opcodes), TARGET_BB(block[b + 1].start))) return 0;
+					if (!zend_jit_cond_jmp(llvm_ctx, opline, OP_JMP_ADDR(opline, *OP1_OP()), TARGET_BB(block[b].successors[0]), TARGET_BB(block[b].successors[1]))) return 0;
 					break;
 				case ZEND_BIND_GLOBAL:
 					if (!zend_jit_bind_global(llvm_ctx, op_array, opline)) return 0;
@@ -18087,7 +18093,7 @@ static int zend_jit_codegen_ex(zend_jit_context *ctx,
 				case ZEND_JMP:
 					break;
 				default:
-					llvm_ctx.builder.CreateBr(TARGET_BB(block[block[b].successors[0]].start));
+					llvm_ctx.builder.CreateBr(TARGET_BB(block[b].successors[0]));
 					break;
 			}
 		}

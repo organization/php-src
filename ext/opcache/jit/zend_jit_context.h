@@ -200,7 +200,6 @@ struct _zend_jit_call_info {
 struct _zend_jit_func_info {
 	int                     num;
 	uint32_t                flags;
-	int                    *block_map;    /* opline number -> block number */
 	zend_jit_basic_block   *block;        /* array of basic blocks         */
 	int                     blocks;       /* number of basic blocks        */
 	zend_jit_ssa_op        *ssa;          /* array of SSA instructions     */
@@ -603,7 +602,7 @@ void zend_jit_remove_useless_clones(zend_op_array *op_array) ZEND_HIDDEN;
 uint32_t array_element_type(uint32_t t1, int write, int insert) ZEND_HIDDEN;
 
 void zend_jit_dump(zend_op_array *op_array, uint32_t dump_flags) ZEND_HIDDEN;
-void zend_jit_dump_ssa_line(zend_op_array *op_array, uint32_t line) ZEND_HIDDEN;
+void zend_jit_dump_ssa_line(zend_op_array *op_array, const zend_jit_basic_block *b, uint32_t line) ZEND_HIDDEN;
 void zend_jit_dump_ssa_bb_header(zend_op_array *op_array, uint32_t line) ZEND_HIDDEN;
 void zend_jit_dump_ssa_var(zend_op_array *op_array, int ssa_var_num, int var_num, int pos) ZEND_HIDDEN;
 void zend_jit_dump_var(zend_op_array *op_array, int var_num) ZEND_HIDDEN;
