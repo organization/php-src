@@ -480,206 +480,12 @@ void zend_jit_dump_ssa_bb_header(zend_op_array *op_array, uint32_t line)
 
 void zend_jit_dump_ssa_line(zend_op_array *op_array, uint32_t line)
 {
-	typedef struct _zend_jit_op_desc {
-		const char *name;
-		uint32_t    flags;
-	} zend_jit_op_desc;
-#define OP1_LINE (1<<0)
-#define OP2_LINE (1<<1)
-#define EXT_LINE (1<<2)
-#define OP1_ADDR (1<<3)
-#define OP2_ADDR (1<<4)
-#define OP1_NUM  (1<<5)
-#define OP2_NUM  (1<<6)
-#define EXT_REL_LINE (1<<7)
-	static const zend_jit_op_desc op_desc[] = {
-		{"NOP",                             0},
-		{"ADD",                             0},
-		{"SUB",                             0},
-		{"MUL",                             0},
-		{"DIV",                             0},
-		{"MOD",                             0},
-		{"SL",                              0},
-		{"SR",                              0},
-		{"CONCAT",                          0},
-		{"BW_OR",                           0},
-		{"BW_AND",                          0},
-		{"BW_XOR",                          0},
-		{"BW_NOT",                          0},
-		{"BOOL_NOT",                        0},
-		{"BOOL_XOR",                        0},
-		{"IS_IDENTICAL",                    0},
-		{"IS_NOT_IDENTICAL",                0},
-		{"IS_EQUAL",                        0},
-		{"IS_NOT_EQUAL",                    0},
-		{"IS_SMALLER",                      0},
-		{"IS_SMALLER_OR_EQUAL",             0},
-		{"CAST",                            0},
-		{"QM_ASSIGN",                       0},
-		{"ASSIGN_ADD",                      0},
-		{"ASSIGN_SUB",                      0},
-		{"ASSIGN_MUL",                      0},
-		{"ASSIGN_DIV",                      0},
-		{"ASSIGN_MOD",                      0},
-		{"ASSIGN_SL",                       0},
-		{"ASSIGN_SR",                       0},
-		{"ASSIGN_CONCAT",                   0},
-		{"ASSIGN_BW_OR",                    0},
-		{"ASSIGN_BW_AND",                   0},
-		{"ASSIGN_BW_XOR",                   0},
-		{"PRE_INC",                         0},
-		{"PRE_DEC",                         0},
-		{"POST_INC",                        0},
-		{"POST_DEC",                        0},
-		{"ASSIGN",                          0},
-		{"ASSIGN_REF",                      0},
-		{"ECHO",                            0},
-		{"???",                             0},
-		{"JMP",                             OP1_ADDR},
-		{"JMPZ",                            OP2_ADDR},
-		{"JMPNZ",                           OP2_ADDR},
-		{"JMPZNZ",                          EXT_REL_LINE | OP2_ADDR},
-		{"JMPZ_EX",                         OP2_ADDR},
-		{"JMPNZ_EX",                        OP2_ADDR},
-		{"CASE",                            0},
-		{"???",                             0},
-		{"???",                             0},
-		{"???",                             0},
-		{"BOOL",                            0},
-		{"FAST_CONCAT",                     0},
-		{"ROPE_INIT",                       0},
-		{"ROPE_ADD",                        0},
-		{"ROPE_END",                        0},
-		{"BEGIN_SILENCE",                   0},
-		{"END_SILENCE",                     0},
-		{"INIT_FCALL_BY_NAME",              0},
-		{"DO_FCALL",                        0},
-		{"INIT_FCALL",                      0},
-		{"RETURN",                          0},
-		{"RECV",                            OP1_NUM},
-		{"RECV_INIT",                       OP1_NUM},
-		{"SEND_VAL",                        OP2_NUM},
-		{"SEND_VAR_EX",                     OP2_NUM},
-		{"SEND_REF",                        OP2_NUM},
-		{"NEW",                             OP2_ADDR},
-		{"INIT_NS_FCALL_BY_NAME",           0},
-		{"FREE",                            0},
-		{"INIT_ARRAY",                      0},
-		{"ADD_ARRAY_ELEMENT",               0},
-		{"INCLUDE_OR_EVAL",                 0},
-		{"UNSET_VAR",                       0},
-		{"UNSET_DIM",                       0},
-		{"UNSET_OBJ",                       0},
-		{"FE_RESET_R",                      OP2_ADDR},
-		{"FE_FETCH_R",                      EXT_REL_LINE},
-		{"EXIT",                            0},
-		{"FETCH_R",                         0},
-		{"FETCH_DIM_R",                     0},
-		{"FETCH_OBJ_R",                     0},
-		{"FETCH_W",                         0},
-		{"FETCH_DIM_W",                     0},
-		{"FETCH_OBJ_W",                     0},
-		{"FETCH_RW",                        0},
-		{"FETCH_DIM_RW",                    0},
-		{"FETCH_OBJ_RW",                    0},
-		{"FETCH_IS",                        0},
-		{"FETCH_DIM_IS",                    0},
-		{"FETCH_OBJ_IS",                    0},
-		{"FETCH_FUNC_ARG",                  0},
-		{"FETCH_DIM_FUNC_ARG",              0},
-		{"FETCH_OBJ_FUNC_ARG",              0},
-		{"FETCH_UNSET",                     0},
-		{"FETCH_DIM_UNSET",                 0},
-		{"FETCH_OBJ_UNSET",                 0},
-		{"FETCH_DIM_TMP_VAR",               0},
-		{"FETCH_CONSTANT",                  0},
-		{"???",                             0},
-		{"EXT_STMT",                        0},
-		{"EXT_FCALL_BEGIN",                 0},
-		{"EXT_FCALL_END",                   0},
-		{"EXT_NOP",                         0},
-		{"TICKS",                           0},
-		{"SEND_VAR_NO_REF",                 OP2_NUM},
-		{"CATCH",                           EXT_LINE},
-		{"THROW",                           0},
-		{"FETCH_CLASS",                     0},
-		{"CLONE",                           0},
-		{"RETURN_BY_REF",                   0},
-		{"INIT_METHOD_CALL",                0},
-		{"INIT_STATIC_METHOD_CALL",         0},
-		{"ISSET_ISEMPTY_VAR",               0},
-		{"ISSET_ISEMPTY_DIM_OBJ",           0},
-		{"SEND_VAL_EX",                     OP2_NUM},
-		{"SEND_VAR",                        OP2_NUM},
-		{"INIT_USER_CALL",                  0}, //???
-		{"SEND_ARRAY",                      0}, //???
-		{"SEND_USER",                       0}, //???
-		{"STRLEN",                          0}, //???
-		{"DEFINED",                         0}, //???
-		{"TYPE_CHECK",                      0}, //???
-		{"VERIFY_RETURN_TYPE",              0},
-		{"FE_RESET_RW",                     OP2_ADDR},
-		{"FE_FETCH_RW",                     EXT_REL_LINE},
-		{"FE_FREE",                         0},
-		{"INIT_DYNAMIC_CALL",               0},
-		{"DO_ICALL",                        0},
-		{"DO_UCALL",                        0},
-		{"FO_FCALL_BY_NAME",                0},
-		{"PRE_INC_OBJ",                     0},
-		{"PRE_DEC_OBJ",                     0},
-		{"POST_INC_OBJ",                    0},
-		{"POST_DEC_OBJ",                    0},
-		{"ASSIGN_OBJ",                      0},
-		{"OP_DATA",                         0},
-		{"INSTANCEOF",                      0},
-		{"DECLARE_CLASS",                   0},
-		{"DECLARE_INHERITED_CLASS",         0},
-		{"DECLARE_FUNCTION",                0},
-		{"YIELD_FROM",                      0},
-		{"DECLARE_CONST",                   0},
-		{"ADD_INTERFACE",                   0},
-		{"DECLARE_INHERITED_CLASS_DELAYED", 0},
-		{"VERIFY_ABSTRACT_CLASS",           0},
-		{"ASSIGN_DIM",                      0},
-		{"ISSET_ISEMPTY_PROP_OBJ",          0},
-		{"HANDLE_EXCEPTION",                0},
-		{"USER_OPCODE",                     0},
-		{"ASSERT_CHECK",                    OP2_ADDR},
-		{"JMP_SET",                         OP2_ADDR},
-		{"DECLARE_LAMBDA_FUNCTION",         0},
-		{"ADD_TRAIT",                       0},
-		{"BIND_TRAITS",                     0},
-		{"SEPARATE",                        0},
-		{"FETCH_CLASS_NAME",                0}, //???
-		{"CALL_TRAMPOLINE",                 0}, //???
-		{"DISCARD_EXCEPTION",               0},
-		{"YIELD",                           0},
-		{"GENERATOR_RETURN",                0},
-        {"FAST_CALL",                       OP1_ADDR| OP2_LINE},
-        {"FAST_RET",                        OP2_LINE},
-		{"RECV_VARIADIC",                   0}, //???
-		{"SEND_UNPACK",                     0}, //???
-		{"POW",                             0}, //???
-		{"ASSIGN_POW",                      0}, //???
-		{"BIND_GLOBAL",                     0}, //???
-		{"COALESCE",                        OP2_ADDR},
-		{"SPACESHIP",                       0},
-		{"DECLARE_ANON_CLASS",              OP1_ADDR},
-		{"DECLARE_ANON_INHERITED_CLASS",    OP1_ADDR},
-		{"FETCH_STATIC_PROP_R",             0},
-		{"FETCH_STATIC_PROP_W",             0},
-		{"FETCH_STATIC_PROP_RW",            0},
-		{"FETCH_STATIC_PROP_IS",            0},
-		{"FETCH_STATIC_PROP_FUNC_ARG",      0},
-		{"FETCH_STATIC_PROP_UNSET",         0},
-		{"UNSET_STATIC_PROP",               0},
-		{"ISSET_ISEMPTY_STATIC_PROP",       0},
-		{"FETCH_CLASS_CONSTANT",            0}
-	};
 	zend_jit_func_info *info = JIT_DATA(op_array);
 	int *block_map = info->block_map;
 	zend_jit_ssa_op *ssa = info->ssa;
 	zend_op *opline = op_array->opcodes + line;
+	const char *name = zend_get_opcode_name(opline->opcode);
+	uint32_t flags = zend_get_opcode_flags(opline->opcode);
 
 	fprintf(stderr, "    ");
 	if (ssa) {
@@ -695,21 +501,21 @@ void zend_jit_dump_ssa_line(zend_op_array *op_array, uint32_t line)
 		zend_jit_dump_var(op_array, EX_VAR_TO_NUM(opline->result.var));
 		fprintf(stderr, " = ");
 	}
-	fprintf(stderr, "%s", op_desc[opline->opcode].name);
+	fprintf(stderr, "%s", name ? (name + 5) : "???");
 
-	if (OP1_LINE & op_desc[opline->opcode].flags) {
+	if (ZEND_VM_OP1_JMP_ABS & flags) {
 		if (block_map) {
 			fprintf(stderr, " BB%d", block_map[opline->op1.opline_num]);
 		} else {
 			fprintf(stderr, " .OP_%d", opline->op1.opline_num);
 		}
-	} else if (OP1_ADDR & op_desc[opline->opcode].flags) {
+	} else if (ZEND_VM_OP1_JMP_ADDR & flags) {
 		if (block_map) {
 			fprintf(stderr, " BB%d", block_map[OP_JMP_ADDR(opline, opline->op1) - op_array->opcodes]);
 		} else {
 			fprintf(stderr, " .OP_%u", (uint32_t)(OP_JMP_ADDR(opline, opline->op1) - op_array->opcodes));
 		}
-	} else if (OP1_NUM & op_desc[opline->opcode].flags) {
+	} else if (ZEND_VM_OP1_NUM & flags) {
 		fprintf(stderr, " %d", opline->op1.num);
 	} else if (opline->op1_type == IS_CONST) {
 		zend_jit_dump_const(RT_CONSTANT(op_array, opline->op1));
@@ -725,19 +531,19 @@ void zend_jit_dump_ssa_line(zend_op_array *op_array, uint32_t line)
 			zend_jit_dump_var(op_array, EX_VAR_TO_NUM(opline->op1.var));
 		}
 	}
-	if (OP2_LINE & op_desc[opline->opcode].flags) {
+	if (ZEND_VM_OP2_JMP_ABS & flags) {
 		if (block_map) {
 			fprintf(stderr, " BB%d", block_map[opline->op2.opline_num]);
 		} else {
 			fprintf(stderr, " .OP_%d", opline->op2.opline_num);
 		}
-	} else if (OP2_ADDR & op_desc[opline->opcode].flags) {
+	} else if (ZEND_VM_OP2_JMP_ADDR & flags) {
 		if (block_map) {
 			fprintf(stderr, " BB%d", block_map[OP_JMP_ADDR(opline, opline->op2) - op_array->opcodes]);
 		} else {
 			fprintf(stderr, " .OP_%u", (uint32_t)(OP_JMP_ADDR(opline, opline->op2) - op_array->opcodes));
 		}
-	} else if (OP2_NUM & op_desc[opline->opcode].flags) {
+	} else if (ZEND_VM_OP2_NUM & flags) {
 		fprintf(stderr, " %d", opline->op2.num);
 	} else if (opline->op2_type == IS_CONST) {
 		zend_jit_dump_const(RT_CONSTANT(op_array, opline->op2));
@@ -753,13 +559,13 @@ void zend_jit_dump_ssa_line(zend_op_array *op_array, uint32_t line)
 			zend_jit_dump_var(op_array, EX_VAR_TO_NUM(opline->op2.var));
 		}
 	}
-	if (EXT_LINE & op_desc[opline->opcode].flags) {
+	if (ZEND_VM_EXT_JMP_ABS & flags) {
 		if (block_map) {
 			fprintf(stderr, " BB%d", block_map[opline->extended_value]);
 		} else {
 			fprintf(stderr, " .OP_" ZEND_LONG_FMT, opline->extended_value);
 		}
-	} else if (EXT_REL_LINE & op_desc[opline->opcode].flags) {
+	} else if (ZEND_VM_EXT_JMP_REL & flags) {
 		if (block_map) {
 			fprintf(stderr, " BB%d", block_map[(zend_op*)(((char*)opline) + (int)opline->extended_value) - op_array->opcodes]);
 		} else {
