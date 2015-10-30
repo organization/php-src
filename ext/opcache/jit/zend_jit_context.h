@@ -77,18 +77,29 @@ struct _zend_jit_ssa_phi {
 									         predecessors.  */
 };
 
+/* zend_jit_basic_bloc.flags */
+#define ZEND_BB_TARGET           (1<<0)
+#define ZEND_BB_FOLLOW           (1<<1)
+#define ZEND_BB_ENTRY            (1<<2)
+#define ZEND_BB_EXIT             (1<<3)
+#define ZEND_BB_LOOP_HEADER      (1<<4)
+#define ZEND_BB_IRREDUCIBLE_LOOP (1<<5)
+
+#define ZEND_BB_REACHABLE        (1<<6)
+#define ZEND_BB_PROTECTED        (1<<7)
+
 struct _zend_jit_basic_block {
 	uint32_t               flags;
-	uint32_t               start;
-	uint32_t               end;
-	int                    predecessors_count; /* number of predecessors */
-	int                   *predecessors;  /* array of predecessors, points into ctx.edge */
-	int                    successors[2]; /* up to 2 successor blocks    */
-	int                    idom;          /* immediate dominator block   */
-	int                    loop_header;   /* closest loop header, or -1  */
-	int                    level;         /* steps away from the entry in the dom. tree */
-	int                    children;      /* list of dominated blocks    */
-	int                    next_child;    /* next dominated block        */
+	uint32_t               start;              /* first opcode number         */
+	uint32_t               end;                /* last opcode number          */
+	int                    successors[2];      /* up to 2 successor blocks    */
+	int                    predecessors_count; /* number of predecessors      */
+	int                   *predecessors;       /* array of predecessors       */
+	int                    idom;               /* immediate dominator block   */
+	int                    loop_header;        /* closest loop header, or -1  */
+	int                    level;              /* steps away from the entry in the dom. tree */
+	int                    children;           /* list of dominated blocks    */
+	int                    next_child;         /* next dominated block        */
 	zend_jit_ssa_phi      *phis;
 };
 
@@ -550,18 +561,6 @@ DEFINE_SSA_OP_RANGE_OVERFLOW(op2)
 #define OP2_MAX_RANGE()         (ssa_op2_max_range (op_array, opline))
 #define OP2_RANGE_UNDERFLOW()   (ssa_op2_range_underflow (op_array, opline))
 #define OP2_RANGE_OVERFLOW()    (ssa_op2_range_overflow (op_array, opline))
-
-/* Three ways to start a block: as a jump target, via control flow past a
- * conditional jump, and via entering the function.  A target block may also be
- * a follow block.  */
-#define TARGET_BLOCK_MARK    0x1
-#define FOLLOW_BLOCK_MARK    0x2
-#define ENTRY_BLOCK_MARK     0x4
-#define EXIT_BLOCK_MARK      0x8
-#define LOOP_HEADER_BLOCK_MARK 0x10
-#define IRREDUCIBLE_LOOP_BLOCK_MARK 0x20
-
-#define REACHABLE_BLOCK_MARK 0x40
 
 #define JIT_DUMP_CFG			(1U<<0)
 #define JIT_DUMP_DOMINATORS		(1U<<1)

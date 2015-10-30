@@ -17675,11 +17675,11 @@ static int zend_jit_codegen_ex(zend_jit_context *ctx,
 	zend_jit_assign_regs(llvm_ctx, op_array);
 //???	if (!zend_jit_preallocate_cvs(llvm_ctx, op_array)) return 0;
 
-	if (block[0].flags & TARGET_BLOCK_MARK) {
+	if (block[0].flags & ZEND_BB_TARGET) {
 		llvm_ctx.bb_labels[block[0].start] = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
 	}
 	for (b = 1; b < info->blocks; b++) {
-		if (block[b].flags & REACHABLE_BLOCK_MARK) {
+		if (block[b].flags & ZEND_BB_REACHABLE) {
 			llvm_ctx.bb_labels[block[b].start] = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
 		}
 	}
@@ -17690,17 +17690,17 @@ static int zend_jit_codegen_ex(zend_jit_context *ctx,
 
 	from_b = -1;
 	for (b = 0; b < info->blocks; b++) {
-		if ((block[b].flags & REACHABLE_BLOCK_MARK) == 0) {
+		if ((block[b].flags & ZEND_BB_REACHABLE) == 0) {
 			continue;
 		}
-		if (b > 0 || (block[b].flags & TARGET_BLOCK_MARK)) {
+		if (b > 0 || (block[b].flags & ZEND_BB_TARGET)) {
 			BasicBlock *bb = llvm_ctx.builder.GetInsertBlock();
 			if (bb && !bb->getTerminator()) {
 				llvm_ctx.builder.CreateBr(TARGET_BB(block[b].start));
 			}
 			llvm_ctx.builder.SetInsertPoint(llvm_ctx.bb_labels[block[b].start]);
 		}
-		if (block[b].flags & TARGET_BLOCK_MARK) {
+		if (block[b].flags & ZEND_BB_TARGET) {
 			llvm_ctx.valid_opline = 0;
 		} else if (b > 0 && block[b - 1].end + 1 != block[b].start) {
 			llvm_ctx.valid_opline = 0;

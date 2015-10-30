@@ -376,22 +376,22 @@ static void zend_jit_dump_block_info(
 
 	fprintf(stderr, "  BB%d:\n", n);
 	fprintf(stderr, "    ; lines=[%d-%d]\n", block[n].start, block[n].end);
-	if ((block[n].flags & REACHABLE_BLOCK_MARK) == 0) {
+	if ((block[n].flags & ZEND_BB_REACHABLE) == 0) {
 		fprintf(stderr, "    ; unreachable\n");
 	}
-	if (block[n].flags & TARGET_BLOCK_MARK) {
+	if (block[n].flags & ZEND_BB_TARGET) {
 		fprintf(stderr, "    ; jump target\n");
 	}
-	if (block[n].flags & FOLLOW_BLOCK_MARK) {
+	if (block[n].flags & ZEND_BB_FOLLOW) {
 		fprintf(stderr, "    ; fallthrough control flow\n");
 	}
-	if (block[n].flags & ENTRY_BLOCK_MARK) {
+	if (block[n].flags & ZEND_BB_ENTRY) {
 		fprintf(stderr, "    ; entry block\n");
 	}
-	if (block[n].flags & LOOP_HEADER_BLOCK_MARK) {
+	if (block[n].flags & ZEND_BB_LOOP_HEADER) {
 		fprintf(stderr, "    ; loop header\n");
 	}
-	if (block[n].flags & IRREDUCIBLE_LOOP_BLOCK_MARK) {
+	if (block[n].flags & ZEND_BB_IRREDUCIBLE_LOOP) {
 		fprintf(stderr, "    ; entry to irreducible loop\n");
 	}
 	if (block[n].loop_header >= 0) {
@@ -802,8 +802,8 @@ void zend_jit_dump(zend_op_array *op_array, uint32_t flags)
 static void zend_jit_mark_reachable(zend_jit_basic_block *block, int n)
 {
 	while (1) {
-		if (block[n].flags & REACHABLE_BLOCK_MARK) return;
-		block[n].flags |= REACHABLE_BLOCK_MARK;
+		if (block[n].flags & ZEND_BB_REACHABLE) return;
+		block[n].flags |= ZEND_BB_REACHABLE;
 		if (block[n].successors[0] >= 0) {
 			if (block[n].successors[1] >= 0) {
 				zend_jit_mark_reachable(block, block[n].successors[0]);
@@ -841,9 +841,9 @@ int zend_jit_build_cfg(zend_jit_context *ctx, zend_op_array *op_array)
 		return FAILURE;
 	memset(block_flags, 0, sizeof(uint32_t) * op_array->last);
 
-#define TARGET_BLOCK(i)      do { if (!block_flags[i]) { blocks++;} block_flags[i] |= TARGET_BLOCK_MARK; } while (0)
-#define FOLLOW_BLOCK(i)      do { if (!block_flags[i]) { blocks++;} block_flags[i] |= FOLLOW_BLOCK_MARK; } while (0)
-#define ENTRY_BLOCK(i)       do { if (!block_flags[i]) { blocks++;} block_flags[i] |= ENTRY_BLOCK_MARK; } while (0)
+#define TARGET_BLOCK(i)      do { if (!block_flags[i]) { blocks++;} block_flags[i] |= ZEND_BB_TARGET; } while (0)
+#define FOLLOW_BLOCK(i)      do { if (!block_flags[i]) { blocks++;} block_flags[i] |= ZEND_BB_FOLLOW; } while (0)
+#define ENTRY_BLOCK(i)       do { if (!block_flags[i]) { blocks++;} block_flags[i] |= ZEND_BB_ENTRY; } while (0)
 
 	/* Build CFG, Step 1: Find basic blocks starts, calculate number of blocks */
 	ENTRY_BLOCK(0);
@@ -1139,8 +1139,8 @@ int zend_jit_build_cfg(zend_jit_context *ctx, zend_op_array *op_array)
 			case ZEND_GENERATOR_RETURN:
 			case ZEND_EXIT:
 			case ZEND_THROW:
-				block_flags[block[j].start] |= EXIT_BLOCK_MARK;
-				block[j].flags |= EXIT_BLOCK_MARK;
+				block_flags[block[j].start] |= ZEND_BB_EXIT;
+				block[j].flags |= ZEND_BB_EXIT;
 				break;
 #if 0 // LLVM backend doesn't support generators and stackless VM
 			case ZEND_DO_FCALL:
@@ -1209,7 +1209,7 @@ int zend_jit_build_cfg(zend_jit_context *ctx, zend_op_array *op_array)
 	/* Build CFG, Step 5: Calculate predecessors */
 	edges = 0;
 	for (j = 0; j < blocks; j++) {
-		if ((block[j].flags & REACHABLE_BLOCK_MARK) == 0) {
+		if ((block[j].flags & ZEND_BB_REACHABLE) == 0) {
 			block[j].successors[0] = -1;
 			block[j].successors[1] = -1;
 			block[j].predecessors_count = 0;
@@ -1224,7 +1224,7 @@ int zend_jit_build_cfg(zend_jit_context *ctx, zend_op_array *op_array)
 		return FAILURE;
 
 	for (j = 0; j < blocks; j++) {
-		if (block[j].flags & REACHABLE_BLOCK_MARK) {
+		if (block[j].flags & ZEND_BB_REACHABLE) {
 			block[j].predecessors = edge;
 			edge += block[j].predecessors_count;
 			block[j].predecessors_count = 0;
@@ -1232,7 +1232,7 @@ int zend_jit_build_cfg(zend_jit_context *ctx, zend_op_array *op_array)
 	}
 
 	for (j = 0; j < blocks; j++) {
-		if ((block[j].flags & REACHABLE_BLOCK_MARK) == 0) {
+		if ((block[j].flags & ZEND_BB_REACHABLE) == 0) {
 			continue;
 		}
 		for (i = 0; i < 2; i++) {
@@ -1264,7 +1264,7 @@ static int zend_jit_compute_dominators_tree(zend_op_array *op_array)
 		for (j = 1; j < blocks; j++) {
 			int idom = -1;
 
-			if ((block[j].flags & REACHABLE_BLOCK_MARK) == 0) {
+			if ((block[j].flags & ZEND_BB_REACHABLE) == 0) {
 				continue;
 			}
 			for (k = 0; k < block[j].predecessors_count; k++) {
@@ -1293,7 +1293,7 @@ static int zend_jit_compute_dominators_tree(zend_op_array *op_array)
 	block[0].idom = -1;
 
 	for (j = 1; j < blocks; j++) {
-		if ((block[j].flags & REACHABLE_BLOCK_MARK) == 0) {
+		if ((block[j].flags & ZEND_BB_REACHABLE) == 0) {
 			continue;
 		}
 		if (block[j].idom >= 0) {
@@ -1315,7 +1315,7 @@ static int zend_jit_compute_dominators_tree(zend_op_array *op_array)
 
 	for (j = 0; j < blocks; j++) {
 		int idom = block[j].idom, level = 0;
-		if ((block[j].flags & REACHABLE_BLOCK_MARK) == 0) {
+		if ((block[j].flags & ZEND_BB_REACHABLE) == 0) {
 			continue;
 		}
 		while (idom >= 0) {
@@ -1412,7 +1412,7 @@ static int zend_jit_identify_loops(zend_op_array *op_array)
 				/* In a loop back-edge (back-join edge), the successor dominates
 				   the predecessor.  */
 				if (dominates(op_array, i, pred)) {
-					block[i].flags |= LOOP_HEADER_BLOCK_MARK;
+					block[i].flags |= ZEND_BB_LOOP_HEADER;
 					flag &= ~ZEND_JIT_FUNC_NO_LOOPS;
 					zend_worklist_push(&work, pred);
 				} else {
@@ -1422,7 +1422,7 @@ static int zend_jit_identify_loops(zend_op_array *op_array)
 					while (dj_parent >= 0) {
 						if (dj_parent == i) {
 							/* An sp-back edge: mark as irreducible.  */
-							block[i].flags |= IRREDUCIBLE_LOOP_BLOCK_MARK;
+							block[i].flags |= ZEND_BB_IRREDUCIBLE_LOOP;
 							flag |= ZEND_JIT_FUNC_IRREDUCIBLE;
 							flag &= ~ZEND_JIT_FUNC_NO_LOOPS;
 							break;
@@ -1471,7 +1471,7 @@ static int zend_jit_compute_dfg(zend_jit_dfg *dfg, zend_op_array *op_array)
 
 	/* Collect "gen", "def" and "use" sets */
 	for (j = 0; j < blocks; j++) {
-		if ((block[j].flags & REACHABLE_BLOCK_MARK) == 0) {
+		if ((block[j].flags & ZEND_BB_REACHABLE) == 0) {
 			continue;
 		}
 		for (k = block[j].start; k <= block[j].end; k++) {
@@ -1628,7 +1628,7 @@ static int zend_jit_compute_dfg(zend_jit_dfg *dfg, zend_op_array *op_array)
 	do {
 		changed = 0;
 		for (j = 0; j < blocks; j++) {
-			if ((block[j].flags & REACHABLE_BLOCK_MARK) == 0) {
+			if ((block[j].flags & ZEND_BB_REACHABLE) == 0) {
 				continue;
 			}
 			if (block[j].successors[0] >= 0) {
@@ -2032,7 +2032,7 @@ static int zend_jit_build_ssa(zend_jit_context *ctx, zend_op_array *op_array)
 	do {
 		changed = 0;
 		for (j = 0; j < blocks; j++) {
-			if ((block[j].flags & REACHABLE_BLOCK_MARK) == 0) {
+			if ((block[j].flags & ZEND_BB_REACHABLE) == 0) {
 				continue;
 			}
 			if (j >= 0 && (block[j].predecessors_count > 1 || j == 0)) {
@@ -2058,12 +2058,12 @@ static int zend_jit_build_ssa(zend_jit_context *ctx, zend_op_array *op_array)
 		return FAILURE;
 	zend_bitset_clear(tmp, set_size);
 	for (j = 0; j < blocks; j++) {
-		if ((block[j].flags & REACHABLE_BLOCK_MARK) == 0) {
+		if ((block[j].flags & ZEND_BB_REACHABLE) == 0) {
 			continue;
 		}
 		if (block[j].predecessors_count > 1) {
 			zend_bitset_clear(tmp, set_size);
-			if (block[j].flags & IRREDUCIBLE_LOOP_BLOCK_MARK) {
+			if (block[j].flags & ZEND_BB_IRREDUCIBLE_LOOP) {
 				/* Prevent any values from flowing into irreducible loops by
 				   replacing all incoming values with explicit phis.  The
 				   register allocator depends on this property.  */
@@ -2114,7 +2114,7 @@ static int zend_jit_build_ssa(zend_jit_context *ctx, zend_op_array *op_array)
 		int bt; /* successor block number if a condition is true */
 		int bf; /* successor block number if a condition is false */
 
-		if ((block[j].flags & REACHABLE_BLOCK_MARK) == 0) {
+		if ((block[j].flags & ZEND_BB_REACHABLE) == 0) {
 			continue;
 		}
 		/* the last instruction of basic block is conditional branch,
@@ -2378,12 +2378,12 @@ static int zend_jit_build_ssa(zend_jit_context *ctx, zend_op_array *op_array)
 
 	/* SSA construction, Step ?: Phi after Pi placement based on Dominance Frontiers */
 	for (j = 0; j < blocks; j++) {
-		if ((block[j].flags & REACHABLE_BLOCK_MARK) == 0) {
+		if ((block[j].flags & ZEND_BB_REACHABLE) == 0) {
 			continue;
 		}
 		if (block[j].predecessors_count > 1) {
 			zend_bitset_clear(tmp, set_size);
-			if (block[j].flags & IRREDUCIBLE_LOOP_BLOCK_MARK) {
+			if (block[j].flags & ZEND_BB_IRREDUCIBLE_LOOP) {
 				/* Prevent any values from flowing into irreducible loops by
 				   replacing all incoming values with explicit phis.  The
 				   register allocator depends on this property.  */

@@ -197,7 +197,7 @@ static int zend_jit_sort_blocks(zend_jit_context *ctx, zend_op_array *op_array)
 			zend_jit_ssa_phi *p;
 
 			*bb = info->block[i];
-			bb->flags &= ~(TARGET_BLOCK_MARK | FOLLOW_BLOCK_MARK);
+			bb->flags &= ~(ZEND_BB_TARGET | ZEND_BB_FOLLOW);
 			for (j = bb->start; j <= bb->end; j++) {
 				info->block_map[j] = block_map[i];
 			}
@@ -228,14 +228,14 @@ static int zend_jit_sort_blocks(zend_jit_context *ctx, zend_op_array *op_array)
 			case ZEND_BRK:
 			case ZEND_CONT:
 			case ZEND_GOTO:
-				block[bb->successors[0]].flags |= TARGET_BLOCK_MARK;
+				block[bb->successors[0]].flags |= ZEND_BB_TARGET;
 				break;
 			case ZEND_JMP:
 				if (bb->successors[0] == i + 1 && bb->end > bb->start) {
 					bb->end--;
-					block[i + 1].flags |= FOLLOW_BLOCK_MARK;
+					block[i + 1].flags |= ZEND_BB_FOLLOW;
 				} else {
-					block[bb->successors[0]].flags |= TARGET_BLOCK_MARK;
+					block[bb->successors[0]].flags |= ZEND_BB_TARGET;
 				}
 				break;
 			case ZEND_JMPZ:
@@ -245,8 +245,8 @@ static int zend_jit_sort_blocks(zend_jit_context *ctx, zend_op_array *op_array)
 			case ZEND_JMPZNZ:
 				if (bb->successors[0] == i + 1) {
 					op->op2.jmp_addr = op_array->opcodes + block[bb->successors[1]].start;
-					block[bb->successors[1]].flags |= TARGET_BLOCK_MARK;
-					block[bb->successors[0]].flags |= FOLLOW_BLOCK_MARK;
+					block[bb->successors[1]].flags |= ZEND_BB_TARGET;
+					block[bb->successors[0]].flags |= ZEND_BB_FOLLOW;
 					switch (op->opcode) {
 						case ZEND_JMPZNZ:
 							op->opcode = ZEND_JMPZ;
@@ -269,8 +269,8 @@ static int zend_jit_sort_blocks(zend_jit_context *ctx, zend_op_array *op_array)
 							break;
 					}
 				} else if (bb->successors[1] == i + 1) {
-					block[bb->successors[0]].flags |= TARGET_BLOCK_MARK;
-					block[bb->successors[1]].flags |= FOLLOW_BLOCK_MARK;
+					block[bb->successors[0]].flags |= ZEND_BB_TARGET;
+					block[bb->successors[1]].flags |= ZEND_BB_FOLLOW;
 					switch (op->opcode) {
 						case ZEND_JMPZNZ:
 							op->opcode = ZEND_JMPNZ;
@@ -287,8 +287,8 @@ static int zend_jit_sort_blocks(zend_jit_context *ctx, zend_op_array *op_array)
 							break;
 					}
 				} else {
-					block[bb->successors[0]].flags |= TARGET_BLOCK_MARK;
-					block[bb->successors[1]].flags |= TARGET_BLOCK_MARK;
+					block[bb->successors[0]].flags |= ZEND_BB_TARGET;
+					block[bb->successors[1]].flags |= ZEND_BB_TARGET;
 					switch (op->opcode) {
 						case ZEND_JMPZNZ:
 							break;
@@ -324,15 +324,15 @@ static int zend_jit_sort_blocks(zend_jit_context *ctx, zend_op_array *op_array)
 			case ZEND_FE_RESET_RW:
 			case ZEND_NEW:
 			case ZEND_ASSERT_CHECK:
-				block[bb->successors[0]].flags |= TARGET_BLOCK_MARK;
-				block[bb->successors[1]].flags |= FOLLOW_BLOCK_MARK;
+				block[bb->successors[0]].flags |= ZEND_BB_TARGET;
+				block[bb->successors[1]].flags |= ZEND_BB_FOLLOW;
 				break;
 			case ZEND_OP_DATA:
 				if ((op-1)->opcode == ZEND_FE_FETCH_R || (op-1)->opcode == ZEND_FE_FETCH_RW) {
-					block[bb->successors[0]].flags |= TARGET_BLOCK_MARK;
-					block[bb->successors[1]].flags |= FOLLOW_BLOCK_MARK;
+					block[bb->successors[0]].flags |= ZEND_BB_TARGET;
+					block[bb->successors[1]].flags |= ZEND_BB_FOLLOW;
 				} else if (bb->successors[0] >= 0) {
-					block[bb->successors[0]].flags |= FOLLOW_BLOCK_MARK;
+					block[bb->successors[0]].flags |= ZEND_BB_FOLLOW;
 				}
 				break;
 			case ZEND_RETURN:
@@ -345,7 +345,7 @@ static int zend_jit_sort_blocks(zend_jit_context *ctx, zend_op_array *op_array)
 				break;
 			default:
 				if (bb->successors[0] >= 0) {
-					block[bb->successors[0]].flags |= FOLLOW_BLOCK_MARK;
+					block[bb->successors[0]].flags |= ZEND_BB_FOLLOW;
 				}
 				break;
 		}
@@ -554,7 +554,7 @@ static int zend_jit_compute_preallocated_cvs(zend_op_array *op_array)
 		    i != EX_VAR_TO_NUM(op_array->this_var)) {
 			phi = info->ssa_var[i].phi_use_chain;
 			while (phi) {
-				if (info->block[phi->block].flags & LOOP_HEADER_BLOCK_MARK) {
+				if (info->block[phi->block].flags & ZEND_BB_LOOP_HEADER) {
 					info->ssa_var_info[phi->var].type |= MAY_BE_DEF;
 				}
 				phi = next_use_phi(info, i, phi);
@@ -4365,7 +4365,7 @@ static void zend_jit_func_return_info(zend_jit_context      *ctx,
 	}
 
 	for (j = 0; j < blocks; j++) {
-		if (block[j].flags & REACHABLE_BLOCK_MARK) {
+		if (block[j].flags & ZEND_BB_REACHABLE) {
 			zend_op *opline = op_array->opcodes + block[j].end;
 			
 			if (opline->opcode == ZEND_RETURN || opline->opcode == ZEND_RETURN_BY_REF) {
@@ -4908,7 +4908,7 @@ static void zend_jit_check_no_symtab(zend_op_array *op_array)
 		return;
 	}
 	for (b = 0; b < info->blocks; b++) {
-		if ((info->block[b].flags & REACHABLE_BLOCK_MARK) == 0) {
+		if ((info->block[b].flags & ZEND_BB_REACHABLE) == 0) {
 			continue;
 		}
 		for (i = info->block[b].start; i <= info->block[b].end; i++) {
@@ -5218,7 +5218,7 @@ static void zend_jit_check_no_frame(zend_jit_context *ctx, zend_op_array *op_arr
 		return;
 	} 
 	for (b = 0; b < info->blocks; b++) {
-		if ((info->block[b].flags & REACHABLE_BLOCK_MARK) == 0) {
+		if ((info->block[b].flags & ZEND_BB_REACHABLE) == 0) {
 			continue;
 		}
 		for (i = info->block[b].start; i <= info->block[b].end; i++) {
