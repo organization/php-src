@@ -8825,6 +8825,7 @@ static int zend_jit_math(zend_llvm_ctx    &llvm_ctx,
 				op2_max = LONG_MAX;
 			}
 
+			BasicBlock *bb_fdiv = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
 			if (op2_min <= 0 && op2_max >= 0) {
 				// Check for division by zero
 				BasicBlock *bb_zero = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
@@ -8839,20 +8840,7 @@ static int zend_jit_math(zend_llvm_ctx    &llvm_ctx,
 				llvm_ctx.builder.SetInsertPoint(bb_zero);
 				// JIT: zend_error(E_WARNING, "Division by zero");
 				zend_jit_error(llvm_ctx, opline, E_WARNING, "Division by zero");
-				// JIT: ZVAL_BOOL(result, 0);
-				Value *result; 
-				if (!result_addr) {
-					result = zend_jit_load_tmp_zval(llvm_ctx, result_op->var);
-				} else {
-					result = result_addr;
-				}
-				zend_jit_save_zval_type_info(llvm_ctx,
-					result, result_ssa_var, result_info,
-					llvm_ctx.builder.getInt32(IS_FALSE));
-				if (!bb_finish) {
-					bb_finish = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
-				}
-				llvm_ctx.builder.CreateBr(bb_finish);
+				llvm_ctx.builder.CreateBr(bb_fdiv);
 				llvm_ctx.builder.SetInsertPoint(bb_non_zero);
 			}
 			if (op1_min == LONG_MIN && op2_min <= -1 && op2_max >= -1) {
@@ -8892,7 +8880,6 @@ static int zend_jit_math(zend_llvm_ctx    &llvm_ctx,
 				llvm_ctx.builder.SetInsertPoint(bb_div);
 			}
 					
-			BasicBlock *bb_fdiv = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
 			BasicBlock *bb_sdiv = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
 			res = llvm_ctx.builder.CreateExactSDiv(op1_val, op2_val);
 			zend_jit_unexpected_br(llvm_ctx,
@@ -9137,18 +9124,7 @@ static int zend_jit_math(zend_llvm_ctx    &llvm_ctx,
 				llvm_ctx.builder.SetInsertPoint(bb_zero);
 				// JIT: zend_error(E_WARNING, "Division by zero");
 				zend_jit_error(llvm_ctx, opline, E_WARNING, "Division by zero");
-				// JIT: ZVAL_BOOL(result, 0);
-				Value *result; 
-				if (!result_addr) {
-					result = zend_jit_load_tmp_zval(llvm_ctx, result_op->var);
-				} else {
-					result = result_addr;
-				}
-				zend_jit_save_zval_type_info(llvm_ctx, result, result_ssa_var, result_info, llvm_ctx.builder.getInt32(IS_FALSE));
-				if (!bb_finish) {
-					bb_finish = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
-				}
-				llvm_ctx.builder.CreateBr(bb_finish);
+				llvm_ctx.builder.CreateBr(bb_non_zero);
 				llvm_ctx.builder.SetInsertPoint(bb_non_zero);
 			}
 			res = llvm_ctx.builder.CreateFDiv(op1_val, op2_val);
