@@ -15678,7 +15678,7 @@ static int zend_jit_check_internal_type_hint(zend_llvm_ctx    &llvm_ctx,
 	Function *_helper = zend_jit_get_helper(
 			llvm_ctx,
 			(void*)zend_check_internal_arg_type,
-			ZEND_JIT_SYM("zend_check_internal_atg_type"),
+			ZEND_JIT_SYM("zend_check_internal_arg_type"),
 			ZEND_JIT_HELPER_FAST_CALL,
 			Type::getVoidTy(llvm_ctx.context),
 			PointerType::getUnqual(llvm_ctx.zend_function_type),
@@ -15722,7 +15722,7 @@ static Value* zend_jit_check_type_hint(zend_llvm_ctx    &llvm_ctx,
 /* }}} */
 
 /* {{{ static int zend_jit_check_missing_arg */
-static Value* zend_jit_check_missing_arg(zend_llvm_ctx    &llvm_ctx,
+static void zend_jit_check_missing_arg(zend_llvm_ctx    &llvm_ctx,
                                       uint32_t          arg_num,
                                       Value            *cache_slot)
 {
@@ -15731,7 +15731,7 @@ static Value* zend_jit_check_missing_arg(zend_llvm_ctx    &llvm_ctx,
 			(void*)zend_check_missing_arg,
 			ZEND_JIT_SYM("zend_check_missing_arg"),
 			ZEND_JIT_HELPER_FAST_CALL,
-			Type::getInt32Ty(llvm_ctx.context),
+			Type::getVoidTy(llvm_ctx.context),
 			PointerType::getUnqual(llvm_ctx.zend_execute_data_type),
 			Type::getInt32Ty(llvm_ctx.context),
 			PointerType::getUnqual(PointerType::getUnqual(LLVM_GET_LONG_TY(llvm_ctx.context))),
@@ -15743,7 +15743,6 @@ static Value* zend_jit_check_missing_arg(zend_llvm_ctx    &llvm_ctx,
 		llvm_ctx.builder.getInt32(arg_num),
 		cache_slot);
 	call->setCallingConv(CallingConv::X86_FastCall);
-	return call;
 }
 /* }}} */
 
@@ -17052,27 +17051,20 @@ static int zend_jit_recv(zend_llvm_ctx    &llvm_ctx,
 		}
 		llvm_ctx.builder.CreateBr(bb_check);
 	} else if (opline->opcode == ZEND_RECV) {
-		BasicBlock *bb_error = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
-
 		//JIT: SAVE_OPLINE();
 		if (!llvm_ctx.valid_opline) {
 			JIT_CHECK(zend_jit_store_opline(llvm_ctx, opline, false));
 		}
-		//JIT: if (UNEXPECTED(!zend_verify_missing_arg(execute_data, arg_num, CACHE_ADDR(opline->op2.num))))
-		Value *ret = zend_jit_check_missing_arg(llvm_ctx,
+		//JIT: zend_verify_missing_arg(execute_data, arg_num, CACHE_ADDR(opline->op2.num));
+		zend_jit_check_missing_arg(llvm_ctx,
 			OP1_OP()->num,
 			zend_jit_cache_slot_addr(
 				llvm_ctx,
 				opline->op2.num,
 				PointerType::getUnqual(LLVM_GET_LONG_TY(llvm_ctx.context))));
-		zend_jit_unexpected_br(
-				llvm_ctx,
-				llvm_ctx.builder.CreateICmpEQ(ret, llvm_ctx.builder.getInt32(0)),
-				bb_error,
-				bb_end);
-		llvm_ctx.builder.SetInsertPoint(bb_error);
-		//JIT: HANDLE_EXCEPTION();
-		llvm_ctx.builder.CreateBr(zend_jit_find_exception_bb(llvm_ctx, opline));
+		//JIT: CHECK_EXCEPTION();
+		JIT_CHECK(zend_jit_check_exception(llvm_ctx, opline));
+		llvm_ctx.builder.CreateBr(bb_end);
 	} else {
 		ASSERT_NOT_REACHED();
 	}
