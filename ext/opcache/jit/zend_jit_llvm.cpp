@@ -1212,8 +1212,8 @@ static BasicBlock *zend_jit_find_exception_bb(zend_llvm_ctx &ctx, zend_op *oplin
 			JIT_CHECK(zend_jit_call_handler(ctx, EG(exception_op), 0));
 
 			const zend_jit_func_info *info = JIT_DATA(ctx.op_array);
-			for (int i = 0; i < info->blocks; i++) {
-				if (info->block[i].start == catch_op_num) {
+			for (int i = 0; i < info->cfg.blocks; i++) {
+				if (info->cfg.block[i].start == catch_op_num) {
 					ctx.builder.CreateBr(ctx.bb_labels[i]);
 					break;
 				}
@@ -3516,7 +3516,7 @@ static int zend_jit_separate_array(zend_llvm_ctx  &llvm_ctx,
                                    Value          *type_info,
                                    zend_uchar      op_type,
                                    znode_op       *op,
-                                   int             ssa,
+                                   int             ssa_var,
                                    uint32_t        info,
                                    zend_op        *opline)
 {
@@ -3530,7 +3530,7 @@ static int zend_jit_separate_array(zend_llvm_ctx  &llvm_ctx,
 
 		refcount_addr = zend_jit_refcount_addr(
 				llvm_ctx, 
-				zend_jit_load_array(llvm_ctx, zval_addr, ssa, info));
+				zend_jit_load_array(llvm_ctx, zval_addr, ssa_var, info));
 
 		refcount = llvm_ctx.builder.CreateAlignedLoad(refcount_addr, 4);
 		zend_jit_unexpected_br(llvm_ctx,
@@ -3542,7 +3542,7 @@ static int zend_jit_separate_array(zend_llvm_ctx  &llvm_ctx,
 		llvm_ctx.builder.SetInsertPoint(bb_cont);
 
 		if (!type_info) {
-			type_info = zend_jit_load_type_info_c(llvm_ctx, zval_addr, op_type, op, ssa, info);
+			type_info = zend_jit_load_type_info_c(llvm_ctx, zval_addr, op_type, op, ssa_var, info);
 		}
 
 		//JIT: if (!Z_IMMUTABLE_P(_zv))
@@ -3673,11 +3673,11 @@ static int zend_jit_needs_check_for_this(zend_llvm_ctx &llvm_ctx, int bb)
 	zend_op_array *op_array = llvm_ctx.op_array;
 	zend_jit_func_info *info = JIT_DATA(op_array);
 
-	ZEND_ASSERT(bb >= 0 && bb < info->blocks);
+	ZEND_ASSERT(bb >= 0 && bb < info->cfg.blocks);
 	if (!zend_bitset_in(llvm_ctx.this_checked, bb)) {
 		zend_bitset_incl(llvm_ctx.this_checked, bb);
-		while (bb != info->block[bb].idom) {
-			bb = info->block[bb].idom;
+		while (bb != info->cfg.block[bb].idom) {
+			bb = info->cfg.block[bb].idom;
 			if (bb < 0) {
 				return 1;
 			} else if (zend_bitset_in(llvm_ctx.this_checked, bb)) {
@@ -3831,7 +3831,7 @@ static Value *zend_jit_reload_from_reg(zend_llvm_ctx    &llvm_ctx,
 {
 	zend_op_array *op_array = llvm_ctx.op_array;
 	zend_jit_func_info *info = JIT_DATA(op_array);
-	Value *to_addr = zend_jit_load_slot(llvm_ctx, (zend_uintptr_t)ZEND_CALL_VAR_NUM(NULL, info->ssa_var[from_var].var));
+	Value *to_addr = zend_jit_load_slot(llvm_ctx, (zend_uintptr_t)ZEND_CALL_VAR_NUM(NULL, info->ssa.var[from_var].var));
 
 	zend_jit_save_zval_type_info(llvm_ctx, to_addr, -1, MAY_BE_ANY,
 		zend_jit_load_type_info(llvm_ctx, NULL, from_var, from_info));
@@ -15867,8 +15867,8 @@ static void collect_depended_phi_vars(zend_bitset         worklist,
 {
 	zend_bitset_incl(worklist, var);
 
-	if (info->ssa_var[var].phi_use_chain) {		
-		zend_jit_ssa_phi *p = info->ssa_var[var].phi_use_chain;
+	if (info->ssa.var[var].phi_use_chain) {		
+		zend_jit_ssa_phi *p = info->ssa.var[var].phi_use_chain;
 		do {
 			if (!zend_bitset_in(worklist, p->ssa_var)) {
 				collect_depended_phi_vars(worklist, info, p->ssa_var);
@@ -15888,11 +15888,11 @@ static int zend_jit_may_be_used_as_returned_reference(zend_op_array *op_array,
 	int worklist_len;
 	int j, i;
 
-	if (!info->ssa_var) {
+	if (!info->ssa.var) {
 		return 1;
 	}
 
-	worklist_len = zend_bitset_len(info->ssa_vars);
+	worklist_len = zend_bitset_len(info->ssa.vars);
 	worklist = (zend_bitset)alloca(sizeof(zend_ulong) * worklist_len);
 	memset(worklist, 0, sizeof(zend_ulong) * worklist_len);
 	collect_depended_phi_vars(worklist, info, var);
@@ -15900,13 +15900,13 @@ static int zend_jit_may_be_used_as_returned_reference(zend_op_array *op_array,
 	while (!zend_bitset_empty(worklist, worklist_len)) {
 		i = zend_bitset_first(worklist, worklist_len);
 		zend_bitset_excl(worklist, i);
-		j = info->ssa_var[i].use_chain;
+		j = info->ssa.var[i].use_chain;
 		while (j >= 0) {
 			zend_op *opline = op_array->opcodes + j;
 			if (opline->extended_value == ZEND_RETURNS_FUNCTION) {
 				switch (opline->opcode) {
 					case ZEND_ASSIGN_REF:
-						if (info->ssa[j].op2_use == i) {
+						if (info->ssa.op[j].op2_use == i) {
 							return 1;
 						}
 						break;
@@ -15914,13 +15914,13 @@ static int zend_jit_may_be_used_as_returned_reference(zend_op_array *op_array,
 					case ZEND_SEND_VAR_NO_REF:
 					case ZEND_YIELD:
 					case ZEND_YIELD_FROM:
-						if (info->ssa[j].op1_use == i) {
+						if (info->ssa.op[j].op1_use == i) {
 							return 1;
 						}
 						break;
 				}
 		    }
-			j = next_use(info->ssa, i, j);
+			j = next_use(info->ssa.op, i, j);
 		}
 	}
 
@@ -16655,10 +16655,10 @@ static int zend_jit_free_compiled_variables(zend_llvm_ctx    &llvm_ctx,
 
 	// TODO: use type inference to avoid useless zval_ptr_dtor() ???...
 	for (uint32_t i = 0 ; i < op_array->last_var; i++) {	    
-	    if (ctx && ctx->ssa_var && ctx->ssa_var_info) {
+	    if (ctx && ctx->ssa.var && ctx->ssa_var_info) {
 			info = ctx->ssa_var_info[i].type;
-		    for (uint32_t j = op_array->last_var; j < ctx->ssa_vars; j++) {
-		    	if (ctx->ssa_var[j].var == i) {
+		    for (uint32_t j = op_array->last_var; j < ctx->ssa.vars; j++) {
+		    	if (ctx->ssa.var[j].var == i) {
 		    		if (!(ctx->ssa_var_info[j].type & MAY_BE_IN_REG)) {
 						info |= ctx->ssa_var_info[j].type;
 					}
@@ -17450,32 +17450,32 @@ static int zend_jit_assign_regs(zend_llvm_ctx    &llvm_ctx,
 	Value **tmp_reg = (Value**)alloca(sizeof(Value*) * op_array->last_var * 4);
 
 	memset(tmp_reg, 0, sizeof(Value*) * op_array->last_var * 4);
-	for (i = 0; i < info->ssa_vars; i++) {
+	for (i = 0; i < info->ssa.vars; i++) {
 		if (info->ssa_var_info[i].type & MAY_BE_IN_REG) {
 			if (info->ssa_var_info[i].type & (MAY_BE_NULL|MAY_BE_FALSE|MAY_BE_TRUE)) {
-				if (info->ssa_var[i].var < op_array->last_var) {
-					if (!tmp_reg[info->ssa_var[i].var * 4 + 0]) {
-						tmp_reg[info->ssa_var[i].var * 4 + 0] = llvm_ctx.builder.CreateAlloca(Type::getInt32Ty(llvm_ctx.context));
+				if (info->ssa.var[i].var < op_array->last_var) {
+					if (!tmp_reg[info->ssa.var[i].var * 4 + 0]) {
+						tmp_reg[info->ssa.var[i].var * 4 + 0] = llvm_ctx.builder.CreateAlloca(Type::getInt32Ty(llvm_ctx.context));
 					}
-					reg = tmp_reg[info->ssa_var[i].var * 4 + 0];
+					reg = tmp_reg[info->ssa.var[i].var * 4 + 0];
 				} else {
 					reg = llvm_ctx.builder.CreateAlloca(Type::getInt32Ty(llvm_ctx.context));
 				}
 			} else if (info->ssa_var_info[i].type & MAY_BE_LONG) {
-				if (info->ssa_var[i].var < op_array->last_var) {
-					if (!tmp_reg[info->ssa_var[i].var * 4 + 1]) {
-						tmp_reg[info->ssa_var[i].var * 4 + 1] = llvm_ctx.builder.CreateAlloca(Type::LLVM_GET_LONG_TY(llvm_ctx.context));
+				if (info->ssa.var[i].var < op_array->last_var) {
+					if (!tmp_reg[info->ssa.var[i].var * 4 + 1]) {
+						tmp_reg[info->ssa.var[i].var * 4 + 1] = llvm_ctx.builder.CreateAlloca(Type::LLVM_GET_LONG_TY(llvm_ctx.context));
 					}
-					reg = tmp_reg[info->ssa_var[i].var * 4 + 1];
+					reg = tmp_reg[info->ssa.var[i].var * 4 + 1];
 				} else {
 					reg = llvm_ctx.builder.CreateAlloca(Type::LLVM_GET_LONG_TY(llvm_ctx.context));
 				}
 			} else if (info->ssa_var_info[i].type & MAY_BE_DOUBLE) {
-				if (info->ssa_var[i].var < op_array->last_var) {
-					if (!tmp_reg[info->ssa_var[i].var * 4 + 2]) {
-						tmp_reg[info->ssa_var[i].var * 4 + 2] = llvm_ctx.builder.CreateAlloca(Type::getDoubleTy(llvm_ctx.context));
+				if (info->ssa.var[i].var < op_array->last_var) {
+					if (!tmp_reg[info->ssa.var[i].var * 4 + 2]) {
+						tmp_reg[info->ssa.var[i].var * 4 + 2] = llvm_ctx.builder.CreateAlloca(Type::getDoubleTy(llvm_ctx.context));
 					}
-					reg = tmp_reg[info->ssa_var[i].var * 4 + 2];
+					reg = tmp_reg[info->ssa.var[i].var * 4 + 2];
 				} else {
 					reg = llvm_ctx.builder.CreateAlloca(Type::getDoubleTy(llvm_ctx.context));
 				}
@@ -17504,14 +17504,14 @@ static BasicBlock *zend_jit_ssa_target(zend_llvm_ctx    &llvm_ctx,
 
 	if (info && info->ssa_var_info) {
 		BasicBlock *bb_start = NULL;
-		zend_jit_basic_block *b = info->block + to_block;
-		zend_jit_ssa_phi *p;
+		zend_jit_basic_block *b = info->cfg.block + to_block;
+		zend_jit_ssa_phi *p = info->ssa.block[to_block].phis;
 		int to_var, from_var;
 		uint32_t to_info, from_info;
 		BasicBlock *orig_bb;
 
 		ZEND_ASSERT(from_block >= 0);
-		for (p = b->phis; p; p = p->next) {
+		for (; p; p = p->next) {
 			to_var = p->ssa_var;
 			from_var = -1;
 			if (p->pi >= 0) {
@@ -17520,7 +17520,7 @@ static BasicBlock *zend_jit_ssa_target(zend_llvm_ctx    &llvm_ctx,
 				int j;
 
 				for (j = 0; j < b->predecessors_count; j++) {
-					if (b->predecessors[j] == from_block) {
+					if (info->cfg.predecessor[b->predecessor_offset + j] == from_block) {
 						from_var = p->sources[j];
 						break;
 					}
@@ -17531,7 +17531,7 @@ static BasicBlock *zend_jit_ssa_target(zend_llvm_ctx    &llvm_ctx,
 				continue;
 			}
 			ZEND_ASSERT(to_var >= 0 && from_var >= 0);
-			if (info->ssa_var[from_var].no_val) {
+			if (info->ssa.var[from_var].no_val) {
 				continue;
 			}			
 			to_info = info->ssa_var_info[to_var].type;
@@ -17607,7 +17607,7 @@ static int zend_jit_codegen_ex(zend_jit_context *ctx,
 	int i;
 	int b, from_b;
 	zend_jit_func_info *info = JIT_DATA(op_array);
-	zend_jit_basic_block *block = info->block;
+	zend_jit_basic_block *block = info->cfg.block;
 	zend_op *opline;
 
 #if JIT_STAT
@@ -17621,9 +17621,9 @@ static int zend_jit_codegen_ex(zend_jit_context *ctx,
 		}
 	}
 
-	jit_stat.ssa_vars += info->ssa_vars - op_array->last_var;
+	jit_stat.ssa_vars += info->ssa.vars - op_array->last_var;
 	if (info->ssa_var_info) {
-		for (i = op_array->last_var; i < info->ssa_vars; i++) {
+		for (i = op_array->last_var; i < info->ssa.vars; i++) {
 			if ((info->ssa_var_info[i].type & MAY_BE_ANY) == MAY_BE_ANY) {
 				jit_stat.untyped_ssa_vars++;
 			} else if (has_concrete_type(info->ssa_var_info[i].type)) {
@@ -17634,7 +17634,7 @@ static int zend_jit_codegen_ex(zend_jit_context *ctx,
 			}
 		}
 	} else {
-		jit_stat.untyped_ssa_vars += info->ssa_vars - op_array->last_var;
+		jit_stat.untyped_ssa_vars += info->ssa.vars - op_array->last_var;
 	}
 #endif
 	
@@ -17647,7 +17647,7 @@ static int zend_jit_codegen_ex(zend_jit_context *ctx,
 	llvm_ctx.bb_leave = NULL;
 	llvm_ctx.call_level = 0;
 	
-	llvm_ctx.bb_labels = (BasicBlock**)zend_jit_context_calloc(ctx, sizeof(BasicBlock*), info->blocks);
+	llvm_ctx.bb_labels = (BasicBlock**)zend_jit_context_calloc(ctx, sizeof(BasicBlock*), info->cfg.blocks);
 	if (!llvm_ctx.bb_labels) return 0;
 
 	if (op_array->last_try_catch) {
@@ -17656,7 +17656,7 @@ static int zend_jit_codegen_ex(zend_jit_context *ctx,
 	}
 
 	/* Find variables that may be allocated in registers */
-	llvm_ctx.reg = (Value**)zend_jit_context_calloc(ctx, sizeof(Value*), info->ssa_vars);
+	llvm_ctx.reg = (Value**)zend_jit_context_calloc(ctx, sizeof(Value*), info->ssa.vars);
 
 //???	llvm_ctx.param_reg = (Value**)zend_jit_context_calloc(ctx, sizeof(Value*), op_array->used_stack);
 //???	llvm_ctx.param_top = 0;
@@ -17685,18 +17685,18 @@ static int zend_jit_codegen_ex(zend_jit_context *ctx,
 	if (block[0].flags & ZEND_BB_TARGET) {
 		llvm_ctx.bb_labels[0] = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
 	}
-	for (b = 1; b < info->blocks; b++) {
+	for (b = 1; b < info->cfg.blocks; b++) {
 		if (block[b].flags & ZEND_BB_REACHABLE) {
 			llvm_ctx.bb_labels[b] = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
 		}
 	}
 
-	llvm_ctx.this_checked = (zend_bitset)zend_jit_context_calloc(ctx, sizeof(zend_ulong), zend_bitset_len(info->blocks));
+	llvm_ctx.this_checked = (zend_bitset)zend_jit_context_calloc(ctx, sizeof(zend_ulong), zend_bitset_len(info->cfg.blocks));
 
 	llvm_ctx.valid_opline = 1;
 
 	from_b = -1;
-	for (b = 0; b < info->blocks; b++) {
+	for (b = 0; b < info->cfg.blocks; b++) {
 		if ((block[b].flags & ZEND_BB_REACHABLE) == 0) {
 			continue;
 		}
@@ -18656,11 +18656,11 @@ int zend_opline_supports_reg_alloc(zend_op_array    *op_array,
 void zend_jit_mark_reg_zvals(zend_op_array *op_array) /* {{{ */
 {
 	zend_jit_func_info    *info         = JIT_DATA(op_array);
-//	zend_jit_basic_block  *block        = info->block;
-	zend_jit_ssa_op       *ssa          = info->ssa;
-	zend_jit_ssa_var      *ssa_var      = info->ssa_var;
+//	zend_jit_basic_block  *block        = info->cfg.block;
+	zend_jit_ssa_op       *ssa_op       = info->ssa.op;
+	zend_jit_ssa_var      *ssa_var      = info->ssa.var;
 	zend_jit_ssa_var_info *ssa_var_info = info->ssa_var_info;
-	int                    ssa_vars     = info->ssa_vars;
+	int                    ssa_vars     = info->ssa.vars;
 	int i, j;
 
 	for (i = 0; i < ssa_vars; i++) {
@@ -18705,7 +18705,7 @@ void zend_jit_mark_reg_zvals(zend_op_array *op_array) /* {{{ */
 					ssa_var_info[i].type &= ~MAY_BE_IN_REG;
 					break;
 				}
-				j = next_use(ssa, i, j);
+				j = next_use(ssa_op, i, j);
 			}
 		}
 	}

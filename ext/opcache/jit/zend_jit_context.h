@@ -31,52 +31,6 @@
 #include "zend_arena.h"
 #include "zend_bitset.h"
 
-typedef struct _zend_jit_basic_block zend_jit_basic_block;
-typedef struct _zend_jit_ssa_phi zend_jit_ssa_phi;
-typedef struct _zend_jit_context zend_jit_context;
-
-typedef struct _zend_jit_range {
-	zend_long  min;
-	zend_long  max;
-	zend_bool  underflow;
-	zend_bool  overflow;
-} zend_jit_range;
-
-typedef enum _negative_lat {
-	NEG_NONE      = 0,
-	NEG_INIT      = 1,
-	NEG_INVARIANT = 2,
-	NEG_USE_LT    = 3,
-	NEG_USE_GT    = 4,
-	NEG_UNKNOWN   = 5
-} negative_lat;
-
-/* Special kind of SSA Phi function used in eSSA */
-typedef struct _zend_jit_pi_range {
-	zend_jit_range range;       /* simple range constraint */
-	int            min_var;
-	int            max_var;
-	int            min_ssa_var; /* ((min_var>0) ? MIN(ssa_var) : 0) + range.min */
-	int            max_ssa_var; /* ((man_var>0) ? MAX(ssa_var) : 0) + range.man */
-	negative_lat   negative;
-} zend_jit_pi_range;
-
-/* SSA Phi - ssa_var = Phi(source0, source1, ...sourceN) */
-struct _zend_jit_ssa_phi {
-	zend_jit_ssa_phi      *next;          /* next Phi in the same BB */
-	int                    pi;            /* if >= 0 this is actually a e-SSA Pi */
-	zend_jit_pi_range      constraint;    /* e-SSA Pi constraint */
-	int                    var;           /* Original CV, VAR or TMP variable index */
-	int                    ssa_var;       /* SSA variable index */
-	int                    block;         /* current BB index */
-	int                    visited;       /* flag to avoid recursive processing */
-	zend_jit_ssa_phi     **use_chains;
-	zend_jit_ssa_phi      *sym_use_chain;
-	int                   *sources;       /* Array of SSA IDs that produce this var.
-									         As many as this block has
-									         predecessors.  */
-};
-
 /* zend_jit_basic_bloc.flags */
 #define ZEND_BB_TARGET           (1<<0)
 #define ZEND_BB_FOLLOW           (1<<1)
@@ -94,53 +48,112 @@ struct _zend_jit_ssa_phi {
 
 #define ZEND_BB_REACHABLE        (1<<31)
 
-struct _zend_jit_basic_block {
+typedef struct _zend_jit_basic_block {
 	uint32_t               flags;
 	uint32_t               start;              /* first opcode number         */
 	uint32_t               end;                /* last opcode number          */
 	int                    successors[2];      /* up to 2 successor blocks    */
 	int                    predecessors_count; /* number of predecessors      */
-	int                   *predecessors;       /* array of predecessors       */
+	int                    predecessor_offset; /* offset of 1-st predecessor  */
 	int                    idom;               /* immediate dominator block   */
 	int                    loop_header;        /* closest loop header, or -1  */
 	int                    level;              /* steps away from the entry in the dom. tree */
 	int                    children;           /* list of dominated blocks    */
 	int                    next_child;         /* next dominated block        */
-	zend_jit_ssa_phi      *phis;
+} zend_jit_basic_block;
+
+typedef struct _zend_jit_cfg {
+	int                    blocks;             /* number of basic blocks      */
+	zend_jit_basic_block  *block;              /* array of basic blocks       */
+	int                   *predecessor;
+} zend_jit_cfg;
+
+typedef struct _zend_jit_range {
+	zend_long              min;
+	zend_long              max;
+	zend_bool              underflow;
+	zend_bool              overflow;
+} zend_jit_range;
+
+typedef enum _negative_lat {
+	NEG_NONE      = 0,
+	NEG_INIT      = 1,
+	NEG_INVARIANT = 2,
+	NEG_USE_LT    = 3,
+	NEG_USE_GT    = 4,
+	NEG_UNKNOWN   = 5
+} negative_lat;
+
+/* Special kind of SSA Phi function used in eSSA */
+typedef struct _zend_jit_pi_range {
+	zend_jit_range         range;       /* simple range constraint */
+	int                    min_var;
+	int                    max_var;
+	int                    min_ssa_var; /* ((min_var>0) ? MIN(ssa_var) : 0) + range.min */
+	int                    max_ssa_var; /* ((man_var>0) ? MAX(ssa_var) : 0) + range.man */
+	negative_lat           negative;
+} zend_jit_pi_range;
+
+/* SSA Phi - ssa_var = Phi(source0, source1, ...sourceN) */
+typedef struct _zend_jit_ssa_phi zend_jit_ssa_phi;
+struct _zend_jit_ssa_phi {
+	zend_jit_ssa_phi      *next;          /* next Phi in the same BB */
+	int                    pi;            /* if >= 0 this is actually a e-SSA Pi */
+	zend_jit_pi_range      constraint;    /* e-SSA Pi constraint */
+	int                    var;           /* Original CV, VAR or TMP variable index */
+	int                    ssa_var;       /* SSA variable index */
+	int                    block;         /* current BB index */
+	int                    visited;       /* flag to avoid recursive processing */
+	zend_jit_ssa_phi     **use_chains;
+	zend_jit_ssa_phi      *sym_use_chain;
+	int                   *sources;       /* Array of SSA IDs that produce this var.
+									         As many as this block has
+									         predecessors.  */
 };
 
+typedef struct _zend_jit_ssa_block {
+	zend_jit_ssa_phi      *phis;
+} zend_jit_ssa_block;
+
 typedef struct _zend_jit_ssa_op {
-	int op1_use;
-	int op2_use;
-	int result_use;
-	int op1_def;
-	int op2_def;
-	int result_def;
-	int op1_use_chain;
-	int op2_use_chain;
-	int res_use_chain;
+	int                    op1_use;
+	int                    op2_use;
+	int                    result_use;
+	int                    op1_def;
+	int                    op2_def;
+	int                    result_def;
+	int                    op1_use_chain;
+	int                    op2_use_chain;
+	int                    res_use_chain;
 } zend_jit_ssa_op;
 
 typedef struct _zend_jit_ssa_var {
-	int               var;            /* original var number; op.var for CVs and following numbers for VARs and TMP_VARs */
-	int               scc;            /* strongly connected component */
-	int               definition;     /* opcode that defines this value */
-	zend_jit_ssa_phi *definition_phi; /* phi that defines this value */
-	int               use_chain;      /* uses of this value, linked through opN_use_chain */
-	zend_jit_ssa_phi *phi_use_chain;  /* uses of this value in Phi, linked through use_chain */
-	zend_jit_ssa_phi *sym_use_chain;  /* uses of this value in Pi constaints */
-	unsigned int      no_val : 1;     /* value doesn't mater (used as op1 in ZEND_ASSIGN) */
-	unsigned int      scc_entry : 1;
+	int                    var;            /* original var number; op.var for CVs and following numbers for VARs and TMP_VARs */
+	int                    scc;            /* strongly connected component */
+	int                    definition;     /* opcode that defines this value */
+	zend_jit_ssa_phi      *definition_phi; /* phi that defines this value */
+	int                    use_chain;      /* uses of this value, linked through opN_use_chain */
+	zend_jit_ssa_phi      *phi_use_chain;  /* uses of this value in Phi, linked through use_chain */
+	zend_jit_ssa_phi      *sym_use_chain;  /* uses of this value in Pi constaints */
+	unsigned int           no_val : 1;     /* value doesn't mater (used as op1 in ZEND_ASSIGN) */
+	unsigned int           scc_entry : 1;
 } zend_jit_ssa_var;
 
+typedef struct _zend_jit_ssa {
+	int                    vars;     /* number of SSA variables        */
+	zend_jit_ssa_block    *block;    /* array of SSA blocks            */
+	zend_jit_ssa_op       *op;       /* array of SSA instructions      */
+	zend_jit_ssa_var      *var;      /* use/def chain of SSA variables */
+} zend_jit_ssa;
+
 typedef struct _zend_jit_ssa_var_info {
-	uint32_t          type; /* inferred type */
-	zend_jit_range    range;
-	zend_class_entry *ce;
-	unsigned int      has_range : 1;
-	unsigned int      is_instanceof : 1; /* 0 - class == "ce", 1 - may be child of "ce" */
-	unsigned int      recursive : 1;
-	unsigned int      use_as_double : 1;
+	uint32_t               type; /* inferred type */
+	zend_jit_range         range;
+	zend_class_entry      *ce;
+	unsigned int           has_range : 1;
+	unsigned int           is_instanceof : 1; /* 0 - class == "ce", 1 - may be child of "ce" */
+	unsigned int           recursive : 1;
+	unsigned int           use_as_double : 1;
 } zend_jit_ssa_var_info;
 
 #define ZEND_JIT_FUNC_TOO_DYNAMIC              (1<<0)
@@ -200,12 +213,9 @@ struct _zend_jit_call_info {
 struct _zend_jit_func_info {
 	int                     num;
 	uint32_t                flags;
-	zend_jit_basic_block   *block;        /* array of basic blocks         */
-	int                     blocks;       /* number of basic blocks        */
-	zend_jit_ssa_op        *ssa;          /* array of SSA instructions     */
-	zend_jit_ssa_var       *ssa_var;      /* use/def chain of SSA variables*/
+	zend_jit_cfg            cfg;          /* Control Flow Graph            */
+	zend_jit_ssa            ssa;          /* Static Single Assignmnt Form  */
 	zend_jit_ssa_var_info  *ssa_var_info; /* type/range of SSA variales    */
-	int                     ssa_vars;     /* number of SSA variables       */
 	int                     sccs;         /* number of SCCs                */
 	zend_jit_call_info     *caller_info;  /* where this function is called from */
 	zend_jit_call_info     *callee_info;  /* which functions are called from this one */
@@ -218,13 +228,13 @@ struct _zend_jit_func_info {
 	void                   *codegen_data;
 };
 
-struct _zend_jit_context {
+typedef struct _zend_jit_context {
 	zend_arena             *arena;
 	zend_persistent_script *main_persistent_script;
 	int                     op_arrays_count;
 	zend_op_array         **op_arrays;
 	void                   *codegen_ctx;
-};
+} zend_jit_context;
 
 extern int zend_jit_rid;
 
@@ -336,9 +346,9 @@ extern int zend_jit_rid;
 #define FUNC_MAY_WARN               (1<<30)
 #define FUNC_MAY_INLINE             (1<<31)
 
-static inline int next_use(zend_jit_ssa_op *ssa, int var, int use)
+static inline int next_use(zend_jit_ssa_op *ssa_op, int var, int use)
 {
-	zend_jit_ssa_op *ssa_op = ssa + use;
+	ssa_op += use;
 	if (ssa_op->result_use == var) {
 		return ssa_op->res_use_chain;
 	}
@@ -351,7 +361,7 @@ static inline zend_jit_ssa_phi* next_use_phi(zend_jit_func_info *info, int var, 
 		return p->use_chains[0];
 	} else {
 		int j;
-		for (j = 0; j < info->block[p->block].predecessors_count; j++) {
+		for (j = 0; j < info->cfg.block[p->block].predecessors_count; j++) {
 			if (p->sources[j] == var) {
 				return p->use_chains[j];
 			}
@@ -372,25 +382,25 @@ static inline uint32_t get_ssa_var_info(zend_jit_func_info *info, int ssa_var_nu
 static inline uint32_t ssa_result_info(zend_op_array *op_array, zend_op *opline)
 {
 	zend_jit_func_info *info = JIT_DATA(op_array);
-	return get_ssa_var_info(info, info->ssa ? info->ssa[opline - op_array->opcodes].result_def : -1);
+	return get_ssa_var_info(info, info->ssa.op ? info->ssa.op[opline - op_array->opcodes].result_def : -1);
 }
 
 static inline uint32_t ssa_op1_def_info(zend_op_array *op_array, zend_op *opline)
 {
 	zend_jit_func_info *info = JIT_DATA(op_array);
-	return get_ssa_var_info(info, info->ssa ? info->ssa[opline - op_array->opcodes].op1_def : -1);
+	return get_ssa_var_info(info, info->ssa.op ? info->ssa.op[opline - op_array->opcodes].op1_def : -1);
 }
 
 static inline uint32_t ssa_op2_def_info(zend_op_array *op_array, zend_op *opline)
 {
 	zend_jit_func_info *info = JIT_DATA(op_array);
-	return get_ssa_var_info(info, info->ssa ? info->ssa[opline - op_array->opcodes].op2_def : -1);
+	return get_ssa_var_info(info, info->ssa.op ? info->ssa.op[opline - op_array->opcodes].op2_def : -1);
 }
 
 static inline int ssa_result_var(zend_op_array *op_array, zend_op *opline)
 {
 	zend_jit_func_info *info = JIT_DATA(op_array);
-	return info->ssa ? info->ssa[opline - op_array->opcodes].result_def : -1;
+	return info->ssa.op ? info->ssa.op[opline - op_array->opcodes].result_def : -1;
 }
 
 #define DEFINE_SSA_OP_INFO(opN) \
@@ -412,22 +422,22 @@ static inline int ssa_result_var(zend_op_array *op_array, zend_op *opline)
 			} \
 			return tmp; \
 		} else { \
-			return get_ssa_var_info(info, info->ssa ? info->ssa[opline - op_array->opcodes].opN##_use : -1); \
+			return get_ssa_var_info(info, info->ssa.op ? info->ssa.op[opline - op_array->opcodes].opN##_use : -1); \
 		} \
 	}
 
 DEFINE_SSA_OP_INFO(op1)
 DEFINE_SSA_OP_INFO(op2)
 
-#define OP1_SSA_VAR()           (JIT_DATA(op_array)->ssa ? JIT_DATA(op_array)->ssa[opline - op_array->opcodes].op1_use : -1)
-#define OP2_SSA_VAR()           (JIT_DATA(op_array)->ssa ? JIT_DATA(op_array)->ssa[opline - op_array->opcodes].op2_use : -1)
-#define OP1_DATA_SSA_VAR()      (JIT_DATA(op_array)->ssa ? JIT_DATA(op_array)->ssa[opline + 1 - op_array->opcodes].op1_use : -1)
-#define OP2_DATA_SSA_VAR()      (JIT_DATA(op_array)->ssa ? JIT_DATA(op_array)->ssa[opline + 1 - op_array->opcodes].op2_use : -1)
-#define OP1_DEF_SSA_VAR()       (JIT_DATA(op_array)->ssa ? JIT_DATA(op_array)->ssa[opline - op_array->opcodes].op1_def : -1)
-#define OP2_DEF_SSA_VAR()       (JIT_DATA(op_array)->ssa ? JIT_DATA(op_array)->ssa[opline - op_array->opcodes].op2_def : -1)
-#define OP1_DATA_DEF_SSA_VAR()  (JIT_DATA(op_array)->ssa ? JIT_DATA(op_array)->ssa[opline + 1 - op_array->opcodes].op1_def : -1)
-#define OP2_DATA_DEF_SSA_VAR()  (JIT_DATA(op_array)->ssa ? JIT_DATA(op_array)->ssa[opline + 1 - op_array->opcodes].op2_def : -1)
-#define RES_SSA_VAR()           (JIT_DATA(op_array)->ssa ? JIT_DATA(op_array)->ssa[opline - op_array->opcodes].result_def : -1)
+#define OP1_SSA_VAR()           (JIT_DATA(op_array)->ssa.op ? JIT_DATA(op_array)->ssa.op[opline - op_array->opcodes].op1_use : -1)
+#define OP2_SSA_VAR()           (JIT_DATA(op_array)->ssa.op ? JIT_DATA(op_array)->ssa.op[opline - op_array->opcodes].op2_use : -1)
+#define OP1_DATA_SSA_VAR()      (JIT_DATA(op_array)->ssa.op ? JIT_DATA(op_array)->ssa.op[opline + 1 - op_array->opcodes].op1_use : -1)
+#define OP2_DATA_SSA_VAR()      (JIT_DATA(op_array)->ssa.op ? JIT_DATA(op_array)->ssa.op[opline + 1 - op_array->opcodes].op2_use : -1)
+#define OP1_DEF_SSA_VAR()       (JIT_DATA(op_array)->ssa.op ? JIT_DATA(op_array)->ssa.op[opline - op_array->opcodes].op1_def : -1)
+#define OP2_DEF_SSA_VAR()       (JIT_DATA(op_array)->ssa.op ? JIT_DATA(op_array)->ssa.op[opline - op_array->opcodes].op2_def : -1)
+#define OP1_DATA_DEF_SSA_VAR()  (JIT_DATA(op_array)->ssa.op ? JIT_DATA(op_array)->ssa.op[opline + 1 - op_array->opcodes].op1_def : -1)
+#define OP2_DATA_DEF_SSA_VAR()  (JIT_DATA(op_array)->ssa.op ? JIT_DATA(op_array)->ssa.op[opline + 1 - op_array->opcodes].op2_def : -1)
+#define RES_SSA_VAR()           (JIT_DATA(op_array)->ssa.op ? JIT_DATA(op_array)->ssa.op[opline - op_array->opcodes].result_def : -1)
 
 #define OP1_INFO()              (ssa_op1_info(op_array, opline))
 #define OP2_INFO()              (ssa_op2_info(op_array, opline))
@@ -459,10 +469,10 @@ DEFINE_SSA_OP_INFO(op2)
 		return ((opline->opN##_type == IS_CONST && \
 			    (Z_TYPE_P(RT_CONSTANT(op_array, opline->opN)) == IS_LONG || Z_TYPE_P(RT_CONSTANT(op_array, opline->opN)) == IS_TRUE || Z_TYPE_P(RT_CONSTANT(op_array, opline->opN)) == IS_FALSE || Z_TYPE_P(RT_CONSTANT(op_array, opline->opN)) == IS_NULL)) || \
 		       (opline->opN##_type != IS_UNUSED && \
-		        JIT_DATA(op_array)->ssa && \
+		        JIT_DATA(op_array)->ssa.op && \
 		        JIT_DATA(op_array)->ssa_var_info && \
-		        JIT_DATA(op_array)->ssa[opline - op_array->opcodes].opN##_use >= 0 && \
-			    JIT_DATA(op_array)->ssa_var_info[JIT_DATA(op_array)->ssa[opline - op_array->opcodes].opN##_use].has_range)); \
+		        JIT_DATA(op_array)->ssa.op[opline - op_array->opcodes].opN##_use >= 0 && \
+			    JIT_DATA(op_array)->ssa_var_info[JIT_DATA(op_array)->ssa.op[opline - op_array->opcodes].opN##_use].has_range)); \
 	}
 
 #define DEFINE_SSA_OP_MIN_RANGE(opN) \
@@ -479,11 +489,11 @@ DEFINE_SSA_OP_INFO(op2)
 				return 0; \
 			} \
 		} else if (opline->opN##_type != IS_UNUSED && \
-		    JIT_DATA(op_array)->ssa && \
+		    JIT_DATA(op_array)->ssa.op && \
 		    JIT_DATA(op_array)->ssa_var_info && \
-		    JIT_DATA(op_array)->ssa[opline - op_array->opcodes].opN##_use >= 0 && \
-		    JIT_DATA(op_array)->ssa_var_info[JIT_DATA(op_array)->ssa[opline - op_array->opcodes].opN##_use].has_range) { \
-			return JIT_DATA(op_array)->ssa_var_info[JIT_DATA(op_array)->ssa[opline - op_array->opcodes].opN##_use].range.min; \
+		    JIT_DATA(op_array)->ssa.op[opline - op_array->opcodes].opN##_use >= 0 && \
+		    JIT_DATA(op_array)->ssa_var_info[JIT_DATA(op_array)->ssa.op[opline - op_array->opcodes].opN##_use].has_range) { \
+			return JIT_DATA(op_array)->ssa_var_info[JIT_DATA(op_array)->ssa.op[opline - op_array->opcodes].opN##_use].range.min; \
 		} \
 		return LONG_MIN; \
 	}
@@ -502,11 +512,11 @@ DEFINE_SSA_OP_INFO(op2)
 				return 0; \
 			} \
 		} else if (opline->opN##_type != IS_UNUSED && \
-		    JIT_DATA(op_array)->ssa && \
+		    JIT_DATA(op_array)->ssa.op && \
 		    JIT_DATA(op_array)->ssa_var_info && \
-		    JIT_DATA(op_array)->ssa[opline - op_array->opcodes].opN##_use >= 0 && \
-		    JIT_DATA(op_array)->ssa_var_info[JIT_DATA(op_array)->ssa[opline - op_array->opcodes].opN##_use].has_range) { \
-			return JIT_DATA(op_array)->ssa_var_info[JIT_DATA(op_array)->ssa[opline - op_array->opcodes].opN##_use].range.max; \
+		    JIT_DATA(op_array)->ssa.op[opline - op_array->opcodes].opN##_use >= 0 && \
+		    JIT_DATA(op_array)->ssa_var_info[JIT_DATA(op_array)->ssa.op[opline - op_array->opcodes].opN##_use].has_range) { \
+			return JIT_DATA(op_array)->ssa_var_info[JIT_DATA(op_array)->ssa.op[opline - op_array->opcodes].opN##_use].range.max; \
 		} \
 		return LONG_MAX; \
 	}
@@ -519,11 +529,11 @@ DEFINE_SSA_OP_INFO(op2)
 				return 0; \
 			} \
 		} else if (opline->opN##_type != IS_UNUSED && \
-		    JIT_DATA(op_array)->ssa && \
+		    JIT_DATA(op_array)->ssa.op && \
 		    JIT_DATA(op_array)->ssa_var_info && \
-		    JIT_DATA(op_array)->ssa[opline - op_array->opcodes].opN##_use >= 0 && \
-		    JIT_DATA(op_array)->ssa_var_info[JIT_DATA(op_array)->ssa[opline - op_array->opcodes].opN##_use].has_range) { \
-			return JIT_DATA(op_array)->ssa_var_info[JIT_DATA(op_array)->ssa[opline - op_array->opcodes].opN##_use].range.underflow; \
+		    JIT_DATA(op_array)->ssa.op[opline - op_array->opcodes].opN##_use >= 0 && \
+		    JIT_DATA(op_array)->ssa_var_info[JIT_DATA(op_array)->ssa.op[opline - op_array->opcodes].opN##_use].has_range) { \
+			return JIT_DATA(op_array)->ssa_var_info[JIT_DATA(op_array)->ssa.op[opline - op_array->opcodes].opN##_use].range.underflow; \
 		} \
 		return 1; \
 	}
@@ -536,11 +546,11 @@ DEFINE_SSA_OP_INFO(op2)
 				return 0; \
 			} \
 		} else if (opline->opN##_type != IS_UNUSED && \
-		    JIT_DATA(op_array)->ssa && \
+		    JIT_DATA(op_array)->ssa.op && \
 		    JIT_DATA(op_array)->ssa_var_info && \
-		    JIT_DATA(op_array)->ssa[opline - op_array->opcodes].opN##_use >= 0 && \
-		    JIT_DATA(op_array)->ssa_var_info[JIT_DATA(op_array)->ssa[opline - op_array->opcodes].opN##_use].has_range) { \
-			return JIT_DATA(op_array)->ssa_var_info[JIT_DATA(op_array)->ssa[opline - op_array->opcodes].opN##_use].range.overflow; \
+		    JIT_DATA(op_array)->ssa.op[opline - op_array->opcodes].opN##_use >= 0 && \
+		    JIT_DATA(op_array)->ssa_var_info[JIT_DATA(op_array)->ssa.op[opline - op_array->opcodes].opN##_use].has_range) { \
+			return JIT_DATA(op_array)->ssa_var_info[JIT_DATA(op_array)->ssa.op[opline - op_array->opcodes].opN##_use].range.overflow; \
 		} \
 		return 1; \
 	}

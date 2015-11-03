@@ -57,14 +57,14 @@ static int choose_branch(zend_jit_func_info *info, zend_worklist *in, int i)
 {
 	int s0, s1, s0_loop, s1_loop;
 
-	s0 = info->block[i].successors[0];
-	s1 = info->block[i].successors[1];
+	s0 = info->cfg.block[i].successors[0];
+	s1 = info->cfg.block[i].successors[1];
 
 	if (s1 < 0)
 		return 0;
 
-	s0_loop = info->block[s0].loop_header;
-	s1_loop = info->block[s1].loop_header;
+	s0_loop = info->cfg.block[s0].loop_header;
+	s1_loop = info->cfg.block[s1].loop_header;
 
 	if (s0_loop == s1_loop)
 		return 0;
@@ -78,7 +78,7 @@ static int compute_block_map(zend_jit_func_info *info, struct block_order *order
 {
 	int blocks = 0, next;
 
-	for (next = 0; next < info->blocks; ) {
+	for (next = 0; next < info->cfg.blocks; ) {
 		int from = order[next].block_num;
 
 		if (!order[next].last_visited) {
@@ -97,7 +97,7 @@ static int compute_block_order(zend_op_array *op_array, struct block_order *orde
 {
 	zend_jit_func_info *info = JIT_DATA(op_array);
 	zend_worklist in;
-	int blocks = info->blocks;
+	int blocks = info->cfg.blocks;
 	int i;
 	int visit_count = 0;
 
@@ -110,7 +110,7 @@ static int compute_block_order(zend_op_array *op_array, struct block_order *orde
 		order[i].last_visited = 0;
 	}
 
-	ZEND_ASSERT(info->block[0].start == 0);
+	ZEND_ASSERT(info->cfg.block[0].start == 0);
 
 	zend_worklist_push(&in, 0);
 
@@ -121,7 +121,7 @@ static int compute_block_order(zend_op_array *op_array, struct block_order *orde
 
 	while (zend_worklist_len(&in)) {
 		int i = zend_worklist_peek(&in);
-		zend_jit_basic_block *block = info->block + i;
+		zend_jit_basic_block *block = info->cfg.block + i;
 
 		if (choose_branch(info, &in, i))
 			continue;
@@ -165,19 +165,19 @@ static int zend_jit_sort_blocks(zend_jit_context *ctx, zend_op_array *op_array)
 	int i, k;
 	uint32_t j;
 
-	order = alloca(sizeof(struct block_order) * info->blocks);
+	order = alloca(sizeof(struct block_order) * info->cfg.blocks);
 
 	/* block_map: an array mapping old block_num to new block_num.  */
-	block_map = alloca(sizeof(int) * info->blocks);
-	FILL_ARRAY(block_map, -1, int, info->blocks);
+	block_map = alloca(sizeof(int) * info->cfg.blocks);
+	FILL_ARRAY(block_map, -1, int, info->cfg.blocks);
 
 	if (compute_block_order(op_array, order, block_map, &blocks) != SUCCESS)
 		return FAILURE;
 
-	ZEND_ASSERT(blocks <= info->blocks);
+	ZEND_ASSERT(blocks <= info->cfg.blocks);
 
 	/* Check if block order is still the same */
-	if (blocks == info->blocks) {
+	if (blocks == info->cfg.blocks) {
 		for (i = 0; i < blocks; i++) {
 			if (block_map[i] != i) {
 				break;
@@ -191,15 +191,15 @@ static int zend_jit_sort_blocks(zend_jit_context *ctx, zend_op_array *op_array)
 	/* FIXME: avoid double allocation */
 	ZEND_JIT_CONTEXT_CALLOC(ctx, block, blocks);
 
-	for (i = 0; i < info->blocks; i++) {
+	for (i = 0; i < info->cfg.blocks; i++) {
 		if (block_map[i] >= 0) {
 			zend_jit_basic_block *bb = &block[block_map[i]];
 			zend_jit_ssa_phi *p;
 
-			*bb = info->block[i];
+			*bb = info->cfg.block[i];
 			bb->flags &= ~(ZEND_BB_TARGET | ZEND_BB_FOLLOW);
 			for (j = bb->start; j <= bb->end; j++) {
-				info->block_map[j] = block_map[i];
+				info->cfg.block_map[j] = block_map[i];
 			}
 			for (k = 0; k < bb->predecessors_count; k++) {
 				bb->predecessors[k] = remap_block(block_map, bb->predecessors[k]);
@@ -346,8 +346,8 @@ static int zend_jit_sort_blocks(zend_jit_context *ctx, zend_op_array *op_array)
 		}
 	}
 
-	info->block = block;
-	info->blocks = blocks;
+	info->cfg.block = block;
+	info->cfg.blocks = blocks;
 #endif
 	return SUCCESS;
 }
@@ -359,12 +359,12 @@ static int zend_jit_compute_use_def_chains(zend_jit_context *ctx, zend_op_array 
 	zend_jit_ssa_var_info *ssa_var_info;
 	int i;
 
-	if (!info->ssa_var) {
-		ZEND_JIT_CONTEXT_CALLOC(ctx, info->ssa_var, info->ssa_vars);
+	if (!info->ssa.var) {
+		ZEND_JIT_CONTEXT_CALLOC(ctx, info->ssa.var, info->ssa.vars);
 	}
-	ssa_var = info->ssa_var;
+	ssa_var = info->ssa.var;
 	if (!info->ssa_var_info) {
-		ZEND_JIT_CONTEXT_CALLOC(ctx, info->ssa_var_info, info->ssa_vars);
+		ZEND_JIT_CONTEXT_CALLOC(ctx, info->ssa_var_info, info->ssa.vars);
 	}
 	ssa_var_info = info->ssa_var_info;
 
@@ -384,7 +384,7 @@ static int zend_jit_compute_use_def_chains(zend_jit_context *ctx, zend_op_array 
 		}
 		ssa_var_info[i].has_range = 0;
 	}
-	for (i = op_array->last_var; i < info->ssa_vars; i++) {
+	for (i = op_array->last_var; i < info->ssa.vars; i++) {
 		ssa_var[i].var = -1;
 		ssa_var[i].scc = -1;
 		ssa_var[i].definition = -1;
@@ -394,7 +394,7 @@ static int zend_jit_compute_use_def_chains(zend_jit_context *ctx, zend_op_array 
 	}
 
 	for (i = op_array->last - 1; i >= 0; i--) {
-		zend_jit_ssa_op *op = info->ssa + i;
+		zend_jit_ssa_op *op = info->ssa.op + i;
 
 		if (op->op1_use >= 0) {
 			op->op1_use_chain = ssa_var[op->op1_use].use_chain;
@@ -422,8 +422,8 @@ static int zend_jit_compute_use_def_chains(zend_jit_context *ctx, zend_op_array 
 		}
 	}
 
-	for (i = 0; i < info->blocks; i++) {
-		zend_jit_ssa_phi *phi = info->block[i].phis;
+	for (i = 0; i < info->cfg.blocks; i++) {
+		zend_jit_ssa_phi *phi = info->ssa.block[i].phis;
 		while (phi) {
 			phi->block = i;
 			ssa_var[phi->ssa_var].var = phi->var;
@@ -450,7 +450,7 @@ static int zend_jit_compute_use_def_chains(zend_jit_context *ctx, zend_op_array 
 			} else {
 				int j;
 
-				for (j = 0; j < info->block[i].predecessors_count; j++) {
+				for (j = 0; j < info->cfg.block[i].predecessors_count; j++) {
 					if (phi->sources[j] >= 0) {
 						zend_jit_ssa_phi *p = ssa_var[phi->sources[j]].phi_use_chain;
 						while (p && p != phi) {
@@ -474,14 +474,14 @@ static int zend_jit_compute_false_dependencies(zend_op_array *op_array)
 {
 		
 	zend_jit_func_info *info = JIT_DATA(op_array);
-	zend_jit_ssa_var *ssa_var = info->ssa_var;
-	zend_jit_ssa_op *ssa = info->ssa;
-	int ssa_vars = info->ssa_vars;
+	zend_jit_ssa_var *ssa_var = info->ssa.var;
+	zend_jit_ssa_op *ssa_op = info->ssa.op;
+	int ssa_vars = info->ssa.vars;
 	zend_bitset worklist;
 	int i, j, use;
 	zend_jit_ssa_phi *p;
 
-	if (!op_array->function_name || !info->ssa_var || !info->ssa)
+	if (!op_array->function_name || !info->ssa.var || !info->ssa.op)
 		return SUCCESS;
 
 	worklist = alloca(sizeof(zend_ulong) * zend_bitset_len(ssa_vars));
@@ -489,15 +489,15 @@ static int zend_jit_compute_false_dependencies(zend_op_array *op_array)
 	
 	for (i = 0; i < ssa_vars; i++) {
 		ssa_var[i].no_val = 1; /* mark as unused */
-		use = info->ssa_var[i].use_chain;
+		use = info->ssa.var[i].use_chain;
 		while (use >= 0) {
 			if (op_array->opcodes[use].opcode != ZEND_ASSIGN ||
-				info->ssa[use].op1_use != i ||
-				info->ssa[use].op2_use == i) {
+				info->ssa.op[use].op1_use != i ||
+				info->ssa.op[use].op2_use == i) {
 				ssa_var[i].no_val = 0; /* used directly */
 				zend_bitset_incl(worklist, i);
 			}				
-			use = next_use(ssa, i, use);			
+			use = next_use(ssa_op, i, use);			
 		}
 	}
 
@@ -513,8 +513,8 @@ static int zend_jit_compute_false_dependencies(zend_op_array *op_array)
 					zend_bitset_incl(worklist, p->sources[0]);
 				}
 			} else {
-				for (j = 0; j < info->block[p->block].predecessors_count; j++) {
-					if (p->sources[j] >= 0 && info->ssa_var[p->sources[j]].no_val) {
+				for (j = 0; j < info->cfg.block[p->block].predecessors_count; j++) {
+					if (p->sources[j] >= 0 && info->ssa.var[p->sources[j]].no_val) {
 						ssa_var[p->sources[j]].no_val = 0; /* used indirectly */
 						zend_bitset_incl(worklist, p->sources[j]);
 					}
@@ -541,15 +541,15 @@ static int zend_jit_compute_preallocated_cvs(zend_op_array *op_array)
 	int i;
 	zend_jit_ssa_phi *phi;
 
-	if (!op_array->function_name || !info->ssa_var || !info->ssa)
+	if (!op_array->function_name || !info->ssa.var || !info->ssa.op)
 		return SUCCESS;
 
 	for (i = 0; i < (uint32_t)op_array->last_var; i++) {
-		if (info->ssa_var[i].no_val &&
+		if (info->ssa.var[i].no_val &&
 		    i != EX_VAR_TO_NUM(op_array->this_var)) {
-			phi = info->ssa_var[i].phi_use_chain;
+			phi = info->ssa.var[i].phi_use_chain;
 			while (phi) {
-				if (info->block[phi->block].flags & ZEND_BB_LOOP_HEADER) {
+				if (info->cfg.block[phi->block].flags & ZEND_BB_LOOP_HEADER) {
 					info->ssa_var_info[phi->var].type |= MAY_BE_DEF;
 				}
 				phi = next_use_phi(info, i, phi);
@@ -571,7 +571,7 @@ static int zend_jit_compute_preallocated_cvs(zend_op_array *op_array)
 	/* change types of preallocated values */
 	for (i = 0; i < op_array->last_var; i++) {
 		if (info->ssa_var_info[i].type & MAY_BE_DEF &&
-		    info->ssa_var[i].var != EX_VAR_TO_NUM(op_array->this_var)) {
+		    info->ssa.var[i].var != EX_VAR_TO_NUM(op_array->this_var)) {
 			info->ssa_var_info[i].type = MAY_BE_DEF|MAY_BE_RC1|MAY_BE_NULL;
 			info->flags |= ZEND_JIT_FUNC_HAS_PREALLOCATED_CVS;
 #if 0
@@ -590,9 +590,9 @@ static void zend_jit_determine_preallocated_cv_type(zend_op_array *op_array, int
 	zend_jit_ssa_op *op;
 	zend_jit_ssa_phi *phi;
 
-	if (info->ssa_var[v].use_chain >= 0) {
-		opline = &op_array->opcodes[info->ssa_var[v].use_chain];
-		op = &info->ssa[info->ssa_var[v].use_chain];
+	if (info->ssa.var[v].use_chain >= 0) {
+		opline = &op_array->opcodes[info->ssa.var[v].use_chain];
+		op = &info->ssa.op[info->ssa.var[v].use_chain];
 
 		if (opline->opcode == ZEND_ASSIGN &&
 		    op->op1_use == v && op->op2_use != v) {
@@ -609,29 +609,29 @@ static void zend_jit_determine_preallocated_cv_type(zend_op_array *op_array, int
 			return;
 		}
 	}
-	phi = info->ssa_var[v].phi_use_chain;
+	phi = info->ssa.var[v].phi_use_chain;
 	if (phi && !phi->visited) {
 		phi->visited = 1;
-		while (phi && next_use_phi(info, v, phi) != info->ssa_var[v].phi_use_chain) {
+		while (phi && next_use_phi(info, v, phi) != info->ssa.var[v].phi_use_chain) {
 			zend_jit_determine_preallocated_cv_type(op_array, var, phi->ssa_var);
 			phi = next_use_phi(info, v, phi);
 		}
-		info->ssa_var[v].phi_use_chain->visited = 0;
+		info->ssa.var[v].phi_use_chain->visited = 0;
 	}
 }
 
 static void zend_jit_correct_phi_type(zend_jit_func_info *info, int v)
 {
-	zend_jit_ssa_phi *phi = info->ssa_var[v].phi_use_chain;
+	zend_jit_ssa_phi *phi = info->ssa.var[v].phi_use_chain;
 
 	if (phi && !phi->visited) {
 		phi->visited = 1;
-		while (phi && next_use_phi(info, v, phi) != info->ssa_var[v].phi_use_chain) {
+		while (phi && next_use_phi(info, v, phi) != info->ssa.var[v].phi_use_chain) {
 			info->ssa_var_info[phi->ssa_var].type &= ~MAY_BE_NULL;
 			zend_jit_correct_phi_type(info, phi->ssa_var);
 			phi = next_use_phi(info, v, phi);
 		}
-		info->ssa_var[v].phi_use_chain->visited = 0;
+		info->ssa.var[v].phi_use_chain->visited = 0;
 	}
 }
 
@@ -647,7 +647,7 @@ static int zend_jit_compute_preallocated_cvs_types(zend_op_array *op_array)
 
 	for (i = 0; i < op_array->last_var; i++) {
 		if (info->ssa_var_info[i].type & MAY_BE_DEF &&
-		    info->ssa_var[i].var != EX_VAR_TO_NUM(op_array->this_var)) {
+		    info->ssa.var[i].var != EX_VAR_TO_NUM(op_array->this_var)) {
 
 			/* reset MAY_BE_NULL for preallocated variables */
 			info->ssa_var_info[i].type &= ~MAY_BE_NULL;
@@ -678,11 +678,11 @@ static int zend_jit_compute_preallocated_cvs_types(zend_op_array *op_array)
 
 #define CHECK_SCC_VAR(var2) \
 	do { \
-		if (!info->ssa_var[var2].no_val) { \
+		if (!info->ssa.var[var2].no_val) { \
 			if (dfs[var2] < 0) { \
 				zend_jit_check_scc_var(op_array, var2, index, dfs, root, stack); \
 			} \
-			if (info->ssa_var[var2].scc < 0 && dfs[root[var]] >= dfs[root[var2]]) { \
+			if (info->ssa.var[var2].scc < 0 && dfs[root[var]] >= dfs[root[var2]]) { \
 			    root[var] = root[var2]; \
 			} \
 		} \
@@ -690,74 +690,74 @@ static int zend_jit_compute_preallocated_cvs_types(zend_op_array *op_array)
 
 #define CHECK_SCC_ENTRY(var2) \
 	do { \
-		if (info->ssa_var[var2].scc != info->ssa_var[var].scc) { \
-			info->ssa_var[var2].scc_entry = 1; \
+		if (info->ssa.var[var2].scc != info->ssa.var[var].scc) { \
+			info->ssa.var[var2].scc_entry = 1; \
 		} \
 	} while (0)
 
-#define ADD_SCC_VAR(var) \
+#define ADD_SCC_VAR(_var) \
 	do { \
-		if (info->ssa_var[var].scc == scc) { \
-			zend_bitset_incl(worklist, var); \
+		if (info->ssa.var[_var].scc == scc) { \
+			zend_bitset_incl(worklist, _var); \
 		} \
 	} while (0)
 
-#define ADD_SCC_VAR_1(var) \
+#define ADD_SCC_VAR_1(_var) \
 	do { \
-		if (info->ssa_var[var].scc == scc && \
-		    !zend_bitset_in(visited, var)) { \
-			zend_bitset_incl(worklist, var); \
+		if (info->ssa.var[_var].scc == scc && \
+		    !zend_bitset_in(visited, _var)) { \
+			zend_bitset_incl(worklist, _var); \
 		} \
 	} while (0)
 
 #define FOR_EACH_DEFINED_VAR(line, MACRO) \
 	do { \
-		if (info->ssa[line].op1_def >= 0) { \
-			MACRO(info->ssa[line].op1_def); \
+		if (info->ssa.op[line].op1_def >= 0) { \
+			MACRO(info->ssa.op[line].op1_def); \
 		} \
-		if (info->ssa[line].op2_def >= 0) { \
-			MACRO(info->ssa[line].op2_def); \
+		if (info->ssa.op[line].op2_def >= 0) { \
+			MACRO(info->ssa.op[line].op2_def); \
 		} \
-		if (info->ssa[line].result_def >= 0) { \
-			MACRO(info->ssa[line].result_def); \
+		if (info->ssa.op[line].result_def >= 0) { \
+			MACRO(info->ssa.op[line].result_def); \
 		} \
 		if (op_array->opcodes[line].opcode == ZEND_OP_DATA) { \
-			if (info->ssa[line-1].op1_def >= 0) { \
-				MACRO(info->ssa[line-1].op1_def); \
+			if (info->ssa.op[line-1].op1_def >= 0) { \
+				MACRO(info->ssa.op[line-1].op1_def); \
 			} \
-			if (info->ssa[line-1].op2_def >= 0) { \
-				MACRO(info->ssa[line-1].op2_def); \
+			if (info->ssa.op[line-1].op2_def >= 0) { \
+				MACRO(info->ssa.op[line-1].op2_def); \
 			} \
-			if (info->ssa[line-1].result_def >= 0) { \
-				MACRO(info->ssa[line-1].result_def); \
+			if (info->ssa.op[line-1].result_def >= 0) { \
+				MACRO(info->ssa.op[line-1].result_def); \
 			} \
 		} else if (line+1 < op_array->last && \
 		           op_array->opcodes[line+1].opcode == ZEND_OP_DATA) { \
-			if (info->ssa[line+1].op1_def >= 0) { \
-				MACRO(info->ssa[line+1].op1_def); \
+			if (info->ssa.op[line+1].op1_def >= 0) { \
+				MACRO(info->ssa.op[line+1].op1_def); \
 			} \
-			if (info->ssa[line+1].op2_def >= 0) { \
-				MACRO(info->ssa[line+1].op2_def); \
+			if (info->ssa.op[line+1].op2_def >= 0) { \
+				MACRO(info->ssa.op[line+1].op2_def); \
 			} \
-			if (info->ssa[line+1].result_def >= 0) { \
-				MACRO(info->ssa[line+1].result_def); \
+			if (info->ssa.op[line+1].result_def >= 0) { \
+				MACRO(info->ssa.op[line+1].result_def); \
 			} \
 		} \
 	} while (0)
 
 
-#define FOR_EACH_VAR_USAGE(var, MACRO) \
+#define FOR_EACH_VAR_USAGE(_var, MACRO) \
 	do { \
-		zend_jit_ssa_phi *p = info->ssa_var[var].phi_use_chain; \
-		int use = info->ssa_var[var].use_chain; \
+		zend_jit_ssa_phi *p = info->ssa.var[_var].phi_use_chain; \
+		int use = info->ssa.var[_var].use_chain; \
 		while (use >= 0) { \
 			FOR_EACH_DEFINED_VAR(use, MACRO); \
-			use = next_use(info->ssa, var, use); \
+			use = next_use(info->ssa.op, _var, use); \
 		} \
-		p = info->ssa_var[var].phi_use_chain; \
+		p = info->ssa.var[_var].phi_use_chain; \
 		while (p) { \
 			MACRO(p->ssa_var); \
-			p = next_use_phi(info, var, p); \
+			p = next_use_phi(info, _var, p); \
 		} \
 	} while (0)
 
@@ -971,8 +971,8 @@ static int zend_jit_calc_range(zend_jit_context *ctx, zend_op_array *op_array, i
 	zend_op *opline;
 	long op1_min, op2_min, op1_max, op2_max, t1, t2, t3, t4;
 
-	if (info->ssa_var[var].definition_phi) {
-		zend_jit_ssa_phi *p = info->ssa_var[var].definition_phi;
+	if (info->ssa.var[var].definition_phi) {
+		zend_jit_ssa_phi *p = info->ssa.var[var].definition_phi;
 		int i;
 
 		tmp->underflow = 0;
@@ -1077,7 +1077,7 @@ static int zend_jit_calc_range(zend_jit_context *ctx, zend_op_array *op_array, i
 				}
 			}
 		} else {
-			for (i = 0; i < info->block[p->block].predecessors_count; i++) {
+			for (i = 0; i < info->cfg.block[p->block].predecessors_count; i++) {
 				if (p->sources[i] >= 0 && info->ssa_var_info[p->sources[i]].has_range) {
 					/* union */
 					tmp->underflow |= info->ssa_var_info[p->sources[i]].range.underflow;
@@ -1093,7 +1093,7 @@ static int zend_jit_calc_range(zend_jit_context *ctx, zend_op_array *op_array, i
 			}
 		}
 		return (tmp->min <= tmp->max);
-	} else if (info->ssa_var[var].definition < 0) {
+	} else if (info->ssa.var[var].definition < 0) {
 		if (var < op_array->last_var &&
 		    var != EX_VAR_TO_NUM(op_array->this_var) &&
 		    op_array->function_name) {
@@ -1106,14 +1106,14 @@ static int zend_jit_calc_range(zend_jit_context *ctx, zend_op_array *op_array, i
 		}
 		return 0;
 	}
-	line = info->ssa_var[var].definition;
+	line = info->ssa.var[var].definition;
 	opline = op_array->opcodes + line;
 	
 	tmp->underflow = 0;
 	tmp->overflow = 0;
 	switch (opline->opcode) {
 		case ZEND_ADD:
-			if (info->ssa[line].result_def == var) {
+			if (info->ssa.op[line].result_def == var) {
 				if (OP1_HAS_RANGE() && OP2_HAS_RANGE()) {
 					op1_min = OP1_MIN_RANGE();
 					op2_min = OP2_MIN_RANGE();
@@ -1138,7 +1138,7 @@ static int zend_jit_calc_range(zend_jit_context *ctx, zend_op_array *op_array, i
 			}
 			break;
 		case ZEND_SUB:
-			if (info->ssa[line].result_def == var) {
+			if (info->ssa.op[line].result_def == var) {
 				if (OP1_HAS_RANGE() && OP2_HAS_RANGE()) {
 					op1_min = OP1_MIN_RANGE();
 					op2_min = OP2_MIN_RANGE();
@@ -1163,7 +1163,7 @@ static int zend_jit_calc_range(zend_jit_context *ctx, zend_op_array *op_array, i
 			}
 			break;
 		case ZEND_MUL:
-			if (info->ssa[line].result_def == var) {
+			if (info->ssa.op[line].result_def == var) {
 				if (OP1_HAS_RANGE() && OP2_HAS_RANGE()) {
 					op1_min = OP1_MIN_RANGE();
 					op2_min = OP2_MIN_RANGE();
@@ -1195,7 +1195,7 @@ static int zend_jit_calc_range(zend_jit_context *ctx, zend_op_array *op_array, i
 			}
 			break;
 		case ZEND_DIV:
-			if (info->ssa[line].result_def == var) {
+			if (info->ssa.op[line].result_def == var) {
 				if (OP1_HAS_RANGE() && OP2_HAS_RANGE()) {
 					op1_min = OP1_MIN_RANGE();
 					op2_min = OP2_MIN_RANGE();
@@ -1230,7 +1230,7 @@ static int zend_jit_calc_range(zend_jit_context *ctx, zend_op_array *op_array, i
 			}
 			break;
 		case ZEND_MOD:
-			if (info->ssa[line].result_def == var) {
+			if (info->ssa.op[line].result_def == var) {
 				if (OP1_HAS_RANGE() && OP2_HAS_RANGE()) {
 					if (OP1_RANGE_UNDERFLOW() ||
 					    OP2_RANGE_UNDERFLOW() ||
@@ -1258,7 +1258,7 @@ static int zend_jit_calc_range(zend_jit_context *ctx, zend_op_array *op_array, i
 			}
 			break;
 		case ZEND_SL:
-			if (info->ssa[line].result_def == var) {
+			if (info->ssa.op[line].result_def == var) {
 				if (OP1_HAS_RANGE() && OP2_HAS_RANGE()) {
 					if (OP1_RANGE_UNDERFLOW() ||
 					    OP2_RANGE_UNDERFLOW() ||
@@ -1283,7 +1283,7 @@ static int zend_jit_calc_range(zend_jit_context *ctx, zend_op_array *op_array, i
 			}
 			break;
 		case ZEND_SR:
-			if (info->ssa[line].result_def == var) {
+			if (info->ssa.op[line].result_def == var) {
 				if (OP1_HAS_RANGE() && OP2_HAS_RANGE()) {
 					if (OP1_RANGE_UNDERFLOW() ||
 					    OP2_RANGE_UNDERFLOW() ||
@@ -1308,7 +1308,7 @@ static int zend_jit_calc_range(zend_jit_context *ctx, zend_op_array *op_array, i
 			}
 			break;
 		case ZEND_BW_OR:
-			if (info->ssa[line].result_def == var) {
+			if (info->ssa.op[line].result_def == var) {
 				if (OP1_HAS_RANGE() && OP2_HAS_RANGE()) {
 					if (OP1_RANGE_UNDERFLOW() ||
 					    OP2_RANGE_UNDERFLOW() ||
@@ -1328,7 +1328,7 @@ static int zend_jit_calc_range(zend_jit_context *ctx, zend_op_array *op_array, i
 			}
 			break;
 		case ZEND_BW_AND:
-			if (info->ssa[line].result_def == var) {
+			if (info->ssa.op[line].result_def == var) {
 				if (OP1_HAS_RANGE() && OP2_HAS_RANGE()) {
 					if (OP1_RANGE_UNDERFLOW() ||
 					    OP2_RANGE_UNDERFLOW() ||
@@ -1349,7 +1349,7 @@ static int zend_jit_calc_range(zend_jit_context *ctx, zend_op_array *op_array, i
 			break;
 //		case ZEND_BW_XOR:
 		case ZEND_BW_NOT:
-			if (info->ssa[line].result_def == var) {
+			if (info->ssa.op[line].result_def == var) {
 				if (OP1_HAS_RANGE()) {
 					if (OP1_RANGE_UNDERFLOW() ||
 					    OP1_RANGE_OVERFLOW()) {
@@ -1366,7 +1366,7 @@ static int zend_jit_calc_range(zend_jit_context *ctx, zend_op_array *op_array, i
 			}
 			break;
 		case ZEND_CAST:
-			if (info->ssa[line].result_def == var) {
+			if (info->ssa.op[line].result_def == var) {
 				if (opline->extended_value == IS_NULL) {
 					tmp->min = 0;
 					tmp->max = 0;
@@ -1395,7 +1395,7 @@ static int zend_jit_calc_range(zend_jit_context *ctx, zend_op_array *op_array, i
 		case ZEND_BOOL:
 		case ZEND_JMPZ_EX:
 		case ZEND_JMPNZ_EX:
-			if (info->ssa[line].result_def == var) {
+			if (info->ssa.op[line].result_def == var) {
 				if (OP1_HAS_RANGE()) {
 					op1_min = OP1_MIN_RANGE();
 					op1_max = OP1_MAX_RANGE();
@@ -1410,7 +1410,7 @@ static int zend_jit_calc_range(zend_jit_context *ctx, zend_op_array *op_array, i
 			}
 			break;
 		case ZEND_BOOL_NOT:
-			if (info->ssa[line].result_def == var) {
+			if (info->ssa.op[line].result_def == var) {
 				if (OP1_HAS_RANGE()) {
 					op1_min = OP1_MIN_RANGE();
 					op1_max = OP1_MAX_RANGE();
@@ -1425,7 +1425,7 @@ static int zend_jit_calc_range(zend_jit_context *ctx, zend_op_array *op_array, i
 			}
 			break;
 		case ZEND_BOOL_XOR:
-			if (info->ssa[line].result_def == var) {
+			if (info->ssa.op[line].result_def == var) {
 				if (OP1_HAS_RANGE() && OP2_HAS_RANGE()) {
 					op1_min = OP1_MIN_RANGE();
 					op2_min = OP2_MIN_RANGE();
@@ -1454,7 +1454,7 @@ static int zend_jit_calc_range(zend_jit_context *ctx, zend_op_array *op_array, i
 			break;
 		case ZEND_IS_IDENTICAL:
 		case ZEND_IS_EQUAL:
-			if (info->ssa[line].result_def == var) {
+			if (info->ssa.op[line].result_def == var) {
 				if (OP1_HAS_RANGE() && OP2_HAS_RANGE()) {
 					op1_min = OP1_MIN_RANGE();
 					op2_min = OP2_MIN_RANGE();
@@ -1475,7 +1475,7 @@ static int zend_jit_calc_range(zend_jit_context *ctx, zend_op_array *op_array, i
 			break;
 		case ZEND_IS_NOT_IDENTICAL:
 		case ZEND_IS_NOT_EQUAL:
-			if (info->ssa[line].result_def == var) {
+			if (info->ssa.op[line].result_def == var) {
 				if (OP1_HAS_RANGE() && OP2_HAS_RANGE()) {
 					op1_min = OP1_MIN_RANGE();
 					op2_min = OP2_MIN_RANGE();
@@ -1495,7 +1495,7 @@ static int zend_jit_calc_range(zend_jit_context *ctx, zend_op_array *op_array, i
 			}
 			break;
 		case ZEND_IS_SMALLER:
-			if (info->ssa[line].result_def == var) {
+			if (info->ssa.op[line].result_def == var) {
 				if (OP1_HAS_RANGE() && OP2_HAS_RANGE()) {
 					op1_min = OP1_MIN_RANGE();
 					op2_min = OP2_MIN_RANGE();
@@ -1513,7 +1513,7 @@ static int zend_jit_calc_range(zend_jit_context *ctx, zend_op_array *op_array, i
 			}
 			break;
 		case ZEND_IS_SMALLER_OR_EQUAL:
-			if (info->ssa[line].result_def == var) {
+			if (info->ssa.op[line].result_def == var) {
 				if (OP1_HAS_RANGE() && OP2_HAS_RANGE()) {
 					op1_min = OP1_MIN_RANGE();
 					op2_min = OP2_MIN_RANGE();
@@ -1532,7 +1532,7 @@ static int zend_jit_calc_range(zend_jit_context *ctx, zend_op_array *op_array, i
 			break;
 		case ZEND_QM_ASSIGN:
 		case ZEND_COALESCE:
-			if (info->ssa[line].result_def == var) {
+			if (info->ssa.op[line].result_def == var) {
 				if (OP1_HAS_RANGE()) {
 					tmp->min = OP1_MIN_RANGE();
 					tmp->max = OP1_MAX_RANGE();
@@ -1543,15 +1543,15 @@ static int zend_jit_calc_range(zend_jit_context *ctx, zend_op_array *op_array, i
 			}
 			break;
 		case ZEND_ASSERT_CHECK:
-			if (info->ssa[line].result_def == var) {
+			if (info->ssa.op[line].result_def == var) {
 				tmp->min = 0;
 				tmp->max = 1;
 				return 1;
 			}
 			break;
 		case ZEND_SEND_VAR:
-			if (info->ssa[line].op1_def == var) {
-				if (info->ssa[line].op1_def >= 0) {
+			if (info->ssa.op[line].op1_def == var) {
+				if (info->ssa.op[line].op1_def >= 0) {
 					if (OP1_HAS_RANGE()) {
 						tmp->underflow = OP1_RANGE_UNDERFLOW();
 						tmp->min = OP1_MIN_RANGE();
@@ -1563,7 +1563,7 @@ static int zend_jit_calc_range(zend_jit_context *ctx, zend_op_array *op_array, i
 			}
 			break;
 		case ZEND_PRE_INC:
-			if (info->ssa[line].op1_def == var || info->ssa[line].result_def == var) {
+			if (info->ssa.op[line].op1_def == var || info->ssa.op[line].result_def == var) {
 				if (OP1_HAS_RANGE()) {
 					tmp->min = OP1_MIN_RANGE();
 					tmp->max = OP1_MAX_RANGE();
@@ -1582,7 +1582,7 @@ static int zend_jit_calc_range(zend_jit_context *ctx, zend_op_array *op_array, i
 			}
 			break;
 		case ZEND_PRE_DEC:
-			if (info->ssa[line].op1_def == var || info->ssa[line].result_def == var) {
+			if (info->ssa.op[line].op1_def == var || info->ssa.op[line].result_def == var) {
 				if (OP1_HAS_RANGE()) {
 					tmp->min = OP1_MIN_RANGE();
 					tmp->max = OP1_MAX_RANGE();
@@ -1601,13 +1601,13 @@ static int zend_jit_calc_range(zend_jit_context *ctx, zend_op_array *op_array, i
 			}
 			break;
 		case ZEND_POST_INC:
-			if (info->ssa[line].op1_def == var || info->ssa[line].result_def == var) {
+			if (info->ssa.op[line].op1_def == var || info->ssa.op[line].result_def == var) {
 				if (OP1_HAS_RANGE()) {
 					tmp->min = OP1_MIN_RANGE();
 					tmp->max = OP1_MAX_RANGE();
 					tmp->underflow = OP1_RANGE_UNDERFLOW();
 					tmp->overflow = OP1_RANGE_OVERFLOW();
-					if (info->ssa[line].result_def == var) {
+					if (info->ssa.op[line].result_def == var) {
 						return 1;
 					}
 					if (tmp->max < LONG_MAX) {
@@ -1623,13 +1623,13 @@ static int zend_jit_calc_range(zend_jit_context *ctx, zend_op_array *op_array, i
 			}
 			break;
 		case ZEND_POST_DEC:
-			if (info->ssa[line].op1_def == var || info->ssa[line].result_def == var) {
+			if (info->ssa.op[line].op1_def == var || info->ssa.op[line].result_def == var) {
 				if (OP1_HAS_RANGE()) {
 					tmp->min = OP1_MIN_RANGE();
 					tmp->max = OP1_MAX_RANGE();
 					tmp->underflow = OP1_RANGE_UNDERFLOW();
 					tmp->overflow = OP1_RANGE_OVERFLOW();
-					if (info->ssa[line].result_def == var) {
+					if (info->ssa.op[line].result_def == var) {
 						return 1;
 					}
 					if (tmp->min > LONG_MIN) {
@@ -1645,7 +1645,7 @@ static int zend_jit_calc_range(zend_jit_context *ctx, zend_op_array *op_array, i
 			}
 			break;
 		case ZEND_ASSIGN:
-			if (info->ssa[line].op1_def == var || info->ssa[line].op2_def == var || info->ssa[line].result_def == var) {
+			if (info->ssa.op[line].op1_def == var || info->ssa.op[line].op2_def == var || info->ssa.op[line].result_def == var) {
 				if (OP2_HAS_RANGE()) {
 					tmp->min = OP2_MIN_RANGE();
 					tmp->max = OP2_MAX_RANGE();
@@ -1657,7 +1657,7 @@ static int zend_jit_calc_range(zend_jit_context *ctx, zend_op_array *op_array, i
 			break;
 		case ZEND_ASSIGN_DIM:
 		case ZEND_ASSIGN_OBJ:
-			if (info->ssa[line+1].op1_def == var) {
+			if (info->ssa.op[line+1].op1_def == var) {
 				if ((opline+1)->opcode == ZEND_OP_DATA) {
 					opline++;
 					tmp->min = OP1_MIN_RANGE();
@@ -1670,7 +1670,7 @@ static int zend_jit_calc_range(zend_jit_context *ctx, zend_op_array *op_array, i
 			break;
 		case ZEND_ASSIGN_ADD:
 			if (opline->extended_value == 0) {
-				if (info->ssa[line].op1_def == var || info->ssa[line].result_def == var) {
+				if (info->ssa.op[line].op1_def == var || info->ssa.op[line].result_def == var) {
 					if (OP1_HAS_RANGE() && OP2_HAS_RANGE()) {
 						op1_min = OP1_MIN_RANGE();
 						op2_min = OP2_MIN_RANGE();
@@ -1694,7 +1694,7 @@ static int zend_jit_calc_range(zend_jit_context *ctx, zend_op_array *op_array, i
 					}
 				}
 			} else if ((opline+1)->opcode == ZEND_OP_DATA) {
-				if (info->ssa[line+1].op1_def == var) {
+				if (info->ssa.op[line+1].op1_def == var) {
 					opline++;
 					if (OP1_HAS_RANGE()) {
 						tmp->min = OP1_MIN_RANGE();
@@ -1708,7 +1708,7 @@ static int zend_jit_calc_range(zend_jit_context *ctx, zend_op_array *op_array, i
 			break;
 		case ZEND_ASSIGN_SUB:
 			if (opline->extended_value == 0) {
-				if (info->ssa[line].op1_def == var || info->ssa[line].result_def == var) {
+				if (info->ssa.op[line].op1_def == var || info->ssa.op[line].result_def == var) {
 					if (OP1_HAS_RANGE() && OP2_HAS_RANGE()) {
 						op1_min = OP1_MIN_RANGE();
 						op2_min = OP2_MIN_RANGE();
@@ -1732,7 +1732,7 @@ static int zend_jit_calc_range(zend_jit_context *ctx, zend_op_array *op_array, i
 					}
 				}
 			} else if ((opline+1)->opcode == ZEND_OP_DATA) {
-				if (info->ssa[line+1].op1_def == var) {
+				if (info->ssa.op[line+1].op1_def == var) {
 					opline++;
 					if (OP1_HAS_RANGE()) {
 						tmp->min = OP1_MIN_RANGE();
@@ -1746,7 +1746,7 @@ static int zend_jit_calc_range(zend_jit_context *ctx, zend_op_array *op_array, i
 			break;
 		case ZEND_ASSIGN_MUL:
 			if (opline->extended_value == 0) {
-				if (info->ssa[line].op1_def == var || info->ssa[line].result_def == var) {
+				if (info->ssa.op[line].op1_def == var || info->ssa.op[line].result_def == var) {
 					if (OP1_HAS_RANGE() && OP2_HAS_RANGE()) {
 						op1_min = OP1_MIN_RANGE();
 						op2_min = OP2_MIN_RANGE();
@@ -1777,7 +1777,7 @@ static int zend_jit_calc_range(zend_jit_context *ctx, zend_op_array *op_array, i
 					}
 				}
 			} else if ((opline+1)->opcode == ZEND_OP_DATA) {
-				if (info->ssa[line+1].op1_def == var) {
+				if (info->ssa.op[line+1].op1_def == var) {
 					if (OP1_HAS_RANGE()) {
 						opline++;
 						tmp->min = OP1_MIN_RANGE();
@@ -1791,7 +1791,7 @@ static int zend_jit_calc_range(zend_jit_context *ctx, zend_op_array *op_array, i
 			break;
 		case ZEND_ASSIGN_DIV:
 			if (opline->extended_value == 0) {
-				if (info->ssa[line].op1_def == var || info->ssa[line].result_def == var) {
+				if (info->ssa.op[line].op1_def == var || info->ssa.op[line].result_def == var) {
 					if (OP1_HAS_RANGE() && OP2_HAS_RANGE()) {
 						op1_min = OP1_MIN_RANGE();
 						op2_min = OP2_MIN_RANGE();
@@ -1825,7 +1825,7 @@ static int zend_jit_calc_range(zend_jit_context *ctx, zend_op_array *op_array, i
 					}
 				}
 			} else if ((opline+1)->opcode == ZEND_OP_DATA) {
-				if (info->ssa[line+1].op1_def == var) {
+				if (info->ssa.op[line+1].op1_def == var) {
 					if (OP1_HAS_RANGE()) {
 						opline++;
 						tmp->min = OP1_MIN_RANGE();
@@ -1839,7 +1839,7 @@ static int zend_jit_calc_range(zend_jit_context *ctx, zend_op_array *op_array, i
 			break;
 		case ZEND_ASSIGN_MOD:
 			if (opline->extended_value == 0) {
-				if (info->ssa[line].op1_def == var || info->ssa[line].result_def == var) {
+				if (info->ssa.op[line].op1_def == var || info->ssa.op[line].result_def == var) {
 					if (OP1_HAS_RANGE() && OP2_HAS_RANGE()) {
 						if (OP1_RANGE_UNDERFLOW() ||
 						    OP2_RANGE_UNDERFLOW() ||
@@ -1867,7 +1867,7 @@ static int zend_jit_calc_range(zend_jit_context *ctx, zend_op_array *op_array, i
 					}
 				}
 			} else if ((opline+1)->opcode == ZEND_OP_DATA) {
-				if (info->ssa[line+1].op1_def == var) {
+				if (info->ssa.op[line+1].op1_def == var) {
 					if (OP1_HAS_RANGE()) {
 						opline++;
 						tmp->min = OP1_MIN_RANGE();
@@ -1881,7 +1881,7 @@ static int zend_jit_calc_range(zend_jit_context *ctx, zend_op_array *op_array, i
 			break;
 		case ZEND_ASSIGN_SL:
 			if (opline->extended_value == 0) {
-				if (info->ssa[line].op1_def == var || info->ssa[line].result_def == var) {
+				if (info->ssa.op[line].op1_def == var || info->ssa.op[line].result_def == var) {
 					if (OP1_HAS_RANGE() && OP2_HAS_RANGE()) {
 						if (OP1_RANGE_UNDERFLOW() ||
 						    OP2_RANGE_UNDERFLOW() ||
@@ -1905,7 +1905,7 @@ static int zend_jit_calc_range(zend_jit_context *ctx, zend_op_array *op_array, i
 					}
 				}
 			} else if ((opline+1)->opcode == ZEND_OP_DATA) {
-				if (info->ssa[line+1].op1_def == var) {
+				if (info->ssa.op[line+1].op1_def == var) {
 					if (OP1_HAS_RANGE()) {
 						opline++;
 						tmp->min = OP1_MIN_RANGE();
@@ -1919,7 +1919,7 @@ static int zend_jit_calc_range(zend_jit_context *ctx, zend_op_array *op_array, i
 			break;
 		case ZEND_ASSIGN_SR:
 			if (opline->extended_value == 0) {
-				if (info->ssa[line].op1_def == var || info->ssa[line].result_def == var) {
+				if (info->ssa.op[line].op1_def == var || info->ssa.op[line].result_def == var) {
 					if (OP1_HAS_RANGE() && OP2_HAS_RANGE()) {
 						if (OP1_RANGE_UNDERFLOW() ||
 						    OP2_RANGE_UNDERFLOW() ||
@@ -1943,7 +1943,7 @@ static int zend_jit_calc_range(zend_jit_context *ctx, zend_op_array *op_array, i
 					}
 				}
 			} else if ((opline+1)->opcode == ZEND_OP_DATA) {
-				if (info->ssa[line+1].op1_def == var) {
+				if (info->ssa.op[line+1].op1_def == var) {
 					if (OP1_HAS_RANGE()) {
 						opline++;
 						tmp->min = OP1_MIN_RANGE();
@@ -1957,7 +1957,7 @@ static int zend_jit_calc_range(zend_jit_context *ctx, zend_op_array *op_array, i
 			break;
 		case ZEND_ASSIGN_BW_OR:
 			if (opline->extended_value == 0) {
-				if (info->ssa[line].op1_def == var || info->ssa[line].result_def == var) {
+				if (info->ssa.op[line].op1_def == var || info->ssa.op[line].result_def == var) {
 					if (OP1_HAS_RANGE() && OP2_HAS_RANGE()) {
 						if (OP1_RANGE_UNDERFLOW() ||
 						    OP2_RANGE_UNDERFLOW() ||
@@ -1976,7 +1976,7 @@ static int zend_jit_calc_range(zend_jit_context *ctx, zend_op_array *op_array, i
 					}
 				}
 			} else if ((opline+1)->opcode == ZEND_OP_DATA) {
-				if (info->ssa[line+1].op1_def == var) {
+				if (info->ssa.op[line+1].op1_def == var) {
 					if (OP1_HAS_RANGE()) {
 						opline++;
 						tmp->min = OP1_MIN_RANGE();
@@ -1990,7 +1990,7 @@ static int zend_jit_calc_range(zend_jit_context *ctx, zend_op_array *op_array, i
 			break;
 		case ZEND_ASSIGN_BW_AND:
 			if (opline->extended_value == 0) {
-				if (info->ssa[line].op1_def == var || info->ssa[line].result_def == var) {
+				if (info->ssa.op[line].op1_def == var || info->ssa.op[line].result_def == var) {
 					if (OP1_HAS_RANGE() && OP2_HAS_RANGE()) {
 						if (OP1_RANGE_UNDERFLOW() ||
 						    OP2_RANGE_UNDERFLOW() ||
@@ -2009,7 +2009,7 @@ static int zend_jit_calc_range(zend_jit_context *ctx, zend_op_array *op_array, i
 					}
 				}
 			} else if ((opline+1)->opcode == ZEND_OP_DATA) {
-				if (info->ssa[line+1].op1_def == var) {
+				if (info->ssa.op[line+1].op1_def == var) {
 					if (OP1_HAS_RANGE()) {
 						opline++;
 						tmp->min = OP1_MIN_RANGE();
@@ -2029,7 +2029,7 @@ static int zend_jit_calc_range(zend_jit_context *ctx, zend_op_array *op_array, i
 			    (opline-1)->opcode == ZEND_ASSIGN_ADD ||
 			    (opline-1)->opcode == ZEND_ASSIGN_SUB ||
 			    (opline-1)->opcode == ZEND_ASSIGN_MUL) {
-				if (info->ssa[line].op1_def == var) {
+				if (info->ssa.op[line].op1_def == var) {
 					if (OP1_HAS_RANGE()) {
 						tmp->min = OP1_MIN_RANGE();
 						tmp->max = OP1_MAX_RANGE();
@@ -2043,7 +2043,7 @@ static int zend_jit_calc_range(zend_jit_context *ctx, zend_op_array *op_array, i
 			break;
 		case ZEND_RECV:
 		case ZEND_RECV_INIT:
-			if (info->ssa[line].result_def == var) {
+			if (info->ssa.op[line].result_def == var) {
 				if ((int)opline->op1.num-1 < info->num_args &&
 				    info->arg_info[opline->op1.num-1].info.has_range) {
 				    *tmp = info->arg_info[opline->op1.num-1].info.range;
@@ -2071,7 +2071,7 @@ static int zend_jit_calc_range(zend_jit_context *ctx, zend_op_array *op_array, i
 		case ZEND_DO_ICALL: 
 		case ZEND_DO_UCALL: 
 		case ZEND_DO_FCALL_BY_NAME: 
-			if (info->ssa[line].result_def == var) {
+			if (info->ssa.op[line].result_def == var) {
 				zend_jit_call_info *call_info = info->callee_info;
 
 				while (call_info && call_info->caller_call_opline != opline) {
@@ -2132,7 +2132,7 @@ static void zend_jit_check_scc_var(zend_op_array *op_array, int var, int *index,
 
 #ifdef SYM_RANGE
 	/* Process symbolic control-flow constraints */
-	p = info->ssa_var[var].sym_use_chain;
+	p = info->ssa.var[var].sym_use_chain;
 	while (p) {
 		CHECK_SCC_VAR(p->ssa_var);
 		p = p->sym_use_chain;
@@ -2140,14 +2140,14 @@ static void zend_jit_check_scc_var(zend_op_array *op_array, int var, int *index,
 #endif
 
 	if (root[var] == var) {
-		info->ssa_var[var].scc = info->sccs;
+		info->ssa.var[var].scc = info->sccs;
 		while (stack->len > 0) {
 			int var2 = zend_worklist_stack_peek(stack);
 			if (dfs[var2] <= dfs[var]) {
 				break;
 			}
 			zend_worklist_stack_pop(stack);
-			info->ssa_var[var2].scc = info->sccs;
+			info->ssa.var[var2].scc = info->sccs;
 		}
 		info->sccs++;
 	} else {
@@ -2162,30 +2162,30 @@ static int zend_jit_find_sccs(zend_op_array *op_array)
 	zend_worklist_stack stack;
 	int j;
 
-	dfs = alloca(sizeof(int) * info->ssa_vars);
-	memset(dfs, -1, sizeof(int) * info->ssa_vars);
-	root = alloca(sizeof(int) * info->ssa_vars);
-	ZEND_WORKLIST_STACK_ALLOCA(&stack, info->ssa_vars);
+	dfs = alloca(sizeof(int) * info->ssa.vars);
+	memset(dfs, -1, sizeof(int) * info->ssa.vars);
+	root = alloca(sizeof(int) * info->ssa.vars);
+	ZEND_WORKLIST_STACK_ALLOCA(&stack, info->ssa.vars);
 
 	/* Find SCCs */
-	for (j = 0; j < info->ssa_vars; j++) {
-		if (!info->ssa_var[j].no_val && dfs[j] < 0) {
+	for (j = 0; j < info->ssa.vars; j++) {
+		if (!info->ssa.var[j].no_val && dfs[j] < 0) {
 			zend_jit_check_scc_var(op_array, j, &index, dfs, root, &stack);
 		}
 	}
 		
 	/* Revert SCC order */
-	for (j = 0; j < info->ssa_vars; j++) {
-		if (info->ssa_var[j].scc >= 0) {
-			info->ssa_var[j].scc = info->sccs - (info->ssa_var[j].scc + 1);
+	for (j = 0; j < info->ssa.vars; j++) {
+		if (info->ssa.var[j].scc >= 0) {
+			info->ssa.var[j].scc = info->sccs - (info->ssa.var[j].scc + 1);
 		}
 	}
 	
-	for (j = 0; j < info->ssa_vars; j++) {
-		if (info->ssa_var[j].scc >= 0) {
+	for (j = 0; j < info->ssa.vars; j++) {
+		if (info->ssa.var[j].scc >= 0) {
 			int var = j;
 			if (root[j] == j) {
-				info->ssa_var[j].scc_entry = 1;
+				info->ssa.var[j].scc_entry = 1;
 			}
 			FOR_EACH_VAR_USAGE(var, CHECK_SCC_ENTRY);
 		}
@@ -2210,7 +2210,7 @@ static void zend_jit_init_range(zend_op_array *op_array, int var, zend_bool unde
 	info->ssa_var_info[var].range.max = max;
 	info->ssa_var_info[var].range.overflow = overflow;
 #ifdef LOG_SSA_RANGE
-	fprintf(stderr, "  change range (init      SCC %2d) %2d [%s%ld..%ld%s]\n", info->ssa_var[var].scc, var, (underflow?"-- ":""), min, max, (overflow?" ++":""));
+	fprintf(stderr, "  change range (init      SCC %2d) %2d [%s%ld..%ld%s]\n", info->ssa.var[var].scc, var, (underflow?"-- ":""), min, max, (overflow?" ++":""));
 #endif
 }
 
@@ -2311,8 +2311,8 @@ static int zend_jit_range_narrowing(zend_jit_context *ctx, zend_op_array *op_arr
 #ifdef NEG_RANGE
 # define CHECK_INNER_CYCLE(var2) \
 	do { \
-		if (info->ssa_var[var2].scc == info->ssa_var[var].scc && \
-		    !info->ssa_var[var2].scc_entry && \
+		if (info->ssa.var[var2].scc == info->ssa.var[var].scc && \
+		    !info->ssa.var[var2].scc_entry && \
 		    !zend_bitset_in(visited, var2) && \
 			zend_jit_check_inner_cycles(op_array, worklist, visited, var2)) { \
 			return 1; \
@@ -2336,7 +2336,7 @@ static int zend_jit_check_inner_cycles(zend_op_array *op_array, zend_bitset work
 static void zend_jit_infer_ranges_warmup(zend_jit_context *ctx, zend_op_array *op_array, int *scc_var, int *next_scc_var, int scc)
 {
 	zend_jit_func_info *info = JIT_DATA(op_array);
-	int worklist_len = zend_bitset_len(info->ssa_vars);
+	int worklist_len = zend_bitset_len(info->ssa.vars);
 	zend_bitset worklist = alloca(sizeof(zend_ulong) * worklist_len);
 	zend_bitset visited = alloca(sizeof(zend_ulong) * worklist_len);
 	int j, n;
@@ -2362,7 +2362,7 @@ static void zend_jit_infer_ranges_warmup(zend_jit_context *ctx, zend_op_array *o
 	for (n = 0; n < RANGE_WARMAP_PASSES; n++) {
 		j= scc_var[scc];
 		while (j >= 0) {
-			if (info->ssa_var[j].scc_entry) {
+			if (info->ssa.var[j].scc_entry) {
 				zend_bitset_incl(worklist, j);
 			}
 			j = next_scc_var[j];
@@ -2377,54 +2377,54 @@ static void zend_jit_infer_ranges_warmup(zend_jit_context *ctx, zend_op_array *o
 #ifdef NEG_RANGE
 				if (!has_inner_cycles &&
 				    info->ssa_var_info[j].has_range &&
-				    info->ssa_var[j].definition_phi &&
-				    info->ssa_var[j].definition_phi->pi >= 0 &&
-				    info->ssa_var[j].definition_phi->constraint.negative &&
-				    info->ssa_var[j].definition_phi->constraint.min_ssa_var < 0 &&
-				    info->ssa_var[j].definition_phi->constraint.min_ssa_var < 0) {
+				    info->ssa.var[j].definition_phi &&
+				    info->ssa.var[j].definition_phi->pi >= 0 &&
+				    info->ssa.var[j].definition_phi->constraint.negative &&
+				    info->ssa.var[j].definition_phi->constraint.min_ssa_var < 0 &&
+				    info->ssa.var[j].definition_phi->constraint.min_ssa_var < 0) {
 					if (tmp.min == info->ssa_var_info[j].range.min &&
 					    tmp.max == info->ssa_var_info[j].range.max) {
-						if (info->ssa_var[j].definition_phi->constraint.negative == NEG_INIT) {
+						if (info->ssa.var[j].definition_phi->constraint.negative == NEG_INIT) {
 #ifdef LOG_NEG_RANGE
 							fprintf(stderr, "#%d INVARIANT\n", j);
 #endif
-							info->ssa_var[j].definition_phi->constraint.negative = NEG_INVARIANT;
+							info->ssa.var[j].definition_phi->constraint.negative = NEG_INVARIANT;
 						}
 					} else if (tmp.min == info->ssa_var_info[j].range.min &&
 					           tmp.max == info->ssa_var_info[j].range.max + 1 &&
-					           tmp.max < info->ssa_var[j].definition_phi->constraint.range.min) {
-						if (info->ssa_var[j].definition_phi->constraint.negative == NEG_INIT ||
-						    info->ssa_var[j].definition_phi->constraint.negative == NEG_INVARIANT) {
+					           tmp.max < info->ssa.var[j].definition_phi->constraint.range.min) {
+						if (info->ssa.var[j].definition_phi->constraint.negative == NEG_INIT ||
+						    info->ssa.var[j].definition_phi->constraint.negative == NEG_INVARIANT) {
 #ifdef LOG_NEG_RANGE
 							fprintf(stderr, "#%d LT\n", j);
 #endif
-							info->ssa_var[j].definition_phi->constraint.negative = NEG_USE_LT;
-						} else if (!info->ssa_var[j].definition_phi->constraint.negative == NEG_USE_GT) {
+							info->ssa.var[j].definition_phi->constraint.negative = NEG_USE_LT;
+						} else if (!info->ssa.var[j].definition_phi->constraint.negative == NEG_USE_GT) {
 #ifdef LOG_NEG_RANGE
 							fprintf(stderr, "#%d UNKNOWN\n", j);
 #endif
-							info->ssa_var[j].definition_phi->constraint.negative = NEG_UNKNOWN;
+							info->ssa.var[j].definition_phi->constraint.negative = NEG_UNKNOWN;
 						}
 					} else if (tmp.max == info->ssa_var_info[j].range.max &&
 				               tmp.min == info->ssa_var_info[j].range.min - 1 &&
-					           tmp.min > info->ssa_var[j].definition_phi->constraint.range.max) {
-						if (info->ssa_var[j].definition_phi->constraint.negative == NEG_INIT ||
-						    info->ssa_var[j].definition_phi->constraint.negative == NEG_INVARIANT) {
+					           tmp.min > info->ssa.var[j].definition_phi->constraint.range.max) {
+						if (info->ssa.var[j].definition_phi->constraint.negative == NEG_INIT ||
+						    info->ssa.var[j].definition_phi->constraint.negative == NEG_INVARIANT) {
 #ifdef LOG_NEG_RANGE
 							fprintf(stderr, "#%d GT\n", j);
 #endif
-							info->ssa_var[j].definition_phi->constraint.negative = NEG_USE_GT;
-						} else if (!info->ssa_var[j].definition_phi->constraint.negative == NEG_USE_LT) {
+							info->ssa.var[j].definition_phi->constraint.negative = NEG_USE_GT;
+						} else if (!info->ssa.var[j].definition_phi->constraint.negative == NEG_USE_LT) {
 #ifdef LOG_NEG_RANGE
 							fprintf(stderr, "#%d UNKNOWN\n", j);
 #endif
-							info->ssa_var[j].definition_phi->constraint.negative = NEG_UNKNOWN;
+							info->ssa.var[j].definition_phi->constraint.negative = NEG_UNKNOWN;
 						}
 					} else {
 #ifdef LOG_NEG_RANGE
 						fprintf(stderr, "#%d UNKNOWN\n", j);
 #endif
-						info->ssa_var[j].definition_phi->constraint.negative = NEG_UNKNOWN;
+						info->ssa.var[j].definition_phi->constraint.negative = NEG_UNKNOWN;
 					}
 				}
 #endif
@@ -2443,9 +2443,9 @@ static void zend_jit_infer_ranges_warmup(zend_jit_context *ctx, zend_op_array *o
 static int zend_jit_infer_ranges(zend_jit_context *ctx, zend_op_array *op_array)
 {
 	zend_jit_func_info *info = JIT_DATA(op_array);
-	int worklist_len = zend_bitset_len(info->ssa_vars);
+	int worklist_len = zend_bitset_len(info->ssa.vars);
 	zend_bitset worklist = alloca(sizeof(zend_ulong) * worklist_len);
-	int *next_scc_var = alloca(sizeof(int) * info->ssa_vars);
+	int *next_scc_var = alloca(sizeof(int) * info->ssa.vars);
 	int *scc_var = alloca(sizeof(int) * info->sccs);
 	zend_jit_ssa_phi *p;
 	zend_jit_range tmp;
@@ -2457,10 +2457,10 @@ static int zend_jit_infer_ranges(zend_jit_context *ctx, zend_op_array *op_array)
 
 	/* Create linked lists of SSA variables for each SCC */
 	memset(scc_var, -1, sizeof(int) * info->sccs);
-	for (j = 0; j < info->ssa_vars; j++) {
-		if (info->ssa_var[j].scc >= 0) {
-			next_scc_var[j] = scc_var[info->ssa_var[j].scc];
-			scc_var[info->ssa_var[j].scc] = j;
+	for (j = 0; j < info->ssa.vars; j++) {
+		if (info->ssa.var[j].scc >= 0) {
+			next_scc_var[j] = scc_var[info->ssa.var[j].scc];
+			scc_var[info->ssa.var[j].scc] = j;
 		}
 	}		
 
@@ -2477,7 +2477,7 @@ static int zend_jit_infer_ranges(zend_jit_context *ctx, zend_op_array *op_array)
 			/* Find SCC entry points */
 			memset(worklist, 0, sizeof(zend_ulong) * worklist_len);
 			do {
-				if (info->ssa_var[j].scc_entry) {
+				if (info->ssa.var[j].scc_entry) {
 					zend_bitset_incl(worklist, j);
 				}
 				j = next_scc_var[j];
@@ -2517,7 +2517,7 @@ static int zend_jit_infer_ranges(zend_jit_context *ctx, zend_op_array *op_array)
 					FOR_EACH_VAR_USAGE(j, ADD_SCC_VAR);
 #ifdef SYM_RANGE
 					/* Process symbolic control-flow constraints */
-					p = info->ssa_var[j].sym_use_chain;
+					p = info->ssa.var[j].sym_use_chain;
 					while (p) {
 						ADD_SCC_VAR(p->ssa_var);
 						p = p->sym_use_chain;
@@ -2535,37 +2535,37 @@ static void add_usages(zend_op_array *op_array, zend_bitset worklist, int var)
 {
 	zend_jit_func_info *info = JIT_DATA(op_array);
 
-	if (info->ssa_var[var].phi_use_chain) {
-		zend_jit_ssa_phi *p = info->ssa_var[var].phi_use_chain;
+	if (info->ssa.var[var].phi_use_chain) {
+		zend_jit_ssa_phi *p = info->ssa.var[var].phi_use_chain;
 		do {
 			zend_bitset_incl(worklist, p->ssa_var);
 			p = next_use_phi(info, var, p);
 		} while (p);
 	}
-	if (info->ssa_var[var].use_chain >= 0) {
-		int use = info->ssa_var[var].use_chain;
+	if (info->ssa.var[var].use_chain >= 0) {
+		int use = info->ssa.var[var].use_chain;
 		do {
-			if (info->ssa[use].result_def >= 0) {
-				zend_bitset_incl(worklist, info->ssa[use].result_def);
+			if (info->ssa.op[use].result_def >= 0) {
+				zend_bitset_incl(worklist, info->ssa.op[use].result_def);
 			}
-			if (info->ssa[use].op1_def >= 0) {
-				zend_bitset_incl(worklist, info->ssa[use].op1_def);
+			if (info->ssa.op[use].op1_def >= 0) {
+				zend_bitset_incl(worklist, info->ssa.op[use].op1_def);
 			}
-			if (info->ssa[use].op2_def >= 0) {
-				zend_bitset_incl(worklist, info->ssa[use].op2_def);
+			if (info->ssa.op[use].op2_def >= 0) {
+				zend_bitset_incl(worklist, info->ssa.op[use].op2_def);
 			}
 			if (op_array->opcodes[use].opcode == ZEND_OP_DATA) {
-				if (info->ssa[use-1].result_def >= 0) {
-					zend_bitset_incl(worklist, info->ssa[use-1].result_def);
+				if (info->ssa.op[use-1].result_def >= 0) {
+					zend_bitset_incl(worklist, info->ssa.op[use-1].result_def);
 				}
-				if (info->ssa[use-1].op1_def >= 0) {
-					zend_bitset_incl(worklist, info->ssa[use-1].op1_def);
+				if (info->ssa.op[use-1].op1_def >= 0) {
+					zend_bitset_incl(worklist, info->ssa.op[use-1].op1_def);
 				}
-				if (info->ssa[use-1].op2_def >= 0) {
-					zend_bitset_incl(worklist, info->ssa[use-1].op2_def);
+				if (info->ssa.op[use-1].op2_def >= 0) {
+					zend_bitset_incl(worklist, info->ssa.op[use-1].op2_def);
 				}
 			}
-			use = next_use(info->ssa, var, use);
+			use = next_use(info->ssa.op, var, use);
 		} while (use >= 0);
 	}
 }
@@ -2573,8 +2573,8 @@ static void add_usages(zend_op_array *op_array, zend_bitset worklist, int var)
 static void reset_dependent_vars(zend_op_array *op_array, zend_bitset worklist, int var)
 {
 	zend_jit_func_info *info = JIT_DATA(op_array);
-	zend_jit_ssa_op *ssa = info->ssa;
-	zend_jit_ssa_var *ssa_var = info->ssa_var;
+	zend_jit_ssa_op *ssa_op = info->ssa.op;
+	zend_jit_ssa_var *ssa_var = info->ssa.var;
 	zend_jit_ssa_var_info *ssa_var_info = info->ssa_var_info;
 	zend_jit_ssa_phi *p;
 	int use;
@@ -2590,43 +2590,43 @@ static void reset_dependent_vars(zend_op_array *op_array, zend_bitset worklist, 
 	}
 	use = ssa_var[var].use_chain;
 	while (use >= 0) {
-		if (ssa[use].op1_def >= 0 && ssa_var_info[ssa[use].op1_def].type) {
-			ssa_var_info[ssa[use].op1_def].type = 0;
-			zend_bitset_incl(worklist, ssa[use].op1_def);
-			reset_dependent_vars(op_array, worklist, ssa[use].op1_def);
+		if (ssa_op[use].op1_def >= 0 && ssa_var_info[ssa_op[use].op1_def].type) {
+			ssa_var_info[ssa_op[use].op1_def].type = 0;
+			zend_bitset_incl(worklist, ssa_op[use].op1_def);
+			reset_dependent_vars(op_array, worklist, ssa_op[use].op1_def);
 		}
-		if (ssa[use].op2_def >= 0 && ssa_var_info[ssa[use].op2_def].type) {
-			ssa_var_info[ssa[use].op2_def].type = 0;
-			zend_bitset_incl(worklist, ssa[use].op2_def);
-			reset_dependent_vars(op_array, worklist, ssa[use].op2_def);
+		if (ssa_op[use].op2_def >= 0 && ssa_var_info[ssa_op[use].op2_def].type) {
+			ssa_var_info[ssa_op[use].op2_def].type = 0;
+			zend_bitset_incl(worklist, ssa_op[use].op2_def);
+			reset_dependent_vars(op_array, worklist, ssa_op[use].op2_def);
 		}
-		if (ssa[use].result_def >= 0 && ssa_var_info[ssa[use].result_def].type) {
-			ssa_var_info[ssa[use].result_def].type = 0;
-			zend_bitset_incl(worklist, ssa[use].result_def);
-			reset_dependent_vars(op_array, worklist, ssa[use].result_def);
+		if (ssa_op[use].result_def >= 0 && ssa_var_info[ssa_op[use].result_def].type) {
+			ssa_var_info[ssa_op[use].result_def].type = 0;
+			zend_bitset_incl(worklist, ssa_op[use].result_def);
+			reset_dependent_vars(op_array, worklist, ssa_op[use].result_def);
 		}
 		if (op_array->opcodes[use+1].opcode == ZEND_OP_DATA) {
-			if (ssa[use+1].op1_def >= 0 && ssa_var_info[ssa[use+1].op1_def].type) {
-				ssa_var_info[ssa[use+1].op1_def].type = 0;
-				zend_bitset_incl(worklist, ssa[use+1].op1_def);
-				reset_dependent_vars(op_array, worklist, ssa[use+1].op1_def);
+			if (ssa_op[use+1].op1_def >= 0 && ssa_var_info[ssa_op[use+1].op1_def].type) {
+				ssa_var_info[ssa_op[use+1].op1_def].type = 0;
+				zend_bitset_incl(worklist, ssa_op[use+1].op1_def);
+				reset_dependent_vars(op_array, worklist, ssa_op[use+1].op1_def);
 			}
-			if (ssa[use+1].op2_def >= 0 && ssa_var_info[ssa[use+1].op2_def].type) {
-				ssa_var_info[ssa[use+1].op2_def].type = 0;
-				zend_bitset_incl(worklist, ssa[use+1].op2_def);
-				reset_dependent_vars(op_array, worklist, ssa[use+1].op2_def);
+			if (ssa_op[use+1].op2_def >= 0 && ssa_var_info[ssa_op[use+1].op2_def].type) {
+				ssa_var_info[ssa_op[use+1].op2_def].type = 0;
+				zend_bitset_incl(worklist, ssa_op[use+1].op2_def);
+				reset_dependent_vars(op_array, worklist, ssa_op[use+1].op2_def);
 			}
-			if (ssa[use+1].result_def >= 0 && ssa_var_info[ssa[use+1].result_def].type) {
-				ssa_var_info[ssa[use+1].result_def].type = 0;
-				zend_bitset_incl(worklist, ssa[use+1].result_def);
-				reset_dependent_vars(op_array, worklist, ssa[use+1].result_def);
+			if (ssa_op[use+1].result_def >= 0 && ssa_var_info[ssa_op[use+1].result_def].type) {
+				ssa_var_info[ssa_op[use+1].result_def].type = 0;
+				zend_bitset_incl(worklist, ssa_op[use+1].result_def);
+				reset_dependent_vars(op_array, worklist, ssa_op[use+1].result_def);
 			}
 		}
-		use = next_use(ssa, var, use);
+		use = next_use(ssa_op, var, use);
 	}
 #ifdef SYM_RANGE
 	/* Process symbolic control-flow constraints */
-	p = info->ssa_var[var].sym_use_chain;
+	p = info->ssa.var[var].sym_use_chain;
 	while (p) {
 		ssa_var_info[p->ssa_var].type = 0;
 		zend_bitset_incl(worklist, p->ssa_var);
@@ -2734,8 +2734,8 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 	uint32_t tmp, orig;
 	zend_op *opline = op_array->opcodes + i;
 	zend_jit_func_info *info = JIT_DATA(op_array);
-	zend_jit_ssa_op *ssa = info->ssa;
-	zend_jit_ssa_var *ssa_var = info->ssa_var;
+	zend_jit_ssa_op *ssa_op = info->ssa.op;
+	zend_jit_ssa_var *ssa_var = info->ssa.var;
 	zend_jit_ssa_var_info *ssa_var_info = info->ssa_var_info;
 	zend_class_entry *ce;
 	int j;
@@ -2769,9 +2769,9 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 			if ((t1 & MAY_BE_ANY) == MAY_BE_LONG &&
 				(t2 & MAY_BE_ANY) == MAY_BE_LONG) {
 
-			    if (!ssa_var_info[ssa[i].result_def].has_range ||
-			         ssa_var_info[ssa[i].result_def].range.underflow ||
-			         ssa_var_info[ssa[i].result_def].range.overflow) {
+			    if (!ssa_var_info[ssa_op[i].result_def].has_range ||
+			         ssa_var_info[ssa_op[i].result_def].range.underflow ||
+			         ssa_var_info[ssa_op[i].result_def].range.overflow) {
 					/* may overflow */
 					tmp |= MAY_BE_LONG | MAY_BE_DOUBLE;
 				} else {
@@ -2793,16 +2793,16 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 					tmp |= t2 & (MAY_BE_ARRAY_KEY_ANY|MAY_BE_ARRAY_OF_ANY|MAY_BE_ARRAY_OF_REF);
 				}
 			}
-			UPDATE_SSA_TYPE(tmp, ssa[i].result_def);
+			UPDATE_SSA_TYPE(tmp, ssa_op[i].result_def);
 			break;
 		case ZEND_SUB:
 		case ZEND_MUL:
 			tmp = MAY_BE_DEF | MAY_BE_RC1;
 			if ((t1 & MAY_BE_ANY) == MAY_BE_LONG &&
 				(t2 & MAY_BE_ANY) == MAY_BE_LONG) {
-			    if (!ssa_var_info[ssa[i].result_def].has_range ||
-			         ssa_var_info[ssa[i].result_def].range.underflow ||
-			         ssa_var_info[ssa[i].result_def].range.overflow) {
+			    if (!ssa_var_info[ssa_op[i].result_def].has_range ||
+			         ssa_var_info[ssa_op[i].result_def].range.underflow ||
+			         ssa_var_info[ssa_op[i].result_def].range.overflow) {
 					/* may overflow */
 					tmp |= MAY_BE_LONG | MAY_BE_DOUBLE;
 				} else {
@@ -2814,7 +2814,7 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 			} else {
 				tmp |= MAY_BE_LONG | MAY_BE_DOUBLE;
 			}
-			UPDATE_SSA_TYPE(tmp, ssa[i].result_def);
+			UPDATE_SSA_TYPE(tmp, ssa_op[i].result_def);
 			break;
 		case ZEND_DIV:
 			tmp = MAY_BE_DEF | MAY_BE_RC1;
@@ -2838,10 +2838,10 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 					tmp |= MAY_BE_FALSE;
 				}
 			} else if ((t2 & MAY_BE_ANY) == MAY_BE_LONG) {
-				if (ssa[i].op2_use >= 0 &&
-				    ssa_var_info[ssa[i].op2_use].has_range) {
-					if (info->ssa_var_info[ssa[i].op2_use].range.min <= 0 &&
-					    info->ssa_var_info[ssa[i].op2_use].range.max >= 0) {
+				if (ssa_op[i].op2_use >= 0 &&
+				    ssa_var_info[ssa_op[i].op2_use].has_range) {
+					if (info->ssa_var_info[ssa_op[i].op2_use].range.min <= 0 &&
+					    info->ssa_var_info[ssa_op[i].op2_use].range.max >= 0) {
 						tmp |= MAY_BE_FALSE;
 					}
 				} else {
@@ -2850,7 +2850,7 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 			} else {
 				tmp |= MAY_BE_FALSE;
 			}
-			UPDATE_SSA_TYPE(tmp, ssa[i].result_def);
+			UPDATE_SSA_TYPE(tmp, ssa_op[i].result_def);
 			break;
 		case ZEND_MOD:
 			tmp = MAY_BE_DEF|MAY_BE_RC1|MAY_BE_LONG;
@@ -2868,10 +2868,10 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 					tmp |= MAY_BE_FALSE;
 				}
 			} else if ((t2 & MAY_BE_ANY) == MAY_BE_LONG) {
-				if (ssa[i].op2_use >= 0 &&
-				    ssa_var_info[ssa[i].op2_use].has_range) {
-					if (info->ssa_var_info[ssa[i].op2_use].range.min <= 0 &&
-					    info->ssa_var_info[ssa[i].op2_use].range.max >= 0) {
+				if (ssa_op[i].op2_use >= 0 &&
+				    ssa_var_info[ssa_op[i].op2_use].has_range) {
+					if (info->ssa_var_info[ssa_op[i].op2_use].range.min <= 0 &&
+					    info->ssa_var_info[ssa_op[i].op2_use].range.max >= 0) {
 						tmp |= MAY_BE_FALSE;
 					}
 				} else {
@@ -2880,7 +2880,7 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 			} else {
 				tmp |= MAY_BE_FALSE;
 			}
-			UPDATE_SSA_TYPE(tmp, ssa[i].result_def);
+			UPDATE_SSA_TYPE(tmp, ssa_op[i].result_def);
 			break;
 		case ZEND_BW_NOT:
 			tmp = MAY_BE_DEF | MAY_BE_RC1;
@@ -2890,7 +2890,7 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 			if (t1 & (MAY_BE_ANY-MAY_BE_STRING)) {
 				tmp |= MAY_BE_LONG;
 			}
-			UPDATE_SSA_TYPE(tmp, ssa[i].result_def);
+			UPDATE_SSA_TYPE(tmp, ssa_op[i].result_def);
 			break;
 		case ZEND_BW_OR:
 		case ZEND_BW_AND:
@@ -2902,12 +2902,12 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 			if ((t1 & (MAY_BE_ANY-MAY_BE_STRING)) || (t1 & (MAY_BE_ANY-MAY_BE_STRING))) {
 				tmp |= MAY_BE_LONG;
 			}
-			UPDATE_SSA_TYPE(tmp, ssa[i].result_def);
+			UPDATE_SSA_TYPE(tmp, ssa_op[i].result_def);
 			break;
 		case ZEND_SL:
 		case ZEND_SR:
 		case ZEND_BEGIN_SILENCE:
-			UPDATE_SSA_TYPE(MAY_BE_DEF|MAY_BE_RC1|MAY_BE_LONG, ssa[i].result_def);
+			UPDATE_SSA_TYPE(MAY_BE_DEF|MAY_BE_RC1|MAY_BE_LONG, ssa_op[i].result_def);
 			break;
 		case ZEND_BOOL_NOT:
 		case ZEND_BOOL_XOR:
@@ -2927,7 +2927,7 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 		case ZEND_ISSET_ISEMPTY_PROP_OBJ:
 		case ZEND_ISSET_ISEMPTY_STATIC_PROP:
 		case ZEND_ASSERT_CHECK:
-			UPDATE_SSA_TYPE(MAY_BE_DEF|MAY_BE_RC1|MAY_BE_FALSE|MAY_BE_TRUE, ssa[i].result_def);
+			UPDATE_SSA_TYPE(MAY_BE_DEF|MAY_BE_RC1|MAY_BE_FALSE|MAY_BE_TRUE, ssa_op[i].result_def);
 			break;
 		case ZEND_CAST:
 			tmp = MAY_BE_DEF|MAY_BE_RC1 | (1 << (opline->extended_value-1));
@@ -2941,7 +2941,7 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 					tmp |= (t1 & MAY_BE_ANY) << 16;
 				}
 			}
-			UPDATE_SSA_TYPE(tmp, ssa[i].result_def);
+			UPDATE_SSA_TYPE(tmp, ssa_op[i].result_def);
 			break;
 		case ZEND_QM_ASSIGN:
 		case ZEND_COALESCE:
@@ -2950,11 +2950,11 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 			} else {
 				tmp = (MAY_BE_DEF | MAY_BE_RC1 | t1) & ~(MAY_BE_UNDEF|MAY_BE_REF|MAY_BE_RCN);
 			}
-			UPDATE_SSA_TYPE(tmp, ssa[i].result_def);
-			if ((t1 & MAY_BE_OBJECT) && ssa[i].op1_use >= 0 && ssa_var_info[ssa[i].op1_use].ce) {
-				UPDATE_SSA_OBJ_TYPE(ssa_var_info[ssa[i].op1_use].ce, ssa_var_info[ssa[i].op1_use].is_instanceof, ssa[i].result_def);
+			UPDATE_SSA_TYPE(tmp, ssa_op[i].result_def);
+			if ((t1 & MAY_BE_OBJECT) && ssa_op[i].op1_use >= 0 && ssa_var_info[ssa_op[i].op1_use].ce) {
+				UPDATE_SSA_OBJ_TYPE(ssa_var_info[ssa_op[i].op1_use].ce, ssa_var_info[ssa_op[i].op1_use].is_instanceof, ssa_op[i].result_def);
 			} else {
-				UPDATE_SSA_OBJ_TYPE(NULL, 0, ssa[i].result_def);
+				UPDATE_SSA_OBJ_TYPE(NULL, 0, ssa_op[i].result_def);
 			}
 			break;
 		case ZEND_ASSIGN_ADD:
@@ -2973,7 +2973,7 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 				tmp = MAY_BE_DEF;
 				if (t1 & (MAY_BE_RC1|MAY_BE_RCN)) {
 					tmp |= MAY_BE_RC1;
-					if (ssa[i].result_def >= 0) {
+					if (ssa_op[i].result_def >= 0) {
 						tmp |= MAY_BE_RCN;
 					}
 				}
@@ -2984,9 +2984,9 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 			if ((t1 & MAY_BE_ANY) == MAY_BE_LONG &&
 				(t2 & MAY_BE_ANY) == MAY_BE_LONG) {
 
-			    if (!ssa_var_info[ssa[i].op1_def].has_range ||
-			         ssa_var_info[ssa[i].op1_def].range.underflow ||
-			         ssa_var_info[ssa[i].op1_def].range.overflow) {
+			    if (!ssa_var_info[ssa_op[i].op1_def].has_range ||
+			         ssa_var_info[ssa_op[i].op1_def].range.underflow ||
+			         ssa_var_info[ssa_op[i].op1_def].range.overflow) {
 					/* may overflow */
 					tmp |= MAY_BE_LONG | MAY_BE_DOUBLE;
 				} else {
@@ -3022,11 +3022,11 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 					if (t2 & (MAY_BE_NULL)) {
 						tmp |= MAY_BE_ARRAY_KEY_STRING;
 					}
-					UPDATE_SSA_TYPE(orig, ssa[i].op1_def);
-					if ((orig & MAY_BE_OBJECT) && ssa[i].op1_use >= 0 && ssa_var_info[ssa[i].op1_use].ce) {
-						UPDATE_SSA_OBJ_TYPE(ssa_var_info[ssa[i].op1_use].ce, ssa_var_info[ssa[i].op1_use].is_instanceof, ssa[i].op1_def);
+					UPDATE_SSA_TYPE(orig, ssa_op[i].op1_def);
+					if ((orig & MAY_BE_OBJECT) && ssa_op[i].op1_use >= 0 && ssa_var_info[ssa_op[i].op1_use].ce) {
+						UPDATE_SSA_OBJ_TYPE(ssa_var_info[ssa_op[i].op1_use].ce, ssa_var_info[ssa_op[i].op1_use].is_instanceof, ssa_op[i].op1_def);
 					} else {
-						UPDATE_SSA_OBJ_TYPE(NULL, 0, ssa[i].op1_def);
+						UPDATE_SSA_OBJ_TYPE(NULL, 0, ssa_op[i].op1_def);
 					}
 				}
 			} else if (opline->extended_value == ZEND_ASSIGN_OBJ) {
@@ -3037,18 +3037,18 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 					if (orig & MAY_BE_RCN) {
 						orig |= MAY_BE_RC1;
 					}
-					UPDATE_SSA_TYPE(orig, ssa[i].op1_def);
-					if ((orig & MAY_BE_OBJECT) && ssa[i].op1_use >= 0 && ssa_var_info[ssa[i].op1_use].ce) {
-						UPDATE_SSA_OBJ_TYPE(ssa_var_info[ssa[i].op1_use].ce, ssa_var_info[ssa[i].op1_use].is_instanceof, ssa[i].op1_def);
+					UPDATE_SSA_TYPE(orig, ssa_op[i].op1_def);
+					if ((orig & MAY_BE_OBJECT) && ssa_op[i].op1_use >= 0 && ssa_var_info[ssa_op[i].op1_use].ce) {
+						UPDATE_SSA_OBJ_TYPE(ssa_var_info[ssa_op[i].op1_use].ce, ssa_var_info[ssa_op[i].op1_use].is_instanceof, ssa_op[i].op1_def);
 					} else {
-						UPDATE_SSA_OBJ_TYPE(NULL, 0, ssa[i].op1_def);
+						UPDATE_SSA_OBJ_TYPE(NULL, 0, ssa_op[i].op1_def);
 					}
 				}
 			} else {
-				UPDATE_SSA_TYPE(tmp, ssa[i].op1_def);
+				UPDATE_SSA_TYPE(tmp, ssa_op[i].op1_def);
 			}
-			if (ssa[i].result_def >= 0) {
-				UPDATE_SSA_TYPE(tmp, ssa[i].result_def);
+			if (ssa_op[i].result_def >= 0) {
+				UPDATE_SSA_TYPE(tmp, ssa_op[i].result_def);
 			}
 			break;
 		case ZEND_ASSIGN_SUB:
@@ -3064,7 +3064,7 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 				tmp = MAY_BE_DEF;
 				if (t1 & (MAY_BE_RC1|MAY_BE_RCN)) {
 					tmp |= MAY_BE_RC1;
-					if (ssa[i].result_def >= 0) {
+					if (ssa_op[i].result_def >= 0) {
 						tmp |= MAY_BE_RCN;
 					}
 				}
@@ -3074,9 +3074,9 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 			}
 			if ((t1 & MAY_BE_ANY) == MAY_BE_LONG &&
 				(t2 & MAY_BE_ANY) == MAY_BE_LONG) {
-			    if (!ssa_var_info[ssa[i].op1_def].has_range ||
-			         ssa_var_info[ssa[i].op1_def].range.underflow ||
-			         ssa_var_info[ssa[i].op1_def].range.overflow) {
+			    if (!ssa_var_info[ssa_op[i].op1_def].has_range ||
+			         ssa_var_info[ssa_op[i].op1_def].range.underflow ||
+			         ssa_var_info[ssa_op[i].op1_def].range.overflow) {
 					/* may overflow */
 					tmp |= MAY_BE_LONG | MAY_BE_DOUBLE;
 				} else {
@@ -3102,13 +3102,13 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 					if (t2 & (MAY_BE_NULL)) {
 						tmp |= MAY_BE_ARRAY_KEY_STRING;
 					}
-					UPDATE_SSA_TYPE(orig, ssa[i].op1_def);
+					UPDATE_SSA_TYPE(orig, ssa_op[i].op1_def);
 				}
 			} else {
-				UPDATE_SSA_TYPE(tmp, ssa[i].op1_def);
+				UPDATE_SSA_TYPE(tmp, ssa_op[i].op1_def);
 			}
-			if (ssa[i].result_def >= 0) {
-				UPDATE_SSA_TYPE(tmp, ssa[i].result_def);
+			if (ssa_op[i].result_def >= 0) {
+				UPDATE_SSA_TYPE(tmp, ssa_op[i].result_def);
 			}
 			break;
 		case ZEND_ASSIGN_DIV:
@@ -3123,7 +3123,7 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 				tmp = MAY_BE_DEF;
 				if (t1 & (MAY_BE_RC1|MAY_BE_RCN)) {
 					tmp |= MAY_BE_RC1;
-					if (ssa[i].result_def >= 0) {
+					if (ssa_op[i].result_def >= 0) {
 						tmp |= MAY_BE_RCN;
 					}
 				}
@@ -3151,10 +3151,10 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 					tmp |= MAY_BE_FALSE;
 				}
 			} else if ((t2 & MAY_BE_ANY) == MAY_BE_LONG) {
-				if (ssa[i+1].op1_use >= 0 &&
-				    ssa_var_info[ssa[i+1].op1_use].has_range) {
-					if (info->ssa_var_info[ssa[i+1].op1_use].range.min <= 0 &&
-					    info->ssa_var_info[ssa[i+1].op1_use].range.max >= 0) {
+				if (ssa_op[i+1].op1_use >= 0 &&
+				    ssa_var_info[ssa_op[i+1].op1_use].has_range) {
+					if (info->ssa_var_info[ssa_op[i+1].op1_use].range.min <= 0 &&
+					    info->ssa_var_info[ssa_op[i+1].op1_use].range.max >= 0) {
 						tmp |= MAY_BE_FALSE;
 					}
 				} else {
@@ -3177,13 +3177,13 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 					if (t2 & (MAY_BE_NULL)) {
 						tmp |= MAY_BE_ARRAY_KEY_STRING;
 					}
-					UPDATE_SSA_TYPE(orig, ssa[i].op1_def);
+					UPDATE_SSA_TYPE(orig, ssa_op[i].op1_def);
 				}
 			} else {
-				UPDATE_SSA_TYPE(tmp, ssa[i].op1_def);
+				UPDATE_SSA_TYPE(tmp, ssa_op[i].op1_def);
 			}
-			if (ssa[i].result_def >= 0) {
-				UPDATE_SSA_TYPE(tmp, ssa[i].result_def);
+			if (ssa_op[i].result_def >= 0) {
+				UPDATE_SSA_TYPE(tmp, ssa_op[i].result_def);
 			}
 			break;
 		case ZEND_ASSIGN_MOD:
@@ -3198,7 +3198,7 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 				tmp = MAY_BE_DEF;
 				if (t1 & (MAY_BE_RC1|MAY_BE_RCN)) {
 					tmp |= MAY_BE_RC1;
-					if (ssa[i].result_def >= 0) {
+					if (ssa_op[i].result_def >= 0) {
 						tmp |= MAY_BE_RCN;
 					}
 				}
@@ -3221,10 +3221,10 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 					tmp |= MAY_BE_FALSE;
 				}
 			} else if ((t2 & MAY_BE_ANY) == MAY_BE_LONG) {
-				if (ssa[i+1].op1_use >= 0 &&
-				    ssa_var_info[ssa[i+1].op1_use].has_range) {
-					if (info->ssa_var_info[ssa[i+1].op1_use].range.min <= 0 &&
-					    info->ssa_var_info[ssa[i+1].op1_use].range.max >= 0) {
+				if (ssa_op[i+1].op1_use >= 0 &&
+				    ssa_var_info[ssa_op[i+1].op1_use].has_range) {
+					if (info->ssa_var_info[ssa_op[i+1].op1_use].range.min <= 0 &&
+					    info->ssa_var_info[ssa_op[i+1].op1_use].range.max >= 0) {
 						tmp |= MAY_BE_FALSE;
 					}
 				} else {
@@ -3247,13 +3247,13 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 					if (t2 & (MAY_BE_NULL)) {
 						tmp |= MAY_BE_ARRAY_KEY_STRING;
 					}
-					UPDATE_SSA_TYPE(orig, ssa[i].op1_def);
+					UPDATE_SSA_TYPE(orig, ssa_op[i].op1_def);
 				}
 			} else {
-				UPDATE_SSA_TYPE(tmp, ssa[i].op1_def);
+				UPDATE_SSA_TYPE(tmp, ssa_op[i].op1_def);
 			}
-			if (ssa[i].result_def >= 0) {
-				UPDATE_SSA_TYPE(tmp, ssa[i].result_def);
+			if (ssa_op[i].result_def >= 0) {
+				UPDATE_SSA_TYPE(tmp, ssa_op[i].result_def);
 			}
 			break;
 		case ZEND_ASSIGN_SL:
@@ -3269,7 +3269,7 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 				tmp = MAY_BE_DEF;
 				if (t1 & (MAY_BE_RC1|MAY_BE_RCN)) {
 					tmp |= MAY_BE_RC1;
-					if (ssa[i].result_def >= 0) {
+					if (ssa_op[i].result_def >= 0) {
 						tmp |= MAY_BE_RCN;
 					}
 				}
@@ -3292,13 +3292,13 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 					if (t2 & (MAY_BE_NULL)) {
 						tmp |= MAY_BE_ARRAY_KEY_STRING;
 					}
-					UPDATE_SSA_TYPE(orig, ssa[i].op1_def);
+					UPDATE_SSA_TYPE(orig, ssa_op[i].op1_def);
 				}
 			} else {
-				UPDATE_SSA_TYPE(tmp, ssa[i].op1_def);
+				UPDATE_SSA_TYPE(tmp, ssa_op[i].op1_def);
 			}
-			if (ssa[i].result_def >= 0) {
-				UPDATE_SSA_TYPE(tmp, ssa[i].result_def);
+			if (ssa_op[i].result_def >= 0) {
+				UPDATE_SSA_TYPE(tmp, ssa_op[i].result_def);
 			}
 			break;
 		case ZEND_ASSIGN_CONCAT:
@@ -3313,7 +3313,7 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 				tmp = MAY_BE_DEF;
 				if (t1 & (MAY_BE_RC1|MAY_BE_RCN)) {
 					tmp |= MAY_BE_RC1;
-					if (ssa[i].result_def >= 0) {
+					if (ssa_op[i].result_def >= 0) {
 						tmp |= MAY_BE_RCN;
 					}
 				}
@@ -3336,13 +3336,13 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 					if (t2 & (MAY_BE_NULL)) {
 						tmp |= MAY_BE_ARRAY_KEY_STRING;
 					}
-					UPDATE_SSA_TYPE(orig, ssa[i].op1_def);
+					UPDATE_SSA_TYPE(orig, ssa_op[i].op1_def);
 				}
 			} else {
-				UPDATE_SSA_TYPE(tmp, ssa[i].op1_def);
+				UPDATE_SSA_TYPE(tmp, ssa_op[i].op1_def);
 			}
-			if (ssa[i].result_def >= 0) {
-				UPDATE_SSA_TYPE(tmp, ssa[i].result_def);
+			if (ssa_op[i].result_def >= 0) {
+				UPDATE_SSA_TYPE(tmp, ssa_op[i].result_def);
 			}
 			break;
 		case ZEND_ASSIGN_BW_OR:
@@ -3359,7 +3359,7 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 				tmp = MAY_BE_DEF;
 				if (t1 & (MAY_BE_RC1|MAY_BE_RCN)) {
 					tmp |= MAY_BE_RC1;
-					if (ssa[i].result_def >= 0) {
+					if (ssa_op[i].result_def >= 0) {
 						tmp |= MAY_BE_RCN;
 					}
 				}
@@ -3387,19 +3387,19 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 					if (t2 & (MAY_BE_NULL)) {
 						tmp |= MAY_BE_ARRAY_KEY_STRING;
 					}
-					UPDATE_SSA_TYPE(orig, ssa[i].op1_def);
+					UPDATE_SSA_TYPE(orig, ssa_op[i].op1_def);
 				}
 			} else {
-				UPDATE_SSA_TYPE(tmp, ssa[i].op1_def);
+				UPDATE_SSA_TYPE(tmp, ssa_op[i].op1_def);
 			}
-			if (ssa[i].result_def >= 0) {
-				UPDATE_SSA_TYPE(tmp, ssa[i].result_def);
+			if (ssa_op[i].result_def >= 0) {
+				UPDATE_SSA_TYPE(tmp, ssa_op[i].result_def);
 			}
 			break;
 // TODO: ???
-//			UPDATE_SSA_TYPE(MAY_BE_LONG, ssa[i].op1_def);
-//			if (ssa[i].result_def >= 0) {
-//				UPDATE_SSA_TYPE(MAY_BE_LONG, ssa[i].result_def);
+//			UPDATE_SSA_TYPE(MAY_BE_LONG, ssa_op[i].op1_def);
+//			if (ssa_op[i].result_def >= 0) {
+//				UPDATE_SSA_TYPE(MAY_BE_LONG, ssa_op[i].result_def);
 //			}
 //			break;
 		case ZEND_PRE_INC:
@@ -3410,18 +3410,18 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 			}
 			if (t1 & (MAY_BE_RC1|MAY_BE_RCN)) {
 				tmp |= MAY_BE_RC1;
-				if (ssa[i].result_def >= 0) {
+				if (ssa_op[i].result_def >= 0) {
 					tmp |= MAY_BE_RCN;
 				}
 			}
 			if ((t1 & MAY_BE_ANY) == MAY_BE_LONG) {
-			    if (!ssa_var_info[ssa[i].op1_use].has_range ||
+			    if (!ssa_var_info[ssa_op[i].op1_use].has_range ||
 			         (opline->opcode == ZEND_PRE_DEC &&
-			          (ssa_var_info[ssa[i].op1_use].range.underflow ||
-			           ssa_var_info[ssa[i].op1_use].range.min == LONG_MIN)) ||
+			          (ssa_var_info[ssa_op[i].op1_use].range.underflow ||
+			           ssa_var_info[ssa_op[i].op1_use].range.min == LONG_MIN)) ||
 			         (opline->opcode == ZEND_PRE_INC &&
-			          (ssa_var_info[ssa[i].op1_use].range.overflow ||
-			           ssa_var_info[ssa[i].op1_use].range.min == LONG_MAX))) {
+			          (ssa_var_info[ssa_op[i].op1_use].range.overflow ||
+			           ssa_var_info[ssa_op[i].op1_use].range.min == LONG_MAX))) {
 					/* may overflow */
 					tmp |= MAY_BE_LONG | MAY_BE_DOUBLE;
 				} else {
@@ -3442,18 +3442,18 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 				}
 				tmp |= t1 & (MAY_BE_FALSE | MAY_BE_TRUE | MAY_BE_RESOURCE | MAY_BE_ARRAY | MAY_BE_OBJECT | MAY_BE_ARRAY_OF_ANY | MAY_BE_ARRAY_OF_REF | MAY_BE_ARRAY_KEY_ANY);
 			}
-			if (ssa[i].op1_def >= 0) {
-				UPDATE_SSA_TYPE(tmp, ssa[i].op1_def);
+			if (ssa_op[i].op1_def >= 0) {
+				UPDATE_SSA_TYPE(tmp, ssa_op[i].op1_def);
 			}
-			if (ssa[i].result_def >= 0) {
-				UPDATE_SSA_TYPE(tmp, ssa[i].result_def);
+			if (ssa_op[i].result_def >= 0) {
+				UPDATE_SSA_TYPE(tmp, ssa_op[i].result_def);
 			}
 			break;
 		case ZEND_POST_INC:
 		case ZEND_POST_DEC:
-			if (ssa[i].result_def >= 0) {
+			if (ssa_op[i].result_def >= 0) {
 				tmp = (MAY_BE_DEF | MAY_BE_RC1 | t1) & ~(MAY_BE_UNDEF|MAY_BE_REF|MAY_BE_RCN);
-				UPDATE_SSA_TYPE(tmp, ssa[i].result_def);
+				UPDATE_SSA_TYPE(tmp, ssa_op[i].result_def);
 			}
 			tmp = MAY_BE_DEF;
 			if (t1 & MAY_BE_REF) {
@@ -3463,13 +3463,13 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 				tmp |= MAY_BE_RC1;
 			}
 			if ((t1 & MAY_BE_ANY) == MAY_BE_LONG) {
-			    if (!ssa_var_info[ssa[i].op1_use].has_range ||
+			    if (!ssa_var_info[ssa_op[i].op1_use].has_range ||
 			         (opline->opcode == ZEND_PRE_DEC &&
-			          (ssa_var_info[ssa[i].op1_use].range.underflow ||
-			           ssa_var_info[ssa[i].op1_use].range.min == LONG_MIN)) ||
+			          (ssa_var_info[ssa_op[i].op1_use].range.underflow ||
+			           ssa_var_info[ssa_op[i].op1_use].range.min == LONG_MIN)) ||
 			         (opline->opcode == ZEND_PRE_INC &&
-			          (ssa_var_info[ssa[i].op1_use].range.overflow ||
-			           ssa_var_info[ssa[i].op1_use].range.min == LONG_MAX))) {
+			          (ssa_var_info[ssa_op[i].op1_use].range.overflow ||
+			           ssa_var_info[ssa_op[i].op1_use].range.min == LONG_MAX))) {
 					/* may overflow */
 					tmp |= MAY_BE_LONG | MAY_BE_DOUBLE;
 				} else {
@@ -3490,8 +3490,8 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 				}
 				tmp |= t1 & (MAY_BE_FALSE | MAY_BE_TRUE | MAY_BE_RESOURCE | MAY_BE_ARRAY | MAY_BE_OBJECT | MAY_BE_ARRAY_OF_ANY | MAY_BE_ARRAY_OF_REF | MAY_BE_ARRAY_KEY_ANY);
 			}
-			if (ssa[i].op1_def >= 0) {
-				UPDATE_SSA_TYPE(tmp, ssa[i].op1_def);
+			if (ssa_op[i].op1_def >= 0) {
+				UPDATE_SSA_TYPE(tmp, ssa_op[i].op1_def);
 			}
 			break;
 		case ZEND_ASSIGN_DIM:
@@ -3517,14 +3517,14 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 						tmp |= MAY_BE_ARRAY_KEY_STRING;
 					}
 				}
-				UPDATE_SSA_TYPE(tmp, ssa[i].op1_def);
-				if ((t1 & MAY_BE_OBJECT) && ssa[i].op1_use >= 0 && ssa_var_info[ssa[i].op1_use].ce) {
-					UPDATE_SSA_OBJ_TYPE(ssa_var_info[ssa[i].op1_use].ce, ssa_var_info[ssa[i].op1_use].is_instanceof, ssa[i].op1_def);
+				UPDATE_SSA_TYPE(tmp, ssa_op[i].op1_def);
+				if ((t1 & MAY_BE_OBJECT) && ssa_op[i].op1_use >= 0 && ssa_var_info[ssa_op[i].op1_use].ce) {
+					UPDATE_SSA_OBJ_TYPE(ssa_var_info[ssa_op[i].op1_use].ce, ssa_var_info[ssa_op[i].op1_use].is_instanceof, ssa_op[i].op1_def);
 				} else {
-					UPDATE_SSA_OBJ_TYPE(NULL, 0, ssa[i].op1_def);
+					UPDATE_SSA_OBJ_TYPE(NULL, 0, ssa_op[i].op1_def);
 				}
 			}
-			if (ssa[i].result_def >= 0) {
+			if (ssa_op[i].result_def >= 0) {
 			    tmp = MAY_BE_DEF;
 			    if (t1 & MAY_BE_STRING) {
 			    	tmp |= MAY_BE_STRING;
@@ -3536,7 +3536,7 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 			    if (t1 & MAY_BE_OBJECT) {
 			    	tmp |= MAY_BE_REF;
 				}
-				UPDATE_SSA_TYPE(tmp, ssa[i].result_def);
+				UPDATE_SSA_TYPE(tmp, ssa_op[i].result_def);
 			}
 			if ((opline+1)->op1_type == IS_CV) {
 				opline++;
@@ -3549,7 +3549,7 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 						}
 					}
 				}
-				UPDATE_SSA_TYPE(tmp, ssa[i].op1_def);
+				UPDATE_SSA_TYPE(tmp, ssa_op[i].op1_def);
 			}
 			break;
 		case ZEND_ASSIGN_OBJ:
@@ -3562,17 +3562,17 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 				if (tmp & MAY_BE_RCN) {
 					tmp |= MAY_BE_RC1;
 				}
-				UPDATE_SSA_TYPE(tmp, ssa[i].op1_def);
-				if ((t1 & MAY_BE_OBJECT) && ssa[i].op1_use >= 0 && ssa_var_info[ssa[i].op1_use].ce) {
-					UPDATE_SSA_OBJ_TYPE(ssa_var_info[ssa[i].op1_use].ce, ssa_var_info[ssa[i].op1_use].is_instanceof, ssa[i].op1_def);
+				UPDATE_SSA_TYPE(tmp, ssa_op[i].op1_def);
+				if ((t1 & MAY_BE_OBJECT) && ssa_op[i].op1_use >= 0 && ssa_var_info[ssa_op[i].op1_use].ce) {
+					UPDATE_SSA_OBJ_TYPE(ssa_var_info[ssa_op[i].op1_use].ce, ssa_var_info[ssa_op[i].op1_use].is_instanceof, ssa_op[i].op1_def);
 				} else {
-					UPDATE_SSA_OBJ_TYPE(NULL, 0, ssa[i].op1_def);
+					UPDATE_SSA_OBJ_TYPE(NULL, 0, ssa_op[i].op1_def);
 				}
 			}
-			if (ssa[i].result_def >= 0) {
+			if (ssa_op[i].result_def >= 0) {
 			    // TODO: ???
 			    tmp = MAY_BE_DEF | MAY_BE_REF | MAY_BE_RC1 | MAY_BE_RCN | MAY_BE_ANY | MAY_BE_ARRAY_KEY_ANY | MAY_BE_ARRAY_OF_ANY | MAY_BE_ARRAY_OF_REF;
-				UPDATE_SSA_TYPE(tmp, ssa[i].result_def);
+				UPDATE_SSA_TYPE(tmp, ssa_op[i].result_def);
 			}
 			if ((opline+1)->op1_type == IS_CV) {
 				opline++;
@@ -3585,7 +3585,7 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 						}
 					}
 				}
-				UPDATE_SSA_TYPE(tmp, ssa[i].op1_def);
+				UPDATE_SSA_TYPE(tmp, ssa_op[i].op1_def);
 			}
 			break;
 		case ZEND_ASSIGN:
@@ -3598,7 +3598,7 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 	                	}
 					}
 				}
-				UPDATE_SSA_TYPE(tmp, ssa[i].op2_def);
+				UPDATE_SSA_TYPE(tmp, ssa_op[i].op2_def);
 			}
 			tmp = (MAY_BE_DEF | t2) & ~(MAY_BE_UNDEF|MAY_BE_REF|MAY_BE_RC1|MAY_BE_RCN);
 			if (t1 & MAY_BE_REF) {
@@ -3641,24 +3641,24 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 			if (RETURN_VALUE_USED(opline) && (tmp & MAY_BE_RC1)) {
 				tmp |= MAY_BE_RCN;
 			}
-			if (ssa[i].op1_def >= 0) {
-				if (ssa_var_info[ssa[i].op1_def].use_as_double) {
+			if (ssa_op[i].op1_def >= 0) {
+				if (ssa_var_info[ssa_op[i].op1_def].use_as_double) {
 					tmp &= ~MAY_BE_LONG;
 					tmp |= MAY_BE_DOUBLE;
 				}
-				UPDATE_SSA_TYPE(tmp, ssa[i].op1_def);
-				if ((t2 & MAY_BE_OBJECT) && ssa[i].op2_use >= 0 && ssa_var_info[ssa[i].op2_use].ce) {
-					UPDATE_SSA_OBJ_TYPE(ssa_var_info[ssa[i].op2_use].ce, ssa_var_info[ssa[i].op2_use].is_instanceof, ssa[i].op1_def);
+				UPDATE_SSA_TYPE(tmp, ssa_op[i].op1_def);
+				if ((t2 & MAY_BE_OBJECT) && ssa_op[i].op2_use >= 0 && ssa_var_info[ssa_op[i].op2_use].ce) {
+					UPDATE_SSA_OBJ_TYPE(ssa_var_info[ssa_op[i].op2_use].ce, ssa_var_info[ssa_op[i].op2_use].is_instanceof, ssa_op[i].op1_def);
 				} else {
-					UPDATE_SSA_OBJ_TYPE(NULL, 0, ssa[i].op1_def);
+					UPDATE_SSA_OBJ_TYPE(NULL, 0, ssa_op[i].op1_def);
 				}
 			}
-			if (ssa[i].result_def >= 0) {
-				UPDATE_SSA_TYPE(tmp, ssa[i].result_def);
-				if ((t2 & MAY_BE_OBJECT) && ssa[i].op2_use >= 0 && ssa_var_info[ssa[i].op2_use].ce) {
-					UPDATE_SSA_OBJ_TYPE(ssa_var_info[ssa[i].op2_use].ce, ssa_var_info[ssa[i].op2_use].is_instanceof, ssa[i].result_def);
+			if (ssa_op[i].result_def >= 0) {
+				UPDATE_SSA_TYPE(tmp, ssa_op[i].result_def);
+				if ((t2 & MAY_BE_OBJECT) && ssa_op[i].op2_use >= 0 && ssa_var_info[ssa_op[i].op2_use].ce) {
+					UPDATE_SSA_OBJ_TYPE(ssa_var_info[ssa_op[i].op2_use].ce, ssa_var_info[ssa_op[i].op2_use].is_instanceof, ssa_op[i].result_def);
 				} else {
-					UPDATE_SSA_OBJ_TYPE(NULL, 0, ssa[i].result_def);
+					UPDATE_SSA_OBJ_TYPE(NULL, 0, ssa_op[i].result_def);
 				}
 			}
 			break;
@@ -3666,48 +3666,48 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 // TODO: ???
 			if (opline->op2_type == IS_CV) {
 				tmp = (MAY_BE_DEF | MAY_BE_REF | t2) & ~(MAY_BE_UNDEF|MAY_BE_RC1|MAY_BE_RCN);
-				UPDATE_SSA_TYPE(tmp, ssa[i].op2_def);
+				UPDATE_SSA_TYPE(tmp, ssa_op[i].op2_def);
 			}
 			if (opline->op2_type == IS_VAR && opline->extended_value == ZEND_RETURNS_FUNCTION) {
 				tmp = (MAY_BE_DEF | MAY_BE_REF | MAY_BE_RCN | MAY_BE_RC1 | t2) & ~MAY_BE_UNDEF;
 			} else {
 				tmp = (MAY_BE_DEF | MAY_BE_REF | t2) & ~(MAY_BE_UNDEF | MAY_BE_RC1 | MAY_BE_RCN);
 			}
-			UPDATE_SSA_TYPE(tmp, ssa[i].op1_def);
-			if (ssa[i].result_def >= 0) {
-				UPDATE_SSA_TYPE(tmp, ssa[i].result_def);
+			UPDATE_SSA_TYPE(tmp, ssa_op[i].op1_def);
+			if (ssa_op[i].result_def >= 0) {
+				UPDATE_SSA_TYPE(tmp, ssa_op[i].result_def);
 			}
 			break;
 		case ZEND_BIND_GLOBAL:
 			tmp = (MAY_BE_DEF | MAY_BE_REF | MAY_BE_ANY );
-			UPDATE_SSA_TYPE(tmp, ssa[i].op1_def);
+			UPDATE_SSA_TYPE(tmp, ssa_op[i].op1_def);
 			break;
 		case ZEND_SEND_VAR:
-			UPDATE_SSA_TYPE(t1 | MAY_BE_RC1 | MAY_BE_RCN, ssa[i].op1_def);
-			if ((t1 & MAY_BE_OBJECT) && ssa[i].op1_use >= 0 && ssa_var_info[ssa[i].op1_use].ce) {
-				UPDATE_SSA_OBJ_TYPE(ssa_var_info[ssa[i].op1_use].ce, ssa_var_info[ssa[i].op1_use].is_instanceof, ssa[i].op1_def);
+			UPDATE_SSA_TYPE(t1 | MAY_BE_RC1 | MAY_BE_RCN, ssa_op[i].op1_def);
+			if ((t1 & MAY_BE_OBJECT) && ssa_op[i].op1_use >= 0 && ssa_var_info[ssa_op[i].op1_use].ce) {
+				UPDATE_SSA_OBJ_TYPE(ssa_var_info[ssa_op[i].op1_use].ce, ssa_var_info[ssa_op[i].op1_use].is_instanceof, ssa_op[i].op1_def);
 			} else {
-				UPDATE_SSA_OBJ_TYPE(NULL, 0, ssa[i].op1_def);
+				UPDATE_SSA_OBJ_TYPE(NULL, 0, ssa_op[i].op1_def);
 			}
 			break;
 		case ZEND_SEND_VAR_EX:
 		case ZEND_SEND_VAR_NO_REF:
 		case ZEND_SEND_REF:
 // TODO: ???
-			if (ssa[i].op1_def >= 0) {
+			if (ssa_op[i].op1_def >= 0) {
 				tmp = (t1 & MAY_BE_UNDEF)|MAY_BE_DEF|MAY_BE_REF|MAY_BE_RC1|MAY_BE_RCN|MAY_BE_ANY|MAY_BE_ARRAY_KEY_ANY|MAY_BE_ARRAY_OF_ANY|MAY_BE_ARRAY_OF_REF;
-				UPDATE_SSA_TYPE(tmp, ssa[i].op1_def);
+				UPDATE_SSA_TYPE(tmp, ssa_op[i].op1_def);
 			}
 			break;
 		case ZEND_FAST_CONCAT:
 		case ZEND_ROPE_INIT:
 		case ZEND_ROPE_ADD:
 		case ZEND_ROPE_END:
-			UPDATE_SSA_TYPE(MAY_BE_DEF|MAY_BE_RC1|MAY_BE_STRING, ssa[i].result_def);
+			UPDATE_SSA_TYPE(MAY_BE_DEF|MAY_BE_RC1|MAY_BE_STRING, ssa_op[i].result_def);
 			break;
 		case ZEND_CONCAT:
 			/* TODO: +MAY_BE_OBJECT ??? */
-			UPDATE_SSA_TYPE(MAY_BE_DEF|MAY_BE_RC1|MAY_BE_STRING, ssa[i].result_def);
+			UPDATE_SSA_TYPE(MAY_BE_DEF|MAY_BE_RC1|MAY_BE_STRING, ssa_op[i].result_def);
 			break;
 		case ZEND_RECV:
 		case ZEND_RECV_INIT:
@@ -3767,8 +3767,8 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 			}
 #if 0
 			/* We won't recieve unused arguments */
-			if (ssa_var[ssa[i].result_def].use_chain < 0 &&
-			    ssa_var[ssa[i].result_def].phi_use_chain == NULL &&
+			if (ssa_var[ssa_op[i].result_def].use_chain < 0 &&
+			    ssa_var[ssa_op[i].result_def].phi_use_chain == NULL &&
 			    op_array->arg_info &&
 			    opline->op1.num <= op_array->num_args &&
 			    op_array->arg_info[opline->op1.num-1].class_name == NULL &&
@@ -3776,68 +3776,68 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 				tmp = MAY_BE_UNDEF|MAY_BE_RCN|MAY_BE_NULL;
 			}
 #endif						   
-			UPDATE_SSA_TYPE(tmp, ssa[i].result_def);
+			UPDATE_SSA_TYPE(tmp, ssa_op[i].result_def);
 			if ((int)opline->op1.num-1 < info->num_args &&
 			    info->arg_info[opline->op1.num-1].info.ce) {
 				UPDATE_SSA_OBJ_TYPE(
 					info->arg_info[opline->op1.num-1].info.ce,
 					info->arg_info[opline->op1.num-1].info.is_instanceof,
-					ssa[i].result_def);
+					ssa_op[i].result_def);
 			} else if (ce) {
-				UPDATE_SSA_OBJ_TYPE(ce, 1, ssa[i].result_def);
+				UPDATE_SSA_OBJ_TYPE(ce, 1, ssa_op[i].result_def);
 			} else {
-				UPDATE_SSA_OBJ_TYPE(NULL, 0, ssa[i].result_def);
+				UPDATE_SSA_OBJ_TYPE(NULL, 0, ssa_op[i].result_def);
 			}
 			break;
 		case ZEND_DECLARE_CLASS:
 		case ZEND_DECLARE_INHERITED_CLASS:
-			UPDATE_SSA_TYPE(MAY_BE_CLASS, ssa[i].result_def);
+			UPDATE_SSA_TYPE(MAY_BE_CLASS, ssa_op[i].result_def);
 			if ((ce = zend_hash_find_ptr(&ctx->main_persistent_script->class_table, Z_STR_P(RT_CONSTANT(op_array, opline->op1)))) != NULL) {
-				UPDATE_SSA_OBJ_TYPE(ce, 0, ssa[i].result_def);
+				UPDATE_SSA_OBJ_TYPE(ce, 0, ssa_op[i].result_def);
 			}
 			break;
 		case ZEND_FETCH_CLASS:
-			UPDATE_SSA_TYPE(MAY_BE_CLASS, ssa[i].result_def);
+			UPDATE_SSA_TYPE(MAY_BE_CLASS, ssa_op[i].result_def);
 			if (opline->op2_type == IS_UNUSED) {
 				switch (opline->extended_value & ZEND_FETCH_CLASS_MASK) {
 					case ZEND_FETCH_CLASS_SELF:
 						if (op_array->scope) {
-							UPDATE_SSA_OBJ_TYPE(op_array->scope, 0, ssa[i].result_def);
+							UPDATE_SSA_OBJ_TYPE(op_array->scope, 0, ssa_op[i].result_def);
 						} else {
-							UPDATE_SSA_OBJ_TYPE(NULL, 0, ssa[i].result_def);
+							UPDATE_SSA_OBJ_TYPE(NULL, 0, ssa_op[i].result_def);
 						}
 						break;
 					case ZEND_FETCH_CLASS_PARENT:
 						if (op_array->scope && op_array->scope->parent) {
-							UPDATE_SSA_OBJ_TYPE(op_array->scope->parent, 0, ssa[i].result_def);
+							UPDATE_SSA_OBJ_TYPE(op_array->scope->parent, 0, ssa_op[i].result_def);
 						} else {
-							UPDATE_SSA_OBJ_TYPE(NULL, 0, ssa[i].result_def);
+							UPDATE_SSA_OBJ_TYPE(NULL, 0, ssa_op[i].result_def);
 						}
 						break;
 					case ZEND_FETCH_CLASS_STATIC:
 					default:
-						UPDATE_SSA_OBJ_TYPE(NULL, 0, ssa[i].result_def);
+						UPDATE_SSA_OBJ_TYPE(NULL, 0, ssa_op[i].result_def);
 						break;
 				}
 			} else if (opline->op2_type == IS_CONST) {
 				if (Z_TYPE_P(RT_CONSTANT(op_array, opline->op2)) == IS_STRING) {
 					if ((ce = zend_hash_find_ptr(&ctx->main_persistent_script->class_table, Z_STR_P(RT_CONSTANT(op_array, opline->op2)+1))) != NULL) {
-						UPDATE_SSA_OBJ_TYPE(ce, 0, ssa[i].result_def);
+						UPDATE_SSA_OBJ_TYPE(ce, 0, ssa_op[i].result_def);
 					} else if ((ce = zend_hash_find_ptr(CG(class_table), Z_STR_P(RT_CONSTANT(op_array, opline->op2)+1))) != NULL &&
 					           ce->type == ZEND_INTERNAL_CLASS) {
-						UPDATE_SSA_OBJ_TYPE(ce, 0, ssa[i].result_def);
+						UPDATE_SSA_OBJ_TYPE(ce, 0, ssa_op[i].result_def);
 					} else {
-						UPDATE_SSA_OBJ_TYPE(NULL, 0, ssa[i].result_def);
+						UPDATE_SSA_OBJ_TYPE(NULL, 0, ssa_op[i].result_def);
 					}
 				} else {
-					UPDATE_SSA_OBJ_TYPE(NULL, 0, ssa[i].result_def);
+					UPDATE_SSA_OBJ_TYPE(NULL, 0, ssa_op[i].result_def);
 				}
 			} else if (t2 & MAY_BE_OBJECT) {
-				if (ssa[i].op1_use >= 0 && ssa_var_info[ssa[i].op1_use].ce) {
-					UPDATE_SSA_OBJ_TYPE(ssa_var_info[ssa[i].op1_use].ce, ssa_var_info[ssa[i].op1_use].is_instanceof, ssa[i].result_def);
+				if (ssa_op[i].op1_use >= 0 && ssa_var_info[ssa_op[i].op1_use].ce) {
+					UPDATE_SSA_OBJ_TYPE(ssa_var_info[ssa_op[i].op1_use].ce, ssa_var_info[ssa_op[i].op1_use].is_instanceof, ssa_op[i].result_def);
 				}
 			} else {
-				UPDATE_SSA_OBJ_TYPE(NULL, 0, ssa[i].result_def);
+				UPDATE_SSA_OBJ_TYPE(NULL, 0, ssa_op[i].result_def);
 			}
 			break;
 		case ZEND_NEW:
@@ -3848,21 +3848,21 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 					//TODO: "new" for internal class may return NULL ???
 					tmp |= MAY_BE_NULL;
 			    }
-				UPDATE_SSA_OBJ_TYPE(ce, 0, ssa[i].result_def);
-			} else if ((t1 & MAY_BE_CLASS) && ssa[i].op1_use >= 0 && ssa_var_info[ssa[i].op1_use].ce) {
-				UPDATE_SSA_OBJ_TYPE(ssa_var_info[ssa[i].op1_use].ce, ssa_var_info[ssa[i].op1_use].is_instanceof, ssa[i].result_def);
+				UPDATE_SSA_OBJ_TYPE(ce, 0, ssa_op[i].result_def);
+			} else if ((t1 & MAY_BE_CLASS) && ssa_op[i].op1_use >= 0 && ssa_var_info[ssa_op[i].op1_use].ce) {
+				UPDATE_SSA_OBJ_TYPE(ssa_var_info[ssa_op[i].op1_use].ce, ssa_var_info[ssa_op[i].op1_use].is_instanceof, ssa_op[i].result_def);
 			} else {
-				UPDATE_SSA_OBJ_TYPE(NULL, 0, ssa[i].result_def);
+				UPDATE_SSA_OBJ_TYPE(NULL, 0, ssa_op[i].result_def);
 			}
-			UPDATE_SSA_TYPE(tmp, ssa[i].result_def);
+			UPDATE_SSA_TYPE(tmp, ssa_op[i].result_def);
 			break;
 		case ZEND_CLONE:
 			/* FIXME: For some reason "clone" return reference */
-			UPDATE_SSA_TYPE(MAY_BE_DEF|MAY_BE_REF|MAY_BE_OBJECT, ssa[i].result_def);
-			if ((t1 & MAY_BE_OBJECT) && ssa[i].op1_use >= 0 && ssa_var_info[ssa[i].op1_use].ce) {
-				UPDATE_SSA_OBJ_TYPE(ssa_var_info[ssa[i].op1_use].ce, ssa_var_info[ssa[i].op1_use].is_instanceof, ssa[i].result_def);
+			UPDATE_SSA_TYPE(MAY_BE_DEF|MAY_BE_REF|MAY_BE_OBJECT, ssa_op[i].result_def);
+			if ((t1 & MAY_BE_OBJECT) && ssa_op[i].op1_use >= 0 && ssa_var_info[ssa_op[i].op1_use].ce) {
+				UPDATE_SSA_OBJ_TYPE(ssa_var_info[ssa_op[i].op1_use].ce, ssa_var_info[ssa_op[i].op1_use].is_instanceof, ssa_op[i].result_def);
 			} else {
-				UPDATE_SSA_OBJ_TYPE(NULL, 0, ssa[i].result_def);
+				UPDATE_SSA_OBJ_TYPE(NULL, 0, ssa_op[i].result_def);
 			}
 			break;
 		case ZEND_INIT_ARRAY:
@@ -3880,9 +3880,9 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 						tmp |= MAY_BE_RCN;
 					}
 				}
-				UPDATE_SSA_TYPE(tmp, ssa[i].op1_def);
+				UPDATE_SSA_TYPE(tmp, ssa_op[i].op1_def);
 			}
-			if (ssa[i].result_def >= 0) {
+			if (ssa_op[i].result_def >= 0) {
 				tmp = MAY_BE_DEF|MAY_BE_RC1|MAY_BE_ARRAY;
 				if (opline->op1_type != IS_UNUSED) {
 					tmp |= (t1 & MAY_BE_ANY) << 16;
@@ -3890,8 +3890,8 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 						tmp |= MAY_BE_ARRAY_KEY_ANY|MAY_BE_ARRAY_OF_ANY|MAY_BE_ARRAY_OF_REF;
 					}
 				}
-				if (ssa[i].result_use >= 0) {
-					tmp |= ssa_var_info[ssa[i].result_use].type;
+				if (ssa_op[i].result_use >= 0) {
+					tmp |= ssa_var_info[ssa_op[i].result_use].type;
 				}
 				if (opline->op2_type == IS_UNUSED) {
 					tmp |= MAY_BE_ARRAY_KEY_LONG;
@@ -3907,12 +3907,12 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 						tmp |= MAY_BE_ARRAY_KEY_STRING;
 					}
 				}
-				UPDATE_SSA_TYPE(tmp, ssa[i].result_def);
+				UPDATE_SSA_TYPE(tmp, ssa_op[i].result_def);
 			}
 			break;
 		case ZEND_UNSET_VAR:
 			if (opline->extended_value & ZEND_QUICK_SET) {
-				UPDATE_SSA_TYPE((MAY_BE_NULL|MAY_BE_UNDEF|MAY_BE_RCN), ssa[i].op1_def);
+				UPDATE_SSA_TYPE((MAY_BE_NULL|MAY_BE_UNDEF|MAY_BE_RCN), ssa_op[i].op1_def);
 			}
 			break;
 //		case ZEND_INCLUDE_OR_EVAL:
@@ -3923,7 +3923,7 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 //			break;
 		case ZEND_FE_RESET_R:
 		case ZEND_FE_RESET_RW:
-			if (ssa[i].op1_def) {
+			if (ssa_op[i].op1_def) {
 				tmp = t1;
 				if (t1 & MAY_BE_RCN) {
 					tmp |= MAY_BE_RC1;
@@ -3932,11 +3932,11 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 //???
 					tmp |= MAY_BE_REF;
 				}
-				UPDATE_SSA_TYPE(tmp, ssa[i].op1_def);
-				if ((t1 & MAY_BE_OBJECT) && ssa[i].op1_use >= 0 && ssa_var_info[ssa[i].op1_use].ce) {
-					UPDATE_SSA_OBJ_TYPE(ssa_var_info[ssa[i].op1_use].ce, ssa_var_info[ssa[i].op1_use].is_instanceof, ssa[i].op1_def);
+				UPDATE_SSA_TYPE(tmp, ssa_op[i].op1_def);
+				if ((t1 & MAY_BE_OBJECT) && ssa_op[i].op1_use >= 0 && ssa_var_info[ssa_op[i].op1_use].ce) {
+					UPDATE_SSA_OBJ_TYPE(ssa_var_info[ssa_op[i].op1_use].ce, ssa_var_info[ssa_op[i].op1_use].is_instanceof, ssa_op[i].op1_def);
 				} else {
-					UPDATE_SSA_OBJ_TYPE(NULL, 0, ssa[i].op1_def);
+					UPDATE_SSA_OBJ_TYPE(NULL, 0, ssa_op[i].op1_def);
 				}
 			}
 			if (opline->opcode == ZEND_FE_RESET_RW) {
@@ -3947,11 +3947,11 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 			} else {
 				tmp = MAY_BE_DEF | MAY_BE_RC1 | MAY_BE_RCN | (t1 & (MAY_BE_REF | MAY_BE_ARRAY | MAY_BE_OBJECT | MAY_BE_ARRAY_KEY_ANY | MAY_BE_ARRAY_OF_ANY | MAY_BE_ARRAY_OF_REF));
 			}
-			UPDATE_SSA_TYPE(tmp, ssa[i].result_def);
-			if ((t1 & MAY_BE_OBJECT) && ssa[i].op1_use >= 0 && ssa_var_info[ssa[i].op1_use].ce) {
-				UPDATE_SSA_OBJ_TYPE(ssa_var_info[ssa[i].op1_use].ce, ssa_var_info[ssa[i].op1_use].is_instanceof, ssa[i].result_def);
+			UPDATE_SSA_TYPE(tmp, ssa_op[i].result_def);
+			if ((t1 & MAY_BE_OBJECT) && ssa_op[i].op1_use >= 0 && ssa_var_info[ssa_op[i].op1_use].ce) {
+				UPDATE_SSA_OBJ_TYPE(ssa_var_info[ssa_op[i].op1_use].ce, ssa_var_info[ssa_op[i].op1_use].is_instanceof, ssa_op[i].result_def);
 			} else {
-				UPDATE_SSA_OBJ_TYPE(NULL, 0, ssa[i].result_def);
+				UPDATE_SSA_OBJ_TYPE(NULL, 0, ssa_op[i].result_def);
 			}
 			break;
 		case ZEND_FE_FETCH_R:
@@ -3983,9 +3983,9 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 					tmp = MAY_BE_DEF | MAY_BE_RCN;
 				}					
 			}
-			UPDATE_SSA_TYPE(tmp, ssa[i].op2_def);
+			UPDATE_SSA_TYPE(tmp, ssa_op[i].op2_def);
 			if (opline->result_type == IS_TMP_VAR) {
-				if (ssa[i].result_def >= 0) {
+				if (ssa_op[i].result_def >= 0) {
 					tmp = MAY_BE_DEF | MAY_BE_RC1;
 					if (t1 & MAY_BE_OBJECT) {
 						tmp |= MAY_BE_RCN | MAY_BE_ANY | MAY_BE_ARRAY_KEY_ANY | MAY_BE_ARRAY_OF_ANY | MAY_BE_ARRAY_OF_REF;
@@ -4000,7 +4000,7 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 							tmp |= MAY_BE_NULL;
 						}
 					}
-					UPDATE_SSA_TYPE(tmp, ssa[i].result_def);
+					UPDATE_SSA_TYPE(tmp, ssa_op[i].result_def);
 				}
 			}
 			break;
@@ -4017,7 +4017,7 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 		case ZEND_FETCH_DIM_W:
 		case ZEND_FETCH_DIM_UNSET:
 		case ZEND_FETCH_DIM_FUNC_ARG:
-			if (ssa[i].op1_def >= 0) {
+			if (ssa_op[i].op1_def >= 0) {
 				tmp = t1;
 				if (opline->opcode == ZEND_FETCH_DIM_W ||
 				    opline->opcode == ZEND_FETCH_DIM_RW ||
@@ -4047,8 +4047,8 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 					}
 
 				}
-				ZEND_ASSERT(!ssa_var[ssa[i].result_def].phi_use_chain);
-				j = ssa_var[ssa[i].result_def].use_chain;
+				ZEND_ASSERT(!ssa_var[ssa_op[i].result_def].phi_use_chain);
+				j = ssa_var[ssa_op[i].result_def].use_chain;
 				while (j >= 0) {
 					switch (op_array->opcodes[j].opcode) {
 						case ZEND_FETCH_DIM_W:
@@ -4090,13 +4090,13 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 						default	:
 							break;
 					}						
-					j = next_use(ssa, ssa[i].result_def, j);
+					j = next_use(ssa_op, ssa_op[i].result_def, j);
 				}
-				UPDATE_SSA_TYPE(tmp, ssa[i].op1_def);
-				if ((t1 & MAY_BE_OBJECT) && ssa[i].op1_use >= 0 && ssa_var_info[ssa[i].op1_use].ce) {
-					UPDATE_SSA_OBJ_TYPE(ssa_var_info[ssa[i].op1_use].ce, ssa_var_info[ssa[i].op1_use].is_instanceof, ssa[i].op1_def);
+				UPDATE_SSA_TYPE(tmp, ssa_op[i].op1_def);
+				if ((t1 & MAY_BE_OBJECT) && ssa_op[i].op1_use >= 0 && ssa_var_info[ssa_op[i].op1_use].ce) {
+					UPDATE_SSA_OBJ_TYPE(ssa_var_info[ssa_op[i].op1_use].ce, ssa_var_info[ssa_op[i].op1_use].is_instanceof, ssa_op[i].op1_def);
 				} else {
-					UPDATE_SSA_OBJ_TYPE(NULL, 0, ssa[i].op1_def);
+					UPDATE_SSA_OBJ_TYPE(NULL, 0, ssa_op[i].op1_def);
 				}
 			}
 			tmp = array_element_type(
@@ -4114,7 +4114,7 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 					tmp |= MAY_BE_ERROR;
 				}
 			}
-			UPDATE_SSA_TYPE(tmp, ssa[i].result_def);
+			UPDATE_SSA_TYPE(tmp, ssa_op[i].result_def);
 			break;
 		case ZEND_FETCH_OBJ_R:
 		case ZEND_FETCH_OBJ_IS:
@@ -4122,7 +4122,7 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 		case ZEND_FETCH_OBJ_W:
 		case ZEND_FETCH_OBJ_UNSET:
 		case ZEND_FETCH_OBJ_FUNC_ARG:
-			if (ssa[i].op1_def >= 0) {
+			if (ssa_op[i].op1_def >= 0) {
 				tmp = t1;
 				if (opline->opcode == ZEND_FETCH_OBJ_W ||
 				    opline->opcode == ZEND_FETCH_OBJ_RW ||
@@ -4141,28 +4141,28 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 						tmp |= MAY_BE_RC1;
 					}
 				}
-				UPDATE_SSA_TYPE(tmp, ssa[i].op1_def);
-				if ((t1 & MAY_BE_OBJECT) && ssa[i].op1_use >= 0 && ssa_var_info[ssa[i].op1_use].ce) {
-					UPDATE_SSA_OBJ_TYPE(ssa_var_info[ssa[i].op1_use].ce, ssa_var_info[ssa[i].op1_use].is_instanceof, ssa[i].op1_def);
+				UPDATE_SSA_TYPE(tmp, ssa_op[i].op1_def);
+				if ((t1 & MAY_BE_OBJECT) && ssa_op[i].op1_use >= 0 && ssa_var_info[ssa_op[i].op1_use].ce) {
+					UPDATE_SSA_OBJ_TYPE(ssa_var_info[ssa_op[i].op1_use].ce, ssa_var_info[ssa_op[i].op1_use].is_instanceof, ssa_op[i].op1_def);
 				} else {
-					UPDATE_SSA_OBJ_TYPE(NULL, 0, ssa[i].op1_def);
+					UPDATE_SSA_OBJ_TYPE(NULL, 0, ssa_op[i].op1_def);
 				}
 			}
-			if (ssa[i].result_def >= 0) {
+			if (ssa_op[i].result_def >= 0) {
 				tmp = MAY_BE_DEF | MAY_BE_ANY | MAY_BE_ARRAY_KEY_ANY | MAY_BE_ARRAY_OF_ANY | MAY_BE_ARRAY_OF_REF | MAY_BE_ERROR;
 				if (opline->result_type == IS_TMP_VAR) {
 					tmp |= MAY_BE_RC1;
 				} else {
 					tmp |= MAY_BE_REF | MAY_BE_RC1 | MAY_BE_RCN;
 				}
-				UPDATE_SSA_TYPE(tmp, ssa[i].result_def);
+				UPDATE_SSA_TYPE(tmp, ssa_op[i].result_def);
 			}
 			break;
 		case ZEND_DO_FCALL:
 		case ZEND_DO_ICALL:
 		case ZEND_DO_UCALL:
 		case ZEND_DO_FCALL_BY_NAME:
-			if (ssa[i].result_def >= 0) {
+			if (ssa_op[i].result_def >= 0) {
 				zend_jit_call_info *call_info = info->callee_info;
 
 				while (call_info && call_info->caller_call_opline != opline) {
@@ -4172,47 +4172,47 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 					goto unknown_opcode;
 				}
 				tmp = zend_jit_get_func_info(call_info) & ~(FUNC_MAY_WARN|FUNC_MAY_INLINE);
-				UPDATE_SSA_TYPE(tmp, ssa[i].result_def);
+				UPDATE_SSA_TYPE(tmp, ssa_op[i].result_def);
 				if (call_info->callee_func->type == ZEND_USER_FUNCTION) {
 					zend_jit_func_info *func_info = JIT_DATA(&call_info->callee_func->op_array);
 					if (func_info) {
 						UPDATE_SSA_OBJ_TYPE(
 							func_info->return_info.ce,
 							func_info->return_info.is_instanceof,
-							ssa[i].result_def);
+							ssa_op[i].result_def);
 					}
 				}
 			}
 			break;
 		case ZEND_FETCH_CONSTANT:
 		case ZEND_FETCH_CLASS_CONSTANT:
-			UPDATE_SSA_TYPE(MAY_BE_DEF|MAY_BE_RC1|MAY_BE_NULL|MAY_BE_FALSE|MAY_BE_TRUE|MAY_BE_LONG|MAY_BE_DOUBLE|MAY_BE_STRING|MAY_BE_RESOURCE|MAY_BE_ARRAY|MAY_BE_ARRAY_KEY_ANY|MAY_BE_ARRAY_OF_ANY, ssa[i].result_def);
+			UPDATE_SSA_TYPE(MAY_BE_DEF|MAY_BE_RC1|MAY_BE_NULL|MAY_BE_FALSE|MAY_BE_TRUE|MAY_BE_LONG|MAY_BE_DOUBLE|MAY_BE_STRING|MAY_BE_RESOURCE|MAY_BE_ARRAY|MAY_BE_ARRAY_KEY_ANY|MAY_BE_ARRAY_OF_ANY, ssa_op[i].result_def);
 			break;
 		case ZEND_STRLEN:
 			tmp = MAY_BE_DEF|MAY_BE_RC1|MAY_BE_LONG;
 			if (t1 & (MAY_BE_ANY - (MAY_BE_NULL|MAY_BE_FALSE|MAY_BE_TRUE|MAY_BE_LONG|MAY_BE_DOUBLE|MAY_BE_STRING|MAY_BE_OBJECT))) {
 				tmp |= MAY_BE_NULL;
 			}
-			UPDATE_SSA_TYPE(tmp, ssa[i].result_def);
+			UPDATE_SSA_TYPE(tmp, ssa_op[i].result_def);
 			break;
 		case ZEND_TYPE_CHECK:
 		case ZEND_DEFINED:
-			UPDATE_SSA_TYPE(MAY_BE_DEF|MAY_BE_RC1|MAY_BE_FALSE|MAY_BE_TRUE, ssa[i].result_def);
+			UPDATE_SSA_TYPE(MAY_BE_DEF|MAY_BE_RC1|MAY_BE_FALSE|MAY_BE_TRUE, ssa_op[i].result_def);
 			break;
 		default:
 unknown_opcode:
-			if (ssa[i].op1_def >= 0) {
+			if (ssa_op[i].op1_def >= 0) {
 				tmp = MAY_BE_DEF | MAY_BE_ANY | MAY_BE_REF | MAY_BE_RC1 | MAY_BE_RCN | MAY_BE_ARRAY_KEY_ANY | MAY_BE_ARRAY_OF_ANY | MAY_BE_ARRAY_OF_REF;
-				UPDATE_SSA_TYPE(tmp, ssa[i].op1_def);
+				UPDATE_SSA_TYPE(tmp, ssa_op[i].op1_def);
 			}
-			if (ssa[i].result_def >= 0) {
+			if (ssa_op[i].result_def >= 0) {
 				tmp = MAY_BE_DEF | MAY_BE_ANY | MAY_BE_ARRAY_KEY_ANY | MAY_BE_ARRAY_OF_ANY | MAY_BE_ARRAY_OF_REF;
 				if (opline->result_type == IS_TMP_VAR) {
 					tmp |= MAY_BE_RC1;
 				} else {
 					tmp |= MAY_BE_REF | MAY_BE_RC1 | MAY_BE_RCN;
 				}
-				UPDATE_SSA_TYPE(tmp, ssa[i].result_def);
+				UPDATE_SSA_TYPE(tmp, ssa_op[i].result_def);
 			}
 			break;
 	}
@@ -4221,10 +4221,10 @@ unknown_opcode:
 static int zend_jit_infer_types_ex(zend_jit_context *ctx, zend_op_array *op_array, zend_bitset worklist)
 {
 	zend_jit_func_info *info = JIT_DATA(op_array);
-	zend_jit_basic_block *block = info->block;
-	zend_jit_ssa_var *ssa_var = info->ssa_var;
+	zend_jit_basic_block *block = info->cfg.block;
+	zend_jit_ssa_var *ssa_var = info->ssa.var;
 	zend_jit_ssa_var_info *ssa_var_info = info->ssa_var_info;
-	int ssa_vars = info->ssa_vars;
+	int ssa_vars = info->ssa.vars;
 	uint i;
 	int j;
 	uint32_t tmp;
@@ -4284,14 +4284,14 @@ static void zend_jit_check_recursive_dependencies(zend_op_array *op_array)
 	if (!info->ssa_var_info || !(info->flags & ZEND_JIT_FUNC_RECURSIVE)) {
 		return;
 	}
-	worklist_len = zend_bitset_len(info->ssa_vars);
+	worklist_len = zend_bitset_len(info->ssa.vars);
 	worklist = alloca(sizeof(zend_ulong) * worklist_len);
 	memset(worklist, 0, sizeof(zend_ulong) * worklist_len);
 	call_info = info->callee_info;
 	while (call_info) {
 		if (call_info->recursive &&
-		    info->ssa[call_info->caller_call_opline - op_array->opcodes].result_def >= 0) {
-			zend_bitset_incl(worklist, info->ssa[call_info->caller_call_opline - op_array->opcodes].result_def);
+		    info->ssa.op[call_info->caller_call_opline - op_array->opcodes].result_def >= 0) {
+			zend_bitset_incl(worklist, info->ssa.op[call_info->caller_call_opline - op_array->opcodes].result_def);
 		}
 		call_info = call_info->next_callee;
 	}
@@ -4311,11 +4311,11 @@ static int is_recursive_tail_call(zend_jit_context *ctx,
 {
 	zend_jit_func_info *info = JIT_DATA(op_array);
 
-	if (info->ssa && info->ssa_var &&
-	    info->ssa[opline - op_array->opcodes].op1_use >= 0 &&
-	    info->ssa_var[info->ssa[opline - op_array->opcodes].op1_use].definition >= 0) {
+	if (info->ssa.op && info->ssa.var &&
+	    info->ssa.op[opline - op_array->opcodes].op1_use >= 0 &&
+	    info->ssa.var[info->ssa.op[opline - op_array->opcodes].op1_use].definition >= 0) {
 
-		zend_op *op = op_array->opcodes + info->ssa_var[info->ssa[opline - op_array->opcodes].op1_use].definition;
+		zend_op *op = op_array->opcodes + info->ssa.var[info->ssa.op[opline - op_array->opcodes].op1_use].definition;
 
 		if (op->opcode == ZEND_DO_UCALL) {
 			zend_jit_call_info *call_info = info->callee_info;
@@ -4338,8 +4338,8 @@ static void zend_jit_func_return_info(zend_jit_context      *ctx,
                                       zend_jit_ssa_var_info *ret)
 {
 	zend_jit_func_info *info = JIT_DATA(op_array);
-	int blocks = info->blocks;
-	zend_jit_basic_block *block = info->block;
+	int blocks = info->cfg.blocks;
+	zend_jit_basic_block *block = info->cfg.block;
 	int j;
 	uint32_t t1;
 	uint32_t tmp = 0;
@@ -4365,10 +4365,10 @@ static void zend_jit_func_return_info(zend_jit_context      *ctx,
 			
 			if (opline->opcode == ZEND_RETURN || opline->opcode == ZEND_RETURN_BY_REF) {
 				if (!recursive &&
-				    info->ssa &&
+				    info->ssa.op &&
 				    info->ssa_var_info &&
-				    info->ssa[opline - op_array->opcodes].op1_use >= 0 &&
-				    info->ssa_var_info[info->ssa[opline - op_array->opcodes].op1_use].recursive) {
+				    info->ssa.op[opline - op_array->opcodes].op1_use >= 0 &&
+				    info->ssa_var_info[info->ssa.op[opline - op_array->opcodes].op1_use].recursive) {
 					continue;
 				}
 				if (is_recursive_tail_call(ctx, op_array, opline)) {
@@ -4384,12 +4384,12 @@ static void zend_jit_func_return_info(zend_jit_context      *ctx,
 				}
 				tmp |= t1;
 
-				if (info->ssa &&
+				if (info->ssa.op &&
 				    info->ssa_var_info &&
-				    info->ssa[opline - op_array->opcodes].op1_use >= 0 &&
-				    info->ssa_var_info[info->ssa[opline - op_array->opcodes].op1_use].ce) {
-					arg_ce = info->ssa_var_info[info->ssa[opline - op_array->opcodes].op1_use].ce;
-					arg_is_instanceof = info->ssa_var_info[info->ssa[opline - op_array->opcodes].op1_use].is_instanceof;
+				    info->ssa.op[opline - op_array->opcodes].op1_use >= 0 &&
+				    info->ssa_var_info[info->ssa.op[opline - op_array->opcodes].op1_use].ce) {
+					arg_ce = info->ssa_var_info[info->ssa.op[opline - op_array->opcodes].op1_use].ce;
+					arg_is_instanceof = info->ssa_var_info[info->ssa.op[opline - op_array->opcodes].op1_use].is_instanceof;
 				} else {
 					arg_ce = NULL;
 					arg_is_instanceof = 0;
@@ -4471,26 +4471,26 @@ static void zend_jit_func_return_info(zend_jit_context      *ctx,
 					} else {
 						tmp_has_range = 0;
 					}
-				} else if (info->ssa &&
+				} else if (info->ssa.op &&
 				           info->ssa_var_info &&
-				           info->ssa[opline - op_array->opcodes].op1_use >= 0) {
-					if (info->ssa_var_info[info->ssa[opline - op_array->opcodes].op1_use].has_range) {
+				           info->ssa.op[opline - op_array->opcodes].op1_use >= 0) {
+					if (info->ssa_var_info[info->ssa.op[opline - op_array->opcodes].op1_use].has_range) {
 						if (tmp_has_range < 0) {
 							tmp_has_range = 1;
-							tmp_range = info->ssa_var_info[info->ssa[opline - op_array->opcodes].op1_use].range;
+							tmp_range = info->ssa_var_info[info->ssa.op[opline - op_array->opcodes].op1_use].range;
 						} else if (tmp_has_range) {
 							/* union */
-							if (info->ssa_var_info[info->ssa[opline - op_array->opcodes].op1_use].range.underflow) {
+							if (info->ssa_var_info[info->ssa.op[opline - op_array->opcodes].op1_use].range.underflow) {
 								tmp_range.underflow = 1;
 								tmp_range.min = LONG_MIN;
 							} else {
-								tmp_range.min = MIN(tmp_range.min, info->ssa_var_info[info->ssa[opline - op_array->opcodes].op1_use].range.min);
+								tmp_range.min = MIN(tmp_range.min, info->ssa_var_info[info->ssa.op[opline - op_array->opcodes].op1_use].range.min);
 							}
-							if (info->ssa_var_info[info->ssa[opline - op_array->opcodes].op1_use].range.overflow) {
+							if (info->ssa_var_info[info->ssa.op[opline - op_array->opcodes].op1_use].range.overflow) {
 								tmp_range.overflow = 1;
 								tmp_range.max = LONG_MAX;
 							} else {
-								tmp_range.max = MAX(tmp_range.max, info->ssa_var_info[info->ssa[opline - op_array->opcodes].op1_use].range.max);
+								tmp_range.max = MAX(tmp_range.max, info->ssa_var_info[info->ssa.op[opline - op_array->opcodes].op1_use].range.max);
 							}
 						}
 					} else if (!widening) {
@@ -4550,17 +4550,17 @@ static void zend_jit_func_arg_info(zend_jit_context      *ctx,
 				// Class type inference
 				if ((OP1_INFO() & MAY_BE_OBJECT) &&
 				    caller_info &&
-				    caller_info->ssa &&
+				    caller_info->ssa.op &&
 				    caller_info->ssa_var_info &&
-				    caller_info->ssa[line].op1_use >= 0 &&
-				    caller_info->ssa_var_info[caller_info->ssa[line].op1_use].ce) {
+				    caller_info->ssa.op[line].op1_use >= 0 &&
+				    caller_info->ssa_var_info[caller_info->ssa.op[line].op1_use].ce) {
 
 					if (tmp_is_instanceof < 0) {
-						tmp_ce = caller_info->ssa_var_info[caller_info->ssa[line].op1_use].ce;
-						tmp_is_instanceof = caller_info->ssa_var_info[caller_info->ssa[line].op1_use].is_instanceof;
-					} else if (caller_info->ssa_var_info[caller_info->ssa[line].op1_use].ce &&
-					           caller_info->ssa_var_info[caller_info->ssa[line].op1_use].ce == tmp_ce) {
-						if (caller_info->ssa_var_info[caller_info->ssa[line].op1_use].is_instanceof) {
+						tmp_ce = caller_info->ssa_var_info[caller_info->ssa.op[line].op1_use].ce;
+						tmp_is_instanceof = caller_info->ssa_var_info[caller_info->ssa.op[line].op1_use].is_instanceof;
+					} else if (caller_info->ssa_var_info[caller_info->ssa.op[line].op1_use].ce &&
+					           caller_info->ssa_var_info[caller_info->ssa.op[line].op1_use].ce == tmp_ce) {
+						if (caller_info->ssa_var_info[caller_info->ssa.op[line].op1_use].is_instanceof) {
 							tmp_is_instanceof = 1;
 						}
 					} else {
@@ -4638,23 +4638,23 @@ static void zend_jit_func_arg_info(zend_jit_context      *ctx,
 					}
 				} else if (caller_info &&
 				           caller_info->ssa_var_info &&
-				           caller_info->ssa[line].op1_use >= 0) {
-					if (caller_info->ssa_var_info[caller_info->ssa[line].op1_use].has_range) {
+				           caller_info->ssa.op[line].op1_use >= 0) {
+					if (caller_info->ssa_var_info[caller_info->ssa.op[line].op1_use].has_range) {
 						if (tmp_has_range < 0) {
 							tmp_has_range = 1;
-							tmp_range = caller_info->ssa_var_info[caller_info->ssa[line].op1_use].range;
+							tmp_range = caller_info->ssa_var_info[caller_info->ssa.op[line].op1_use].range;
 						} else if (tmp_has_range) {
-							if (caller_info->ssa_var_info[caller_info->ssa[line].op1_use].range.underflow) {
+							if (caller_info->ssa_var_info[caller_info->ssa.op[line].op1_use].range.underflow) {
 								tmp_range.underflow = 1;
 								tmp_range.min = LONG_MIN;
 							} else {
-								tmp_range.min = MIN(tmp_range.min, caller_info->ssa_var_info[caller_info->ssa[line].op1_use].range.min);
+								tmp_range.min = MIN(tmp_range.min, caller_info->ssa_var_info[caller_info->ssa.op[line].op1_use].range.min);
 							}
-							if (caller_info->ssa_var_info[caller_info->ssa[line].op1_use].range.overflow) {
+							if (caller_info->ssa_var_info[caller_info->ssa.op[line].op1_use].range.overflow) {
 								tmp_range.overflow = 1;
 								tmp_range.max = LONG_MAX;
 							} else {
-								tmp_range.max = MAX(tmp_range.max, caller_info->ssa_var_info[caller_info->ssa[line].op1_use].range.max);
+								tmp_range.max = MAX(tmp_range.max, caller_info->ssa_var_info[caller_info->ssa.op[line].op1_use].range.max);
 							}
 						}
 					} else if (!widening) {
@@ -4686,13 +4686,13 @@ static void zend_jit_func_arg_info(zend_jit_context      *ctx,
 
 #define CHECK_MAY_BE_USED_AS_DOUBLE(var2) do { \
 		if ((info->ssa_var_info[var2].type & MAY_BE_ANY) == (MAY_BE_LONG | MAY_BE_DOUBLE)) { \
-			if (info->ssa_var[var2].var < op_array->last_var) { \
+			if (info->ssa.var[var2].var < op_array->last_var) { \
 				return 0; \
-			} else if (info->ssa_var[var2].definition >= 0 && \
-			           op_array->opcodes[info->ssa_var[var2].definition].opcode != ZEND_ADD && \
-			           op_array->opcodes[info->ssa_var[var2].definition].opcode != ZEND_SUB && \
-			           op_array->opcodes[info->ssa_var[var2].definition].opcode != ZEND_MUL && \
-			           op_array->opcodes[info->ssa_var[var2].definition].opcode != ZEND_DIV) { \
+			} else if (info->ssa.var[var2].definition >= 0 && \
+			           op_array->opcodes[info->ssa.var[var2].definition].opcode != ZEND_ADD && \
+			           op_array->opcodes[info->ssa.var[var2].definition].opcode != ZEND_SUB && \
+			           op_array->opcodes[info->ssa.var[var2].definition].opcode != ZEND_MUL && \
+			           op_array->opcodes[info->ssa.var[var2].definition].opcode != ZEND_DIV) { \
 				return 0; \
 			} else if (!zend_jit_may_be_used_as_double(op_array, var2)) { \
 				return 0; \
@@ -4711,10 +4711,10 @@ static int zend_jit_may_be_used_as_double(zend_op_array *op_array, int var)
 static int zend_jit_type_narrowing(zend_jit_context *ctx, zend_op_array *op_array)
 {
 	zend_jit_func_info *info = JIT_DATA(op_array);
-	zend_jit_ssa_op *ssa = info->ssa;
-	zend_jit_ssa_var *ssa_var = info->ssa_var;
+	zend_jit_ssa_op *ssa_op = info->ssa.op;
+	zend_jit_ssa_var *ssa_var = info->ssa.var;
 	zend_jit_ssa_var_info *ssa_var_info = info->ssa_var_info;
-	int ssa_vars = info->ssa_vars;
+	int ssa_vars = info->ssa.vars;
 	int j;
 	zend_bitset worklist, types;
 
@@ -4778,7 +4778,7 @@ static int zend_jit_type_narrowing(zend_jit_context *ctx, zend_op_array *op_arra
 		    zend_bitset_in(worklist, ssa_var[j].var)) {
 			if ((ssa_var_info[j].type & MAY_BE_ANY) == MAY_BE_LONG &&
 			    ssa_var[j].definition >= 0 &&
-			    ssa[ssa_var[j].definition].result_def < 0 &&
+			    ssa_op[ssa_var[j].definition].result_def < 0 &&
 			    op_array->opcodes[ssa_var[j].definition].opcode == ZEND_ASSIGN &&
 			    op_array->opcodes[ssa_var[j].definition].op2_type == IS_CONST &&
 			    Z_TYPE_P(RT_CONSTANT(op_array, op_array->opcodes[ssa_var[j].definition].op2)) == IS_LONG) {
@@ -4803,7 +4803,7 @@ static int zend_jit_infer_types(zend_jit_context *ctx, zend_op_array *op_array)
 {
 	zend_jit_func_info *info = JIT_DATA(op_array);
 	zend_jit_ssa_var_info *ssa_var_info = info->ssa_var_info;
-	int ssa_vars = info->ssa_vars;
+	int ssa_vars = info->ssa.vars;
 	int j;
 	zend_bitset worklist;
 
@@ -4902,11 +4902,11 @@ static void zend_jit_check_no_symtab(zend_op_array *op_array)
 	    (info->flags & ZEND_JIT_FUNC_TOO_DYNAMIC)) {
 		return;
 	}
-	for (b = 0; b < info->blocks; b++) {
-		if ((info->block[b].flags & ZEND_BB_REACHABLE) == 0) {
+	for (b = 0; b < info->cfg.blocks; b++) {
+		if ((info->cfg.block[b].flags & ZEND_BB_REACHABLE) == 0) {
 			continue;
 		}
-		for (i = info->block[b].start; i <= info->block[b].end; i++) {
+		for (i = info->cfg.block[b].start; i <= info->cfg.block[b].end; i++) {
 			zend_op *opline = op_array->opcodes + i;
 
 			switch (opline->opcode) {
@@ -4961,10 +4961,10 @@ static void zend_jit_check_no_symtab(zend_op_array *op_array)
 							return;
 						}
 					} else {
-						if (info->ssa[i].op2_use < 0 ||
-						    !info->ssa_var_info[info->ssa[i].op2_use].has_range ||
-						    (info->ssa_var_info[info->ssa[i].op2_use].range.min <= 0 &&
-						     info->ssa_var_info[info->ssa[i].op2_use].range.max >= 0)) {
+						if (info->ssa.op[i].op2_use < 0 ||
+						    !info->ssa_var_info[info->ssa.op[i].op2_use].has_range ||
+						    (info->ssa_var_info[info->ssa.op[i].op2_use].range.min <= 0 &&
+						     info->ssa_var_info[info->ssa.op[i].op2_use].range.max >= 0)) {
 							return;
 						}
 					}
@@ -5093,52 +5093,52 @@ static void zend_jit_check_no_symtab(zend_op_array *op_array)
 					break;
 check_ops:
 					if (opline->op1_type == IS_CV &&
-					    info->ssa[i].op1_use >= 0 &&
-					    (info->ssa_var_info[info->ssa[i].op1_use].type & MAY_BE_UNDEF)) {
+					    info->ssa.op[i].op1_use >= 0 &&
+					    (info->ssa_var_info[info->ssa.op[i].op1_use].type & MAY_BE_UNDEF)) {
 					    return;
 					} else if (opline->op1_type == IS_TMP_VAR &&
-					    info->ssa[i].op1_use >= 0 &&
-					    (info->ssa_var_info[info->ssa[i].op1_use].type & (MAY_BE_ARRAY_OF_ARRAY|MAY_BE_ARRAY_OF_OBJECT|MAY_BE_ARRAY_OF_RESOURCE|MAY_BE_OBJECT|MAY_BE_RESOURCE))) {
+					    info->ssa.op[i].op1_use >= 0 &&
+					    (info->ssa_var_info[info->ssa.op[i].op1_use].type & (MAY_BE_ARRAY_OF_ARRAY|MAY_BE_ARRAY_OF_OBJECT|MAY_BE_ARRAY_OF_RESOURCE|MAY_BE_OBJECT|MAY_BE_RESOURCE))) {
 					    return;
 					} else if (opline->op1_type == IS_VAR &&
-					    info->ssa[i].op1_use >= 0 &&
-					    (info->ssa_var_info[info->ssa[i].op1_use].type & MAY_BE_RC1) &&
-					    (info->ssa_var_info[info->ssa[i].op1_use].type & (MAY_BE_ARRAY_OF_ARRAY|MAY_BE_ARRAY_OF_OBJECT|MAY_BE_ARRAY_OF_RESOURCE|MAY_BE_OBJECT|MAY_BE_RESOURCE))) {
+					    info->ssa.op[i].op1_use >= 0 &&
+					    (info->ssa_var_info[info->ssa.op[i].op1_use].type & MAY_BE_RC1) &&
+					    (info->ssa_var_info[info->ssa.op[i].op1_use].type & (MAY_BE_ARRAY_OF_ARRAY|MAY_BE_ARRAY_OF_OBJECT|MAY_BE_ARRAY_OF_RESOURCE|MAY_BE_OBJECT|MAY_BE_RESOURCE))) {
 					    return;
 					}
 check_op2:
 					if (opline->op2_type == IS_TMP_VAR &&
-					    info->ssa[i].op2_use >= 0 &&
-					    (info->ssa_var_info[info->ssa[i].op2_use].type & (MAY_BE_ARRAY_OF_ARRAY|MAY_BE_ARRAY_OF_OBJECT|MAY_BE_ARRAY_OF_RESOURCE|MAY_BE_OBJECT|MAY_BE_RESOURCE))) {
+					    info->ssa.op[i].op2_use >= 0 &&
+					    (info->ssa_var_info[info->ssa.op[i].op2_use].type & (MAY_BE_ARRAY_OF_ARRAY|MAY_BE_ARRAY_OF_OBJECT|MAY_BE_ARRAY_OF_RESOURCE|MAY_BE_OBJECT|MAY_BE_RESOURCE))) {
 					    return;
 					} else if (opline->op2_type == IS_VAR &&
-					    info->ssa[i].op2_use >= 0 &&
-					    (info->ssa_var_info[info->ssa[i].op2_use].type & MAY_BE_RC1) &&
-					    (info->ssa_var_info[info->ssa[i].op2_use].type & (MAY_BE_ARRAY_OF_ARRAY|MAY_BE_ARRAY_OF_OBJECT|MAY_BE_ARRAY_OF_RESOURCE|MAY_BE_OBJECT|MAY_BE_RESOURCE))) {
+					    info->ssa.op[i].op2_use >= 0 &&
+					    (info->ssa_var_info[info->ssa.op[i].op2_use].type & MAY_BE_RC1) &&
+					    (info->ssa_var_info[info->ssa.op[i].op2_use].type & (MAY_BE_ARRAY_OF_ARRAY|MAY_BE_ARRAY_OF_OBJECT|MAY_BE_ARRAY_OF_RESOURCE|MAY_BE_OBJECT|MAY_BE_RESOURCE))) {
 					    return;
 					}
 check_cv2:
 					if (opline->op2_type == IS_CV &&
-					    info->ssa[i].op2_use >= 0 &&
-					    (info->ssa_var_info[info->ssa[i].op2_use].type & MAY_BE_UNDEF)) {
+					    info->ssa.op[i].op2_use >= 0 &&
+					    (info->ssa_var_info[info->ssa.op[i].op2_use].type & MAY_BE_UNDEF)) {
 					    return;
 					}
 					break;
 check_op1:
 					if (opline->op1_type == IS_TMP_VAR &&
-					    info->ssa[i].op1_use >= 0 &&
-					    (info->ssa_var_info[info->ssa[i].op1_use].type & (MAY_BE_ARRAY_OF_ARRAY|MAY_BE_ARRAY_OF_OBJECT|MAY_BE_ARRAY_OF_RESOURCE|MAY_BE_OBJECT|MAY_BE_RESOURCE))) {
+					    info->ssa.op[i].op1_use >= 0 &&
+					    (info->ssa_var_info[info->ssa.op[i].op1_use].type & (MAY_BE_ARRAY_OF_ARRAY|MAY_BE_ARRAY_OF_OBJECT|MAY_BE_ARRAY_OF_RESOURCE|MAY_BE_OBJECT|MAY_BE_RESOURCE))) {
 					    return;
 					} else if (opline->op1_type == IS_VAR &&
-					    info->ssa[i].op1_use >= 0 &&
-					    (info->ssa_var_info[info->ssa[i].op1_use].type & MAY_BE_RC1) &&
-					    (info->ssa_var_info[info->ssa[i].op1_use].type & (MAY_BE_ARRAY_OF_ARRAY|MAY_BE_ARRAY_OF_OBJECT|MAY_BE_ARRAY_OF_RESOURCE|MAY_BE_OBJECT|MAY_BE_RESOURCE))) {
+					    info->ssa.op[i].op1_use >= 0 &&
+					    (info->ssa_var_info[info->ssa.op[i].op1_use].type & MAY_BE_RC1) &&
+					    (info->ssa_var_info[info->ssa.op[i].op1_use].type & (MAY_BE_ARRAY_OF_ARRAY|MAY_BE_ARRAY_OF_OBJECT|MAY_BE_ARRAY_OF_RESOURCE|MAY_BE_OBJECT|MAY_BE_RESOURCE))) {
 					    return;
 					}
 check_cv1:
 					if (opline->op1_type == IS_CV &&
-					    info->ssa[i].op1_use >= 0 &&
-					    (info->ssa_var_info[info->ssa[i].op1_use].type & MAY_BE_UNDEF)) {
+					    info->ssa.op[i].op1_use >= 0 &&
+					    (info->ssa_var_info[info->ssa.op[i].op1_use].type & MAY_BE_UNDEF)) {
 					    return;
 					}
 					break;
@@ -5159,11 +5159,11 @@ static zend_jit_func_info* zend_jit_create_clone(zend_jit_context *ctx, zend_jit
 	memcpy(clone, info, sizeof(zend_jit_func_info));
 	/* TODO: support for multiple clones */
 	clone->clone_num = 1;
-	clone->ssa_var_info = zend_jit_context_calloc(ctx, sizeof(zend_jit_ssa_var_info), info->ssa_vars);
+	clone->ssa_var_info = zend_jit_context_calloc(ctx, sizeof(zend_jit_ssa_var_info), info->ssa.vars);
 	if (!clone->ssa_var_info) {
 		return NULL;
 	}
-	memcpy(clone->ssa_var_info, info->ssa_var_info, sizeof(zend_jit_ssa_var_info) * info->ssa_vars);
+	memcpy(clone->ssa_var_info, info->ssa_var_info, sizeof(zend_jit_ssa_var_info) * info->ssa.vars);
 	return clone;
 }
 
@@ -5212,11 +5212,11 @@ static void zend_jit_check_no_frame(zend_jit_context *ctx, zend_op_array *op_arr
 	if (!info->clone_num && (info->clone || !info->caller_info)) {
 		return;
 	} 
-	for (b = 0; b < info->blocks; b++) {
-		if ((info->block[b].flags & ZEND_BB_REACHABLE) == 0) {
+	for (b = 0; b < info->cfg.blocks; b++) {
+		if ((info->cfg.block[b].flags & ZEND_BB_REACHABLE) == 0) {
 			continue;
 		}
-		for (i = info->block[b].start; i <= info->block[b].end; i++) {
+		for (i = info->cfg.block[b].start; i <= info->cfg.block[b].end; i++) {
 			zend_op *opline = op_array->opcodes + i;
 			if (!zend_opline_supports_jit(op_array, opline)) {
 				return;
@@ -5340,9 +5340,9 @@ void zend_jit_mark_tmp_zvals(zend_op_array *op_array)
 		if ((call_info->callee_func->type == ZEND_INTERNAL_FUNCTION ||
 		     (call_info->clone &&
 		      (call_info->clone->return_info.type & (MAY_BE_IN_REG/*???|MAY_BE_TMP_ZVAL*/)))) &&
-		    info->ssa[call_info->caller_call_opline - op_array->opcodes].result_def >= 0) {
+		    info->ssa.op[call_info->caller_call_opline - op_array->opcodes].result_def >= 0) {
 			
-			int var = info->ssa[call_info->caller_call_opline - op_array->opcodes].result_def;
+			int var = info->ssa.op[call_info->caller_call_opline - op_array->opcodes].result_def;
 
 			if (call_info->callee_func->type == ZEND_INTERNAL_FUNCTION &&
 			    (info->ssa_var_info[var].type & (MAY_BE_RCN|MAY_BE_REF))) {
@@ -5351,16 +5351,16 @@ void zend_jit_mark_tmp_zvals(zend_op_array *op_array)
 			}
 //???
 #if 0
-			if (!info->ssa_var[var].phi_use_chain) {
+			if (!info->ssa.var[var].phi_use_chain) {
 				int may_be_tmp = 1;
-				int use = info->ssa_var[var].use_chain;
+				int use = info->ssa.var[var].use_chain;
 
 				while (use >= 0) {
 					if (!zend_opline_supports_jit(op_array, op_array->opcodes + use)) {
 						may_be_tmp = 0;
 						break;
 					}
-					use = next_use(info->ssa, var, use);
+					use = next_use(info->ssa.op, var, use);
 				}
 
             	if (may_be_tmp) {
@@ -5414,7 +5414,7 @@ static int zend_jit_collect_recv_arg_info(zend_jit_context *ctx, zend_op_array *
 		if (opline->opcode == ZEND_RECV ||
 		    opline->opcode == ZEND_RECV_INIT) {
 			info->arg_info[opline->op1.num - 1].ssa_var =
-				info->ssa[opline - op_array->opcodes].result_def;
+				info->ssa.op[opline - op_array->opcodes].result_def;
 			info->arg_info[opline->op1.num - 1].info.type =
 				(MAY_BE_ANY | MAY_BE_ARRAY_KEY_ANY | MAY_BE_ARRAY_OF_ANY | MAY_BE_ARRAY_OF_REF);
 			if (opline->op1.num == op_array->num_args) {
@@ -5450,14 +5450,14 @@ static void zend_jit_infer_return_types(zend_jit_context *ctx)
 		if (info) {
 			zend_jit_call_info *call_info = info->caller_info;
 
-			varlist[i] = (zend_bitset)alloca(sizeof(zend_ulong) * zend_bitset_len(info->ssa_vars));
-			memset(varlist[i], 0, sizeof(zend_ulong) * zend_bitset_len(info->ssa_vars));
+			varlist[i] = (zend_bitset)alloca(sizeof(zend_ulong) * zend_bitset_len(info->ssa.vars));
+			memset(varlist[i], 0, sizeof(zend_ulong) * zend_bitset_len(info->ssa.vars));
 			while (call_info) {
 				zend_jit_func_info *func_info = JIT_DATA(call_info->caller_op_array);
 				if (func_info &&
 				    func_info->num <= info->num &&
-					func_info->ssa &&
-					func_info->ssa[call_info->caller_call_opline - call_info->caller_op_array->opcodes].result_def >= 0) {
+					func_info->ssa.op &&
+					func_info->ssa.op[call_info->caller_call_opline - call_info->caller_op_array->opcodes].result_def >= 0) {
 					zend_bitset_incl(worklist, info->num);
 					break;
 				}
@@ -5490,8 +5490,8 @@ static void zend_jit_infer_return_types(zend_jit_context *ctx)
 				zend_op_array *op_array = call_info->caller_op_array;
 				zend_jit_func_info *info = JIT_DATA(op_array);
 
-				if (info && info->ssa && info->ssa[call_info->caller_call_opline - op_array->opcodes].result_def >= 0) {
-					zend_bitset_incl(varlist[info->num], info->ssa[call_info->caller_call_opline - op_array->opcodes].result_def);
+				if (info && info->ssa.op && info->ssa.op[call_info->caller_call_opline - op_array->opcodes].result_def >= 0) {
+					zend_bitset_incl(varlist[info->num], info->ssa.op[call_info->caller_call_opline - op_array->opcodes].result_def);
 					zend_bitset_incl(worklist, info->num);
 				}
 				call_info = call_info->next_caller;
@@ -5513,14 +5513,14 @@ static void zend_jit_infer_return_types(zend_jit_context *ctx)
 		} \
 	} while (0)
 
-#define IP_COLLECT_DEP(var) do { \
-		if (!info->ssa_var[var].no_val) { \
-			int v = xlat[i].vars + var; \
+#define IP_COLLECT_DEP(_var) do { \
+		if (!info->ssa.var[_var].no_val) { \
+			int v = xlat[i].vars + _var; \
 			if (ip_var[v].kind == IP_NONE) { \
 				zend_worklist_stack_push(&stack, v); \
 				ip_var[v].kind = IP_VAR; \
 				ip_var[v].op_array_num = i; \
-				ip_var[v].num = var; \
+				ip_var[v].num = _var; \
 				ip_var[v].scc = -1; \
 			} \
 			IP_COLLECT_DEP_EX(v); \
@@ -5528,7 +5528,7 @@ static void zend_jit_infer_return_types(zend_jit_context *ctx)
 	} while (0)
 
 #define IP_MARK_SCC_ENTRY(var) do { \
-		if (!info->ssa_var[var].no_val) { \
+		if (!info->ssa.var[var].no_val) { \
 			int v = xlat[i].vars + var; \
 			if (ip_var[v].kind == IP_VAR && ip_var[v].scc >= 0) { \
 				ip_var[v].scc_entry = 1; \
@@ -5659,12 +5659,12 @@ static void zend_jit_ip_find_vars(zend_jit_context *ctx,
 		for (i = 0; i < ctx->op_arrays_count; i++) {
 			op_array = ctx->op_arrays[i];
 			info = JIT_DATA(op_array);
-			if (info && info->ssa_var && info->num_args > 0 && info->caller_info) {
+			if (info && info->ssa.var && info->num_args > 0 && info->caller_info) {
 				if (info->num_args > 0) {
 					int num_args = MIN(info->num_args, op_array->num_args);
 					/* IP vars for arguments */
 					for (j = 0; j < num_args; j++) {
-						if (!info->ssa_var[info->arg_info[j].ssa_var].no_val) {
+						if (!info->ssa.var[info->arg_info[j].ssa_var].no_val) {
 							n = xlat[i].args + j;
 							ip_var[n].kind = IP_ARG;
 							ip_var[n].op_array_num = i;
@@ -5688,14 +5688,14 @@ static void zend_jit_ip_find_vars(zend_jit_context *ctx,
 		for (i = 0; i < ctx->op_arrays_count; i++) {
 			op_array = ctx->op_arrays[i];
 			info = JIT_DATA(op_array);
-			if (info && info->ssa_var && info->caller_info) {
+			if (info && info->ssa.var && info->caller_info) {
 				call_info = info->caller_info;
 				do {
 					caller_info = JIT_DATA(call_info->caller_op_array);
 					if (caller_info &&
 					    caller_info->num <= info->num && /* FIXME: it's analyzed before */
-						caller_info->ssa &&
-						caller_info->ssa[call_info->caller_call_opline - call_info->caller_op_array->opcodes].result_def >= 0) {
+						caller_info->ssa.op &&
+						caller_info->ssa.op[call_info->caller_call_opline - call_info->caller_op_array->opcodes].result_def >= 0) {
 
 						n = xlat[i].ret;
 						zend_worklist_stack_push(&stack, n);
@@ -5724,15 +5724,15 @@ static void zend_jit_ip_find_vars(zend_jit_context *ctx,
 				caller_info = JIT_DATA(call_info->caller_op_array);
 
 				if (caller_info &&
-				    caller_info->ssa &&
-				    caller_info->ssa[call_info->caller_call_opline - call_info->caller_op_array->opcodes].result_def >= 0) {
+				    caller_info->ssa.op &&
+				    caller_info->ssa.op[call_info->caller_call_opline - call_info->caller_op_array->opcodes].result_def >= 0) {
 
-				    int v = xlat[caller_info->num].vars + caller_info->ssa[call_info->caller_call_opline - call_info->caller_op_array->opcodes].result_def;
+				    int v = xlat[caller_info->num].vars + caller_info->ssa.op[call_info->caller_call_opline - call_info->caller_op_array->opcodes].result_def;
 
 					if (ip_var[v].kind != IP_VAR) {
 						ip_var[v].kind = IP_VAR;
 						ip_var[v].op_array_num = caller_info->num;
-						ip_var[v].num = caller_info->ssa[call_info->caller_call_opline - call_info->caller_op_array->opcodes].result_def;
+						ip_var[v].num = caller_info->ssa.op[call_info->caller_call_opline - call_info->caller_op_array->opcodes].result_def;
 						ip_var[v].scc = -1;
 						zend_worklist_stack_push(&stack, v);
 					}
@@ -5750,20 +5750,20 @@ static void zend_jit_ip_find_vars(zend_jit_context *ctx,
 
 #ifdef SYM_RANGE
 			/* Process symbolic control-flow constraints */
-			p = info->ssa_var[j].sym_use_chain;
+			p = info->ssa.var[j].sym_use_chain;
 			while (p) {
 				IP_COLLECT_DEP(p->ssa_var);
 				p = p->sym_use_chain;
 			}
 #endif
 
-			use = info->ssa_var[j].use_chain;
+			use = info->ssa.var[j].use_chain;
 			while (use >= 0) {
 				switch (op_array->opcodes[use].opcode) {
 					case ZEND_RETURN:
 					case ZEND_RETURN_BY_REF:					
 						if (info->caller_info && 
-						    info->ssa[use].op1_use >= 0) {
+						    info->ssa.op[use].op1_use >= 0) {
 							int v = xlat[i].ret;
 
 							if (ip_var[v].kind != IP_RET) {
@@ -5784,7 +5784,7 @@ static void zend_jit_ip_find_vars(zend_jit_context *ctx,
 //???
 					case ZEND_SEND_VAL_EX:
 					case ZEND_SEND_VAR_EX:
-						if (with_args && info->ssa[use].op1_use >= 0) {
+						if (with_args && info->ssa.op[use].op1_use >= 0) {
 							call_info = info->callee_info;
 							while (call_info) {
 								if (call_info->callee_func->type == ZEND_USER_FUNCTION &&
@@ -5802,7 +5802,7 @@ static void zend_jit_ip_find_vars(zend_jit_context *ctx,
 					default:
 						break;
 				}
-				use = next_use(info->ssa, j, use);
+				use = next_use(info->ssa.op, j, use);
 			}
 		}
 
@@ -5829,9 +5829,9 @@ static int zend_jit_ip_check_inner_cycles(zend_jit_context *ctx, zend_jit_ip_var
 			zend_jit_func_info *info = JIT_DATA(op_array);
 
 			if (ip_var[ip_var[var].dep[i]].kind == IP_VAR &&
-			    info->ssa_var[ip_var[ip_var[var].dep[i]].num].definition_phi &&
-			    info->ssa_var[ip_var[ip_var[var].dep[i]].num].definition_phi->pi >= 0 &&
-			    info->ssa_var[ip_var[ip_var[var].dep[i]].num].definition_phi->sources[0] != ip_var[var].num) {
+			    info->ssa.var[ip_var[ip_var[var].dep[i]].num].definition_phi &&
+			    info->ssa.var[ip_var[ip_var[var].dep[i]].num].definition_phi->pi >= 0 &&
+			    info->ssa.var[ip_var[ip_var[var].dep[i]].num].definition_phi->sources[0] != ip_var[var].num) {
 				/* Don't process symbolic dependencies */
 			    continue;									
 			}
@@ -5895,54 +5895,54 @@ static void zend_jit_ip_infer_ranges_warmup(zend_jit_context *ctx, zend_jit_ip_v
 #ifdef NEG_RANGE
 					if (!has_inner_cycles &&
 					    info->ssa_var_info[ip_var[j].num].has_range &&
-					    info->ssa_var[ip_var[j].num].definition_phi &&
-					    info->ssa_var[ip_var[j].num].definition_phi->pi >= 0 &&
-					    info->ssa_var[ip_var[j].num].definition_phi->constraint.negative &&
-					    info->ssa_var[ip_var[j].num].definition_phi->constraint.min_ssa_var < 0 &&
-					    info->ssa_var[ip_var[j].num].definition_phi->constraint.min_ssa_var < 0) {
+					    info->ssa.var[ip_var[j].num].definition_phi &&
+					    info->ssa.var[ip_var[j].num].definition_phi->pi >= 0 &&
+					    info->ssa.var[ip_var[j].num].definition_phi->constraint.negative &&
+					    info->ssa.var[ip_var[j].num].definition_phi->constraint.min_ssa_var < 0 &&
+					    info->ssa.var[ip_var[j].num].definition_phi->constraint.min_ssa_var < 0) {
 						if (tmp.min == info->ssa_var_info[ip_var[j].num].range.min &&
 						    tmp.max == info->ssa_var_info[ip_var[j].num].range.max) {
-							if (info->ssa_var[ip_var[j].num].definition_phi->constraint.negative == NEG_INIT) {
+							if (info->ssa.var[ip_var[j].num].definition_phi->constraint.negative == NEG_INIT) {
 #ifdef LOG_NEG_RANGE
 								fprintf(stderr, "#%d INVARIANT\n", j);
 #endif
-								info->ssa_var[ip_var[j].num].definition_phi->constraint.negative = NEG_INVARIANT;
+								info->ssa.var[ip_var[j].num].definition_phi->constraint.negative = NEG_INVARIANT;
 							}
 						} else if (tmp.min == info->ssa_var_info[ip_var[j].num].range.min &&
 						           tmp.max == info->ssa_var_info[ip_var[j].num].range.max + 1 &&
-						           tmp.max < info->ssa_var[ip_var[j].num].definition_phi->constraint.range.min) {
-							if (info->ssa_var[ip_var[j].num].definition_phi->constraint.negative == NEG_INIT ||
-							    info->ssa_var[ip_var[j].num].definition_phi->constraint.negative == NEG_INVARIANT) {
+						           tmp.max < info->ssa.var[ip_var[j].num].definition_phi->constraint.range.min) {
+							if (info->ssa.var[ip_var[j].num].definition_phi->constraint.negative == NEG_INIT ||
+							    info->ssa.var[ip_var[j].num].definition_phi->constraint.negative == NEG_INVARIANT) {
 #ifdef LOG_NEG_RANGE
 								fprintf(stderr, "#%d LT\n", j);
 #endif
-								info->ssa_var[ip_var[j].num].definition_phi->constraint.negative = NEG_USE_LT;
-							} else if (!info->ssa_var[ip_var[j].num].definition_phi->constraint.negative == NEG_USE_GT) {
+								info->ssa.var[ip_var[j].num].definition_phi->constraint.negative = NEG_USE_LT;
+							} else if (!info->ssa.var[ip_var[j].num].definition_phi->constraint.negative == NEG_USE_GT) {
 #ifdef LOG_NEG_RANGE
 								fprintf(stderr, "#%d UNKNOWN\n", j);
 #endif
-								info->ssa_var[ip_var[j].num].definition_phi->constraint.negative = NEG_UNKNOWN;
+								info->ssa.var[ip_var[j].num].definition_phi->constraint.negative = NEG_UNKNOWN;
 							}
 						} else if (tmp.max == info->ssa_var_info[ip_var[j].num].range.max &&
 						           tmp.min == info->ssa_var_info[ip_var[j].num].range.min - 1 &&
-						           tmp.min > info->ssa_var[ip_var[j].num].definition_phi->constraint.range.max) {
-							if (info->ssa_var[ip_var[j].num].definition_phi->constraint.negative == NEG_INIT ||
-							    info->ssa_var[ip_var[j].num].definition_phi->constraint.negative == NEG_INVARIANT) {
+						           tmp.min > info->ssa.var[ip_var[j].num].definition_phi->constraint.range.max) {
+							if (info->ssa.var[ip_var[j].num].definition_phi->constraint.negative == NEG_INIT ||
+							    info->ssa.var[ip_var[j].num].definition_phi->constraint.negative == NEG_INVARIANT) {
 #ifdef LOG_NEG_RANGE
 								fprintf(stderr, "#%d GT\n", j);
 #endif
-								info->ssa_var[ip_var[j].num].definition_phi->constraint.negative = NEG_USE_GT;
-							} else if (!info->ssa_var[ip_var[j].num].definition_phi->constraint.negative == NEG_USE_LT) {
+								info->ssa.var[ip_var[j].num].definition_phi->constraint.negative = NEG_USE_GT;
+							} else if (!info->ssa.var[ip_var[j].num].definition_phi->constraint.negative == NEG_USE_LT) {
 #ifdef LOG_NEG_RANGE
 								fprintf(stderr, "#%d UNKNOWN\n", j);
 #endif
-								info->ssa_var[ip_var[j].num].definition_phi->constraint.negative = NEG_UNKNOWN;
+								info->ssa.var[ip_var[j].num].definition_phi->constraint.negative = NEG_UNKNOWN;
 							}
 						} else {
 #ifdef LOG_NEG_RANGE
 							fprintf(stderr, "#%d UNKNOWN\n", j);
 #endif
-							info->ssa_var[ip_var[j].num].definition_phi->constraint.negative = NEG_UNKNOWN;
+							info->ssa.var[ip_var[j].num].definition_phi->constraint.negative = NEG_UNKNOWN;
 						}
 					}
 #endif
@@ -5953,9 +5953,9 @@ static void zend_jit_ip_infer_ranges_warmup(zend_jit_context *ctx, zend_jit_ip_v
 						for (i = 0; i < ip_var[j].deps; i++) {
 							if (ip_var[ip_var[j].dep[i]].scc == ip_var[j].scc) {
 								if (ip_var[ip_var[j].dep[i]].kind == IP_VAR &&
-								    info->ssa_var[ip_var[ip_var[j].dep[i]].num].definition_phi &&
-								    info->ssa_var[ip_var[ip_var[j].dep[i]].num].definition_phi->pi >= 0 &&
-								    info->ssa_var[ip_var[ip_var[j].dep[i]].num].definition_phi->sources[0] != ip_var[j].num) {
+								    info->ssa.var[ip_var[ip_var[j].dep[i]].num].definition_phi &&
+								    info->ssa.var[ip_var[ip_var[j].dep[i]].num].definition_phi->pi >= 0 &&
+								    info->ssa.var[ip_var[ip_var[j].dep[i]].num].definition_phi->sources[0] != ip_var[j].num) {
 									/* Don't process symbolic dependencies during widening */
 								    continue;									
 								}
@@ -6025,7 +6025,7 @@ static void zend_jit_ip_infer_ranges(zend_jit_context *ctx, int with_args)
 		for (i = 0; i < ctx->op_arrays_count; i++) {
 			op_array = ctx->op_arrays[i];
 			info = JIT_DATA(op_array);
-			if (info && info->ssa_var && ((info->num_args > 0 && info->caller_info) || info->callee_info)) {
+			if (info && info->ssa.var && ((info->num_args > 0 && info->caller_info) || info->callee_info)) {
 				if (info->caller_info) {
 					xlat[i].ret = ip_vars;
 					ip_vars += 1; // for return value
@@ -6035,20 +6035,20 @@ static void zend_jit_ip_infer_ranges(zend_jit_context *ctx, int with_args)
 					ip_vars += MIN(info->num_args, op_array->num_args);
 				}
 				xlat[i].vars = ip_vars;
-				ip_vars += info->ssa_vars;
+				ip_vars += info->ssa.vars;
 			}
 		}
 	} else {
 		for (i = 0; i < ctx->op_arrays_count; i++) {
 			op_array = ctx->op_arrays[i];
 			info = JIT_DATA(op_array);
-			if (info && info->ssa_var && (info->caller_info || info->callee_info)) {
+			if (info && info->ssa.var && (info->caller_info || info->callee_info)) {
 				if (info->caller_info) {
 					xlat[i].ret = ip_vars;
 					ip_vars += 1; // for return value
 				}
 				xlat[i].vars = ip_vars;
-				ip_vars += info->ssa_vars;
+				ip_vars += info->ssa.vars;
 			}
 		}
 	}
@@ -6067,67 +6067,67 @@ static void zend_jit_ip_infer_ranges(zend_jit_context *ctx, int with_args)
 			op_array = ctx->op_arrays[ip_var[j].op_array_num];
 			info = JIT_DATA(op_array);
 			
-			if (info->ssa_var[ip_var[j].num].definition_phi) {
-				zend_jit_ssa_phi *p = info->ssa_var[ip_var[j].num].definition_phi;
+			if (info->ssa.var[ip_var[j].num].definition_phi) {
+				zend_jit_ssa_phi *p = info->ssa.var[ip_var[j].num].definition_phi;
 
 				if (p->pi >= 0) {
-					if (!info->ssa_var[p->sources[0]].no_val &&
+					if (!info->ssa.var[p->sources[0]].no_val &&
 					    ip_var[xlat[info->num].vars + p->sources[0]].kind == IP_NONE) {
 						ip_var[j].scc_entry = 1;
 					}
 				} else {
-					for (i = 0; i < info->block[p->block].predecessors_count; i++) {
+					for (i = 0; i < info->cfg.block[p->block].predecessors_count; i++) {
 						if (p->sources[i] >= 0 &&
-						    !info->ssa_var[p->sources[i]].no_val &&
+						    !info->ssa.var[p->sources[i]].no_val &&
 						    ip_var[xlat[info->num].vars + p->sources[i]].kind == IP_NONE) {
 							ip_var[j].scc_entry = 1;
 							break;
 						}
 					}
 				}				
-			} else if (info->ssa_var[ip_var[j].num].definition >= 0) {
-				int line = info->ssa_var[ip_var[j].num].definition;
-				if (info->ssa[line].op1_use >= 0 &&
-				    !info->ssa_var[info->ssa[line].op1_use].no_val &&
-				    ip_var[xlat[info->num].vars + info->ssa[line].op1_use].kind == IP_NONE) {
+			} else if (info->ssa.var[ip_var[j].num].definition >= 0) {
+				int line = info->ssa.var[ip_var[j].num].definition;
+				if (info->ssa.op[line].op1_use >= 0 &&
+				    !info->ssa.var[info->ssa.op[line].op1_use].no_val &&
+				    ip_var[xlat[info->num].vars + info->ssa.op[line].op1_use].kind == IP_NONE) {
 					ip_var[j].scc_entry = 1;
-				} else if (info->ssa[line].op2_use >= 0 &&
-				    !info->ssa_var[info->ssa[line].op2_use].no_val &&
-				    ip_var[xlat[info->num].vars + info->ssa[line].op2_use].kind == IP_NONE) {
+				} else if (info->ssa.op[line].op2_use >= 0 &&
+				    !info->ssa.var[info->ssa.op[line].op2_use].no_val &&
+				    ip_var[xlat[info->num].vars + info->ssa.op[line].op2_use].kind == IP_NONE) {
 					ip_var[j].scc_entry = 1;
-				} else if (info->ssa[line].result_use >= 0 &&
-				    !info->ssa_var[info->ssa[line].result_use].no_val &&
-				    ip_var[xlat[info->num].vars + info->ssa[line].result_use].kind == IP_NONE) {
+				} else if (info->ssa.op[line].result_use >= 0 &&
+				    !info->ssa.var[info->ssa.op[line].result_use].no_val &&
+				    ip_var[xlat[info->num].vars + info->ssa.op[line].result_use].kind == IP_NONE) {
 					ip_var[j].scc_entry = 1;
 				} else if (op_array->opcodes[line].opcode == ZEND_OP_DATA) {
 					line--;
-					if (info->ssa[line].op1_use >= 0 &&
-					    !info->ssa_var[info->ssa[line].op1_use].no_val &&
-					    ip_var[xlat[info->num].vars + info->ssa[line].op1_use].kind == IP_NONE) {
+					if (info->ssa.op[line].op1_use >= 0 &&
+					    !info->ssa.var[info->ssa.op[line].op1_use].no_val &&
+					    ip_var[xlat[info->num].vars + info->ssa.op[line].op1_use].kind == IP_NONE) {
 						ip_var[j].scc_entry = 1;
-					} else if (info->ssa[line].op2_use >= 0 &&
-				    	!info->ssa_var[info->ssa[line].op2_use].no_val &&
-					    ip_var[xlat[info->num].vars + info->ssa[line].op2_use].kind == IP_NONE) {
+					} else if (info->ssa.op[line].op2_use >= 0 &&
+				    	!info->ssa.var[info->ssa.op[line].op2_use].no_val &&
+					    ip_var[xlat[info->num].vars + info->ssa.op[line].op2_use].kind == IP_NONE) {
 						ip_var[j].scc_entry = 1;
-					} else if (info->ssa[line].result_use >= 0 &&
-					    !info->ssa_var[info->ssa[line].result_use].no_val &&
-					    ip_var[xlat[info->num].vars + info->ssa[line].result_use].kind == IP_NONE) {
+					} else if (info->ssa.op[line].result_use >= 0 &&
+					    !info->ssa.var[info->ssa.op[line].result_use].no_val &&
+					    ip_var[xlat[info->num].vars + info->ssa.op[line].result_use].kind == IP_NONE) {
 						ip_var[j].scc_entry = 1;
 					}
 				} else if (line + 1 < op_array->last &&
 				           op_array->opcodes[line + 1].opcode == ZEND_OP_DATA) {
 					line++;
-					if (info->ssa[line].op1_use >= 0 &&
-					    !info->ssa_var[info->ssa[line].op1_use].no_val &&
-					    ip_var[xlat[info->num].vars + info->ssa[line].op1_use].kind == IP_NONE) {
+					if (info->ssa.op[line].op1_use >= 0 &&
+					    !info->ssa.var[info->ssa.op[line].op1_use].no_val &&
+					    ip_var[xlat[info->num].vars + info->ssa.op[line].op1_use].kind == IP_NONE) {
 						ip_var[j].scc_entry = 1;
-					} else if (info->ssa[line].op2_use >= 0 &&
-				    	!info->ssa_var[info->ssa[line].op2_use].no_val &&
-					    ip_var[xlat[info->num].vars + info->ssa[line].op2_use].kind == IP_NONE) {
+					} else if (info->ssa.op[line].op2_use >= 0 &&
+				    	!info->ssa.var[info->ssa.op[line].op2_use].no_val &&
+					    ip_var[xlat[info->num].vars + info->ssa.op[line].op2_use].kind == IP_NONE) {
 						ip_var[j].scc_entry = 1;
-					} else if (info->ssa[line].result_use >= 0 &&
-					    !info->ssa_var[info->ssa[line].result_use].no_val &&
-					    ip_var[xlat[info->num].vars + info->ssa[line].result_use].kind == IP_NONE) {
+					} else if (info->ssa.op[line].result_use >= 0 &&
+					    !info->ssa.var[info->ssa.op[line].result_use].no_val &&
+					    ip_var[xlat[info->num].vars + info->ssa.op[line].result_use].kind == IP_NONE) {
 						ip_var[j].scc_entry = 1;
 					}
 				}
@@ -6232,9 +6232,9 @@ static void zend_jit_ip_infer_ranges(zend_jit_context *ctx, int with_args)
 						for (i = 0; i < ip_var[j].deps; i++) {
 							if (ip_var[ip_var[j].dep[i]].scc == ip_var[j].scc) {
 								if (ip_var[ip_var[j].dep[i]].kind == IP_VAR &&
-								    info->ssa_var[ip_var[ip_var[j].dep[i]].num].definition_phi &&
-								    info->ssa_var[ip_var[ip_var[j].dep[i]].num].definition_phi->pi >= 0 &&
-								    info->ssa_var[ip_var[ip_var[j].dep[i]].num].definition_phi->sources[0] != ip_var[j].num) {
+								    info->ssa.var[ip_var[ip_var[j].dep[i]].num].definition_phi &&
+								    info->ssa.var[ip_var[ip_var[j].dep[i]].num].definition_phi->pi >= 0 &&
+								    info->ssa.var[ip_var[ip_var[j].dep[i]].num].definition_phi->sources[0] != ip_var[j].num) {
 									/* Don't process symbolic dependencies during widening */
 								    continue;									
 								}
@@ -6364,7 +6364,7 @@ static void zend_jit_ip_infer_ranges(zend_jit_context *ctx, int with_args)
 			fprintf(stderr, "  %4d: %2d %s ", i, ip_var[i].op_array_num, ctx->op_arrays[ip_var[i].op_array_num]->function_name ? ctx->op_arrays[ip_var[i].op_array_num]->function_name->val : "$main");
 			if (ip_var[i].kind == IP_VAR) {
 				fprintf(stderr, "#%d(", ip_var[i].num);
-				zend_jit_dump_var(ctx->op_arrays[ip_var[i].op_array_num], JIT_DATA(ctx->op_arrays[ip_var[i].op_array_num])->ssa_var[ip_var[i].num].var);
+				zend_jit_dump_var(ctx->op_arrays[ip_var[i].op_array_num], JIT_DATA(ctx->op_arrays[ip_var[i].op_array_num])->ssa.var[ip_var[i].num].var);
 				fprintf(stderr, ")");
 			} else if (ip_var[i].kind == IP_RET) {
 				fprintf(stderr, "RET");
@@ -6426,8 +6426,8 @@ static void zend_jit_infer_arg_and_return_types(zend_jit_context *ctx, int recur
 
 	for (i = 0; i < ctx->op_arrays_count; i++) {
 		info = JIT_DATA(ctx->op_arrays[i]);
-		varlist[i] = (zend_bitset)alloca(sizeof(zend_ulong) * zend_bitset_len(info->ssa_vars));
-		memset(varlist[i], 0, sizeof(zend_ulong) * zend_bitset_len(info->ssa_vars));
+		varlist[i] = (zend_bitset)alloca(sizeof(zend_ulong) * zend_bitset_len(info->ssa.vars));
+		memset(varlist[i], 0, sizeof(zend_ulong) * zend_bitset_len(info->ssa.vars));
 		if (info && info->caller_info &&
 		    (!recursive || (info->flags & ZEND_JIT_FUNC_RECURSIVE))) {
 			zend_bitset_incl(worklist, info->num);
@@ -6441,7 +6441,7 @@ static void zend_jit_infer_arg_and_return_types(zend_jit_context *ctx, int recur
 		info = JIT_DATA(ctx->op_arrays[i]);
 
 		/* calculate argument types */
-		if (info && info->ssa_var && info->num_args > 0 && info->caller_info) {
+		if (info && info->ssa.var && info->num_args > 0 && info->caller_info) {
 			int num_args = MIN(info->num_args, ctx->op_arrays[i]->num_args);
 
 			for (j = 0; j < num_args; j++) {
@@ -6461,7 +6461,7 @@ static void zend_jit_infer_arg_and_return_types(zend_jit_context *ctx, int recur
 			}
 		}
 		
-		if (zend_bitset_empty(varlist[i], zend_bitset_len(info->ssa_vars))) {
+		if (zend_bitset_empty(varlist[i], zend_bitset_len(info->ssa.vars))) {
 			zend_jit_func_return_info(ctx, ctx->op_arrays[i], recursive, 0, &tmp);
 		} else {		
 			/* perform incremental type inference */
@@ -6497,8 +6497,8 @@ static void zend_jit_infer_arg_and_return_types(zend_jit_context *ctx, int recur
 				zend_op_array *op_array = call_info->caller_op_array;
 				zend_jit_func_info *info = JIT_DATA(op_array);
 
-				if (info && info->ssa && info->ssa[call_info->caller_call_opline - op_array->opcodes].result_def >= 0) {
-					zend_bitset_incl(varlist[info->num], info->ssa[call_info->caller_call_opline - op_array->opcodes].result_def);
+				if (info && info->ssa.op && info->ssa.op[call_info->caller_call_opline - op_array->opcodes].result_def >= 0) {
+					zend_bitset_incl(varlist[info->num], info->ssa.op[call_info->caller_call_opline - op_array->opcodes].result_def);
 					zend_bitset_incl(worklist, info->num);
 				}
 				call_info = call_info->next_caller;
@@ -6531,7 +6531,7 @@ int zend_jit_optimize_calls(zend_jit_context *ctx)
 			op_array = ctx->op_arrays[i];
 			info = JIT_DATA(op_array);
 			return_value_used = zend_jit_is_return_value_used(op_array);
-			if (info && info->ssa_var && info->caller_info &&
+			if (info && info->ssa.var && info->caller_info &&
 			    (op_array->num_args || return_value_used > 0)) {
 				/* Create clone */
 				clone = zend_jit_create_clone(ctx, info);
@@ -6633,7 +6633,7 @@ static int zend_jit_is_similar_clone(zend_jit_func_info *info, zend_jit_func_inf
 	if (info->return_info.type != clone->return_info.type) {
 		return 0;
 	}
-	for (i = 0; i < info->ssa_vars; i++) {
+	for (i = 0; i < info->ssa.vars; i++) {
 		if (info->ssa_var_info[i].type != clone->ssa_var_info[i].type) {
 			return 0;
 		}
