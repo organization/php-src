@@ -3715,40 +3715,43 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 			ce = NULL;
 			if (op_array->arg_info &&
 			    opline->op1.num <= op_array->num_args) {
+				zend_arg_info *arg_info = &op_array->arg_info[opline->op1.num-1];
 				tmp = MAY_BE_DEF;
-#if 0
-                // FIXME: It's stupid but we can't count on type hinting,
-                // becuse "catchable" error may be bypassed :( 
-				if (op_array->arg_info[opline->op1.num-1].class_name) {
-					int name_len = op_array->arg_info[opline->op1.num-1].class_name_len;
-					char *lcname = zend_str_tolower_dup(op_array->arg_info[opline->op1.num-1].class_name, name_len);
-					tmp |= MAY_BE_OBJECT;
+				if (arg_info->class_name) {
 					// class type hinting...
-					if (zend_hash_find(&ctx->main_persistent_script->class_table, lcname, name_len+1, (void **) &pce) == SUCCESS) {
-						ce = *pce;
-					} else if (zend_hash_find(CG(class_table), lcname, name_len+1, (void **) &pce) == SUCCESS &&
-					           (*pce)->type == ZEND_INTERNAL_CLASS) {
-						ce = *pce;
+					zend_string *lcname = zend_string_tolower(arg_info->class_name);
+					tmp |= MAY_BE_OBJECT;
+					ce = zend_hash_find_ptr(&ctx->main_persistent_script->class_table, lcname);
+					if (!ce) {
+						ce = zend_hash_find_ptr(CG(class_table), lcname);
+						if (ce && ce->type != ZEND_INTERNAL_CLASS) {
+							ce = NULL;
+						}
 					}
-					efree(lcname);
-				} else if (op_array->arg_info[opline->op1.num-1].type_hint) {
-					if (op_array->arg_info[opline->op1.num-1].type_hint == IS_CALLABLE) {
+					zend_string_release(lcname);
+				} else if (arg_info->type_hint != IS_UNDEF) {
+					if (arg_info->type_hint == IS_CALLABLE) {
 						tmp |= MAY_BE_STRING|MAY_BE_OBJECT|MAY_BE_ARRAY|MAY_BE_ARRAY_KEY_ANY|MAY_BE_ARRAY_OF_ANY|MAY_BE_ARRAY_OF_REF;
-					} else if (op_array->arg_info[opline->op1.num-1].type_hint == IS_ARRAY) {
+					} else if (arg_info->type_hint == IS_ARRAY) {
 						tmp |= MAY_BE_ARRAY|MAY_BE_ARRAY_KEY_ANY|MAY_BE_ARRAY_OF_ANY|MAY_BE_ARRAY_OF_REF;
-					} else if (op_array->arg_info[opline->op1.num-1].type_hint < IS_CONSTANT) {
-						tmp |= 1 << (op_array->arg_info[opline->op1.num-1].type_hint - 1);
+					} else if (arg_info->type_hint == _IS_BOOL) {
+						tmp |= MAY_BE_TRUE|MAY_BE_FALSE;
 					} else {
-						tmp |= MAY_BE_ANY|MAY_BE_ARRAY_KEY_ANY|MAY_BE_ARRAY_OF_ANY|MAY_BE_ARRAY_OF_REF;
+						ZEND_ASSERT(arg_info->type_hint < IS_REFERENCE);
+						tmp |= 1 << (arg_info->type_hint - 1);
 					}
 				} else {
-#endif
 					tmp |= MAY_BE_ANY|MAY_BE_ARRAY_KEY_ANY|MAY_BE_ARRAY_OF_ANY|MAY_BE_ARRAY_OF_REF;
-//				}
-				if (op_array->arg_info[opline->op1.num-1].allow_null) {
+				}
+				if (arg_info->allow_null) {
+					tmp |= MAY_BE_NULL;
+				} else if (opline->opcode == ZEND_RECV_INIT &&
+						(Z_TYPE_P(RT_CONSTANT(op_array, opline->op2)) == IS_CONSTANT
+						 || Z_TYPE_P(RT_CONSTANT(op_array, opline->op2)) == IS_CONSTANT_AST)) {
+					/* The constant may resolve to NULL */
 					tmp |= MAY_BE_NULL;
 				}
-				if (op_array->arg_info[opline->op1.num-1].pass_by_reference) {
+				if (arg_info->pass_by_reference) {
 					tmp |= MAY_BE_REF;
 				} else {
 					tmp |= MAY_BE_RC1|MAY_BE_RCN;
@@ -3761,7 +3764,7 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 					(tmp & info->arg_info[opline->op1.num-1].info.type);
 			} else {
 				if (opline->opcode == ZEND_RECV) {
-					/* it's possible that caller pass less arguments than function excpects */
+					/* it's possible that caller pass less arguments than function expects */
 					tmp |= MAY_BE_UNDEF|MAY_BE_NULL|MAY_BE_RC1;
 				}
 			}
