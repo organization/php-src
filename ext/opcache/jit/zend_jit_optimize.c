@@ -2854,32 +2854,7 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 			break;
 		case ZEND_MOD:
 			tmp = MAY_BE_DEF|MAY_BE_RC1|MAY_BE_LONG;
-			/* Add bool for division by zero */
-			if (opline->op2_type == IS_CONST) {
-				if (Z_TYPE_P(RT_CONSTANT(op_array, opline->op2)) == IS_LONG) {
-					if (Z_LVAL_P(RT_CONSTANT(op_array, opline->op2)) == 0) {
-						tmp |= MAY_BE_FALSE;
-					}
-			    } else if (Z_TYPE_P(RT_CONSTANT(op_array, opline->op2)) == IS_DOUBLE) {
-					if (Z_DVAL_P(RT_CONSTANT(op_array, opline->op2)) == 0.0) {
-						tmp |= MAY_BE_FALSE;
-					}
-				} else {
-					tmp |= MAY_BE_FALSE;
-				}
-			} else if ((t2 & MAY_BE_ANY) == MAY_BE_LONG) {
-				if (ssa_op[i].op2_use >= 0 &&
-				    ssa_var_info[ssa_op[i].op2_use].has_range) {
-					if (info->ssa_var_info[ssa_op[i].op2_use].range.min <= 0 &&
-					    info->ssa_var_info[ssa_op[i].op2_use].range.max >= 0) {
-						tmp |= MAY_BE_FALSE;
-					}
-				} else {
-					tmp |= MAY_BE_FALSE;
-				}
-			} else {
-				tmp |= MAY_BE_FALSE;
-			}
+			/* Division by zero results in an exception, so it doesn't need any special handling */
 			UPDATE_SSA_TYPE(tmp, ssa_op[i].result_def);
 			break;
 		case ZEND_BW_NOT:
@@ -3207,32 +3182,6 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 				}
 			}
 			tmp |= MAY_BE_LONG;
-			/* Add bool for division by zero */
-			if ((opline+1)->op1_type == IS_CONST) {
-				if (Z_TYPE_P(RT_CONSTANT(op_array, (opline+1)->op1)) == IS_LONG) {
-					if (Z_LVAL_P(RT_CONSTANT(op_array, (opline+1)->op1)) == 0) {
-						tmp |= MAY_BE_FALSE;
-					}
-			    } else if (Z_TYPE_P(RT_CONSTANT(op_array, (opline+1)->op1)) == IS_DOUBLE) {
-					if (Z_DVAL_P(RT_CONSTANT(op_array, (opline+1)->op1)) == 0.0) {
-						tmp |= MAY_BE_FALSE;
-					}
-				} else {
-					tmp |= MAY_BE_FALSE;
-				}
-			} else if ((t2 & MAY_BE_ANY) == MAY_BE_LONG) {
-				if (ssa_op[i+1].op1_use >= 0 &&
-				    ssa_var_info[ssa_op[i+1].op1_use].has_range) {
-					if (info->ssa_var_info[ssa_op[i+1].op1_use].range.min <= 0 &&
-					    info->ssa_var_info[ssa_op[i+1].op1_use].range.max >= 0) {
-						tmp |= MAY_BE_FALSE;
-					}
-				} else {
-					tmp |= MAY_BE_FALSE;
-				}
-			} else {
-				tmp |= MAY_BE_FALSE;
-			}
 			if (opline->extended_value == ZEND_ASSIGN_DIM) {
 				if (opline->op1_type == IS_CV) {
 					orig |= MAY_BE_ARRAY | ((tmp & MAY_BE_ANY) << 16);

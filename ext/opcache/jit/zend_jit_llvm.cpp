@@ -9365,30 +9365,10 @@ static int zend_jit_long_math(zend_llvm_ctx    &llvm_ctx,
 					bb_zero,
 					bb_non_zero);
 				llvm_ctx.builder.SetInsertPoint(bb_zero);
-				// JIT: zend_error(E_WARNING, "Division by zero");
-				zend_jit_error(llvm_ctx, opline, E_WARNING, "Division by zero");
-				// JIT: ZVAL_BOOL(result, 0);
-				Value *result; 
-				if (!result_addr) {
-					result = zend_jit_load_tmp_zval(llvm_ctx, result_op->var);
-				} else {
-					result = result_addr;
-				}
-				zend_jit_save_zval_type_info(llvm_ctx, result, result_ssa_var, result_info, llvm_ctx.builder.getInt32(IS_FALSE));
-				if (op1_op_type == IS_VAR && op1_addr != result_addr) {
-					if (!zend_jit_free_operand(llvm_ctx, op1_op_type, orig_op1_addr, NULL, op1_ssa_var, op1_info, lineno)) {
-						return 0;
-					}
-				}
-				if (op2_op_type == IS_VAR) {
-					if (!zend_jit_free_operand(llvm_ctx, op2_op_type, orig_op2_addr, NULL, op2_ssa_var, op2_info, lineno)) {
-						return 0;
-					}
-				}
-				if (!bb_finish) {
-					bb_finish = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
-				}
-				llvm_ctx.builder.CreateBr(bb_finish);
+				// JIT: zend_throw_exception_ex(zend_ce_division_by_zero_error, 0, "Modulo by zero");
+				zend_jit_throw_error(llvm_ctx, opline,
+						zend_ce_division_by_zero_error, "Modulo by zero");
+				llvm_ctx.builder.CreateBr(zend_jit_find_exception_bb(llvm_ctx, opline));
 				llvm_ctx.builder.SetInsertPoint(bb_non_zero);
 			}
 			if (op1_min == LONG_MIN && op2_min <= -1 && op2_max >= -1) {
