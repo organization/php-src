@@ -3711,11 +3711,15 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 			break;
 		case ZEND_RECV:
 		case ZEND_RECV_INIT:
+		{
 			/* Typehinting */
+			zend_arg_info *arg_info = NULL;
+			if (op_array->arg_info && opline->op1.num <= op_array->num_args) {
+				arg_info = &op_array->arg_info[opline->op1.num-1];
+			}
+
 			ce = NULL;
-			if (op_array->arg_info &&
-			    opline->op1.num <= op_array->num_args) {
-				zend_arg_info *arg_info = &op_array->arg_info[opline->op1.num-1];
+			if (arg_info) {
 				tmp = MAY_BE_DEF;
 				if (arg_info->class_name) {
 					// class type hinting...
@@ -3763,8 +3767,9 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 				tmp = (tmp & (MAY_BE_DEF|MAY_BE_RC1|MAY_BE_RCN|MAY_BE_REF)) |
 					(tmp & info->arg_info[opline->op1.num-1].info.type);
 			} else {
-				if (opline->opcode == ZEND_RECV) {
-					/* it's possible that caller pass less arguments than function expects */
+				if (opline->opcode == ZEND_RECV && (!arg_info || arg_info->type_hint == IS_UNDEF)) {
+					/* If the argument has no default value and no typehint, it is possible
+					 * to pass less arguments than the function expects */
 					tmp |= MAY_BE_UNDEF|MAY_BE_NULL|MAY_BE_RC1;
 				}
 			}
@@ -3792,6 +3797,7 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 				UPDATE_SSA_OBJ_TYPE(NULL, 0, ssa_op[i].result_def);
 			}
 			break;
+		}
 		case ZEND_DECLARE_CLASS:
 		case ZEND_DECLARE_INHERITED_CLASS:
 			UPDATE_SSA_TYPE(MAY_BE_CLASS, ssa_op[i].result_def);
