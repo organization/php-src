@@ -3754,10 +3754,6 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 			tmp = MAY_BE_DEF|MAY_BE_RC1|MAY_BE_RCN|MAY_BE_OBJECT;
 			if (opline->op1_type == IS_CONST &&
 			    (ce = zend_hash_find_ptr(CG(class_table), Z_STR_P(RT_CONSTANT(op_array, opline->op1)+1))) != NULL) {
-			    if (ce->type == ZEND_INTERNAL_CLASS) {
-					//TODO: "new" for internal class may return NULL ???
-					tmp |= MAY_BE_NULL;
-			    }
 				UPDATE_SSA_OBJ_TYPE(ce, 0, ssa_op[i].result_def);
 			} else if ((t1 & MAY_BE_CLASS) && ssa_op[i].op1_use >= 0 && ssa_var_info[ssa_op[i].op1_use].ce) {
 				UPDATE_SSA_OBJ_TYPE(ssa_var_info[ssa_op[i].op1_use].ce, ssa_var_info[ssa_op[i].op1_use].is_instanceof, ssa_op[i].result_def);
