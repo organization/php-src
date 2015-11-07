@@ -1505,12 +1505,16 @@ static int zend_jit_compute_dfg(zend_jit_dfg *dfg, zend_op_array *op_array)
 					case ZEND_POST_DEC:
 					case ZEND_ASSIGN_DIM:
 					case ZEND_ASSIGN_OBJ:
+					case ZEND_UNSET_DIM:
+					case ZEND_UNSET_OBJ:
 					case ZEND_FETCH_DIM_W:
 					case ZEND_FETCH_DIM_RW:
 					case ZEND_FETCH_DIM_FUNC_ARG:
+					case ZEND_FETCH_DIM_UNSET:
 					case ZEND_FETCH_OBJ_W:
 					case ZEND_FETCH_OBJ_RW:
 					case ZEND_FETCH_OBJ_FUNC_ARG:
+					case ZEND_FETCH_OBJ_UNSET:
 						zend_bitset_incl(gen + (j * set_size), EX_VAR_TO_NUM(opline->op1.var));
 					default:
 						if (!zend_bitset_in(def + (j * set_size), EX_VAR_TO_NUM(opline->op1.var))) {
@@ -1814,12 +1818,16 @@ static int zend_jit_ssa_rename(zend_op_array *op_array, int *var, int n)
 						ssa_var++;
 					}
 					break;
+				case ZEND_UNSET_DIM:
+				case ZEND_UNSET_OBJ:
 				case ZEND_FETCH_DIM_W:
 				case ZEND_FETCH_DIM_RW:
 				case ZEND_FETCH_DIM_FUNC_ARG:
+				case ZEND_FETCH_DIM_UNSET:
 				case ZEND_FETCH_OBJ_W:
 				case ZEND_FETCH_OBJ_RW:
 				case ZEND_FETCH_OBJ_FUNC_ARG:
+				case ZEND_FETCH_OBJ_UNSET:
 					if (opline->op1_type == IS_CV) {
 						ssa_op[k].op1_def = ssa_var;
 						var[EX_VAR_TO_NUM(opline->op1.var)] = ssa_var;
