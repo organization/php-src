@@ -11476,12 +11476,6 @@ static int zend_jit_send_var_no_ref(zend_llvm_ctx    &llvm_ctx,
 
 		//JIT: ZVAL_MAKE_REF(varptr);
 		zend_jit_make_ref(llvm_ctx, op1_addr, op1_type_info, OP1_SSA_VAR(), OP1_INFO());
-		if (opline->op1_type == IS_CV) {
-			//JIT: Z_ADDREF_P(varptr);
-			zend_jit_addref(llvm_ctx,
-				zend_jit_load_counted(llvm_ctx,
-					op1_addr, OP1_DEF_SSA_VAR(), OP1_DEF_INFO()));
-		}
 
 		llvm_ctx.builder.CreateBr(bb_common);
 		llvm_ctx.builder.SetInsertPoint(bb_error);
@@ -11527,8 +11521,8 @@ static int zend_jit_send_var_no_ref(zend_llvm_ctx    &llvm_ctx,
 	//JIT: ZVAL_COPY_VALUE(arg, varptr);
 	zend_jit_copy_value(llvm_ctx, arg_addr, 0, -1, MAY_BE_ANY,
 		op1_addr, /*???op1_type_info*/NULL, OP1_OP_TYPE(), OP1_OP(),
-		(opline->op1_type == IS_CV) ? OP1_DEF_SSA_VAR() : OP1_SSA_VAR(),
-		(opline->op1_type == IS_CV) ? OP1_DEF_INFO() : OP1_INFO());
+		OP1_SSA_VAR(),
+		OP1_MAY_BE(MAY_BE_OBJECT) ? MAY_BE_ANY : OP1_INFO());
 	
 	//JIT: CHECK_EXCEPTION();
 	JIT_CHECK(zend_jit_check_exception(llvm_ctx, opline));
