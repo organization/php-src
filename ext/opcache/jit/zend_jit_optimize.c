@@ -2754,6 +2754,7 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 	     (opline-1)->opcode == ZEND_ASSIGN_BW_OR ||
 	     (opline-1)->opcode == ZEND_ASSIGN_BW_AND ||
 	     (opline-1)->opcode == ZEND_ASSIGN_BW_XOR ||
+	     (opline-1)->opcode == ZEND_ASSIGN_POW ||
 	     (opline-1)->opcode == ZEND_FE_FETCH_R ||
 	     (opline-1)->opcode == ZEND_FE_FETCH_RW)) {
 		opline--;
@@ -2817,6 +2818,7 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 			UPDATE_SSA_TYPE(tmp, ssa_op[i].result_def);
 			break;
 		case ZEND_DIV:
+		case ZEND_POW:
 			tmp = MAY_BE_DEF | MAY_BE_RC1;
 			if ((t1 & MAY_BE_ANY) == MAY_BE_DOUBLE ||
 			    (t2 & MAY_BE_ANY) == MAY_BE_DOUBLE) {
@@ -3063,6 +3065,7 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 			}
 			break;
 		case ZEND_ASSIGN_DIV:
+		case ZEND_ASSIGN_POW:
 			if (opline->extended_value == ZEND_ASSIGN_OBJ) {
 				goto unknown_opcode;
 			} else if (opline->extended_value == ZEND_ASSIGN_DIM) {
@@ -3971,6 +3974,7 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 						case ZEND_ASSIGN_BW_OR:
 						case ZEND_ASSIGN_BW_AND:
 						case ZEND_ASSIGN_BW_XOR:
+						case ZEND_ASSIGN_POW:
 						case ZEND_ASSIGN_DIM:
 							tmp |= MAY_BE_ARRAY | MAY_BE_ARRAY_OF_ARRAY;
 							break;
@@ -4827,6 +4831,7 @@ static void zend_jit_check_no_symtab(zend_op_array *op_array)
 				case ZEND_ASSIGN_BW_OR:
 				case ZEND_ASSIGN_BW_AND:
 				case ZEND_ASSIGN_BW_XOR:
+				case ZEND_ASSIGN_POW:
 					if (opline->extended_value) {
 						return;
 					}
@@ -4839,6 +4844,7 @@ static void zend_jit_check_no_symtab(zend_op_array *op_array)
 				case ZEND_BW_AND:
 				case ZEND_BW_XOR:
 				case ZEND_BOOL_XOR:
+				case ZEND_POW:
 					if (OP1_MAY_BE(MAY_BE_OBJECT|MAY_BE_RESOURCE)) {
 						return;
 					}

@@ -1459,6 +1459,7 @@ static int zend_jit_compute_dfg(zend_jit_dfg *dfg, zend_op_array *op_array)
 							case ZEND_ASSIGN_BW_OR:
 							case ZEND_ASSIGN_BW_AND:
 							case ZEND_ASSIGN_BW_XOR:
+							case ZEND_ASSIGN_POW:
 								break;
 							default:
 								if (!zend_bitset_in(def + (j * set_size), EX_VAR_TO_NUM(next->op2.var))) {
@@ -1497,6 +1498,7 @@ static int zend_jit_compute_dfg(zend_jit_dfg *dfg, zend_op_array *op_array)
 					case ZEND_ASSIGN_BW_OR:
 					case ZEND_ASSIGN_BW_AND:
 					case ZEND_ASSIGN_BW_XOR:
+					case ZEND_ASSIGN_POW:
 					case ZEND_PRE_INC:
 					case ZEND_PRE_DEC:
 					case ZEND_POST_INC:
@@ -1682,6 +1684,7 @@ static int zend_jit_ssa_rename(zend_op_array *op_array, int *var, int n)
 						case ZEND_ASSIGN_BW_OR:
 						case ZEND_ASSIGN_BW_AND:
 						case ZEND_ASSIGN_BW_XOR:
+						case ZEND_ASSIGN_POW:
 							break;
 						default:
 							ssa_op[k + 1].op2_use = var[EX_VAR_TO_NUM(next->op2.var)];
@@ -1792,6 +1795,7 @@ static int zend_jit_ssa_rename(zend_op_array *op_array, int *var, int n)
 				case ZEND_ASSIGN_BW_OR:
 				case ZEND_ASSIGN_BW_AND:
 				case ZEND_ASSIGN_BW_XOR:
+				case ZEND_ASSIGN_POW:
 				case ZEND_PRE_INC:
 				case ZEND_PRE_DEC:
 				case ZEND_POST_INC:
