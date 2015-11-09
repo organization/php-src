@@ -3832,8 +3832,11 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 						tmp |= MAY_BE_ARRAY_KEY_LONG;
 					}
 					if (t2 & (MAY_BE_STRING)) {
-						// FIXME: numeric string
-						tmp |= MAY_BE_ARRAY_KEY_STRING | MAY_BE_ARRAY_KEY_LONG;
+						tmp |= MAY_BE_ARRAY_KEY_STRING;
+						if (opline->op2_type != IS_CONST) {
+							// FIXME: numeric string
+							tmp |= MAY_BE_ARRAY_KEY_LONG;
+						}
 					}
 					if (t2 & (MAY_BE_NULL)) {
 						tmp |= MAY_BE_ARRAY_KEY_STRING;
