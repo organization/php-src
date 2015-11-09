@@ -3134,7 +3134,7 @@ static Value* zend_jit_load_res_handle(zend_llvm_ctx &llvm_ctx,
 				res_addr,
 				offsetof(zend_resource, handle),
 				PointerType::getUnqual(
-					LLVM_GET_LONG_TY(llvm_ctx.context))), 4);
+					Type::getInt32Ty(llvm_ctx.context))), 4);
 }
 /* }}} */
 
