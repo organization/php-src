@@ -403,24 +403,38 @@ static inline int ssa_result_var(zend_op_array *op_array, zend_op *opline)
 	return info->ssa.op ? info->ssa.op[opline - op_array->opcodes].result_def : -1;
 }
 
+static inline uint32_t _const_op_type(zval *zv) {
+	if (Z_TYPE_P(zv) == IS_CONSTANT) {
+		return MAY_BE_ANY | MAY_BE_ARRAY_KEY_ANY | MAY_BE_ARRAY_OF_ANY;
+	} else if (Z_TYPE_P(zv) == IS_CONSTANT_AST) {
+		return MAY_BE_ANY | MAY_BE_ARRAY_KEY_ANY | MAY_BE_ARRAY_OF_ANY;
+	} else if (Z_TYPE_P(zv) == IS_ARRAY) {
+		HashTable *ht = Z_ARRVAL_P(zv);
+		uint32_t tmp = MAY_BE_ARRAY | MAY_BE_DEF | MAY_BE_RC1;
+
+		zend_string *str;
+		zend_long num;
+		zval *val;
+		ZEND_HASH_FOREACH_KEY_VAL(ht, num, str, val) {
+			if (str) {
+				tmp |= MAY_BE_ARRAY_KEY_STRING;
+			} else {
+				tmp |= MAY_BE_ARRAY_KEY_LONG;
+			}
+			tmp |= 1 << (Z_TYPE_P(val) - 1 + 16);
+		} ZEND_HASH_FOREACH_END();
+		return tmp;
+	} else {
+		return (1 << (Z_TYPE_P(zv) - 1)) | MAY_BE_DEF | MAY_BE_RC1;
+	}
+}
+
 #define DEFINE_SSA_OP_INFO(opN) \
 	static inline uint32_t ssa_##opN##_info(zend_op_array *op_array, zend_op *opline) \
 	{																		\
 		zend_jit_func_info *info = JIT_DATA(op_array); \
 		if (opline->opN##_type == IS_CONST) {							\
-			uint32_t tmp; \
-			if (Z_TYPE_P(RT_CONSTANT(op_array, opline->opN)) == IS_CONSTANT) { \
-				tmp = MAY_BE_ANY; \
-			} else if (Z_TYPE_P(RT_CONSTANT(op_array, opline->opN)) == IS_CONSTANT_AST) { \
-				tmp = MAY_BE_ANY; \
-			} else { \
-				tmp = (1 << (Z_TYPE_P(RT_CONSTANT(op_array, opline->opN)) - 1)) | MAY_BE_DEF | MAY_BE_RC1; \
-			} \
-			if (tmp & MAY_BE_ARRAY) { \
-				/* TODO: more accurate array constant handling ??? */ \
-				tmp |= MAY_BE_ARRAY_KEY_ANY | MAY_BE_ARRAY_OF_ANY | MAY_BE_ARRAY_OF_REF; \
-			} \
-			return tmp; \
+			return _const_op_type(RT_CONSTANT(op_array, opline->opN)); \
 		} else { \
 			return get_ssa_var_info(info, info->ssa.op ? info->ssa.op[opline - op_array->opcodes].opN##_use : -1); \
 		} \
