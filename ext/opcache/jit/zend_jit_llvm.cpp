@@ -9786,6 +9786,9 @@ static int zend_jit_bw_not(zend_llvm_ctx    &llvm_ctx,
 			NULL,
 			NULL);
 
+		if (!llvm_ctx.valid_opline) {
+			JIT_CHECK(zend_jit_store_opline(llvm_ctx, opline, false));
+		}
 		if (op1_info & MAY_BE_IN_REG) {
 			op1_addr = zend_jit_reload_from_reg(llvm_ctx, OP1_SSA_VAR(), op1_info);
 		}
