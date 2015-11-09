@@ -1644,6 +1644,20 @@ static int zend_jit_calc_range(zend_jit_context *ctx, zend_op_array *op_array, i
 				}
 			}
 			break;
+		case ZEND_UNSET_DIM:
+		case ZEND_UNSET_OBJ:
+			if (info->ssa.op[line].op1_def == var) {
+				/* If op1 is scalar, UNSET_DIM and UNSET_OBJ have no effect, so we can keep
+				 * the previous ranges. */
+				if (OP1_HAS_RANGE()) {
+					tmp->min = OP1_MIN_RANGE();
+					tmp->max = OP1_MAX_RANGE();
+					tmp->underflow = OP1_RANGE_UNDERFLOW();
+					tmp->overflow  = OP1_RANGE_OVERFLOW();
+					return 1;
+				}
+			}
+			break;
 		case ZEND_ASSIGN:
 			if (info->ssa.op[line].op1_def == var || info->ssa.op[line].op2_def == var || info->ssa.op[line].result_def == var) {
 				if (OP2_HAS_RANGE()) {
@@ -3824,9 +3838,18 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 				UPDATE_SSA_TYPE((MAY_BE_NULL|MAY_BE_UNDEF|MAY_BE_RCN), ssa_op[i].op1_def);
 			}
 			break;
+		case ZEND_UNSET_DIM:
+		case ZEND_UNSET_OBJ:
+			if (ssa_op[i].op1_def >= 0) {
+				UPDATE_SSA_TYPE(t1, ssa_op[i].op1_def);
+				if ((t1 & MAY_BE_OBJECT) && ssa_op[i].op1_use >= 0 && ssa_var_info[ssa_op[i].op1_use].ce) {
+					UPDATE_SSA_OBJ_TYPE(ssa_var_info[ssa_op[i].op1_use].ce, ssa_var_info[ssa_op[i].op1_use].is_instanceof, ssa_op[i].op1_def);
+				} else {
+					UPDATE_SSA_OBJ_TYPE(NULL, 0, ssa_op[i].op1_def);
+				}
+			}
+			break;
 //		case ZEND_INCLUDE_OR_EVAL:
-//		case ZEND_UNSET_DIM:
-//		case ZEND_UNSET_OBJ:
 //		case ZEND_ISSET_ISEMPTY_VAR:
 // TODO: ???
 //			break;
