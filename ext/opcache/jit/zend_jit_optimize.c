@@ -1371,14 +1371,18 @@ static int zend_jit_calc_range(zend_jit_context *ctx, zend_op_array *op_array, i
 					tmp->min = 0;
 					tmp->max = 0;
 					return 1;
-				} else if (opline->extended_value == IS_FALSE) {
-					tmp->min = 0;
-					tmp->max = 0;
-					return 1;
-				} else if (opline->extended_value == IS_TRUE) {
-					tmp->min = 1;
-					tmp->max = 1;
-					return 1;
+				} else if (opline->extended_value == _IS_BOOL) {
+					if (OP1_HAS_RANGE()) {
+						op1_min = OP1_MIN_RANGE();
+						op1_max = OP1_MAX_RANGE();
+						tmp->min = (op1_min > 0 || op1_max < 0);
+						tmp->max = (op1_min != 0 || op1_max != 0);
+						return 1;
+					} else {
+						tmp->min = 0;
+						tmp->max = 1;
+						return 1;
+					}
 				} else if (opline->extended_value == IS_LONG) {
 					if (OP1_HAS_RANGE()) {
 						tmp->min = OP1_MIN_RANGE();
@@ -2897,7 +2901,12 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 			UPDATE_SSA_TYPE(MAY_BE_DEF|MAY_BE_RC1|MAY_BE_FALSE|MAY_BE_TRUE, ssa_op[i].result_def);
 			break;
 		case ZEND_CAST:
-			tmp = MAY_BE_DEF|MAY_BE_RC1 | (1 << (opline->extended_value-1));
+			tmp = MAY_BE_DEF|MAY_BE_RC1;
+			if (opline->extended_value == _IS_BOOL) {
+				tmp |= MAY_BE_TRUE|MAY_BE_FALSE;
+			} else {
+				tmp |= 1 << (opline->extended_value-1);
+			}
 			if (opline->extended_value == IS_ARRAY) {
 				if (t1 & MAY_BE_ARRAY) {
 					tmp |= t1 & (MAY_BE_ARRAY_KEY_ANY | MAY_BE_ARRAY_OF_ANY | MAY_BE_ARRAY_OF_REF);
