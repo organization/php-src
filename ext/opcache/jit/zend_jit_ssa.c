@@ -1006,11 +1006,9 @@ int zend_jit_build_cfg(zend_jit_context *ctx, zend_op_array *op_array)
 				break;
 		}
 	}
-	for (j = 0; j < op_array->last_brk_cont; j++) {
-		if (op_array->brk_cont_array[j].start >= 0) {
-			BB_START(op_array->brk_cont_array[j].start, ZEND_BB_GEN_VAR);
-			BB_START(op_array->brk_cont_array[j].brk, ZEND_BB_KILL_VAR);
-		}
+	for (j = 0; j < op_array->last_live_range; j++) {
+		BB_START(op_array->live_range[j].start, ZEND_BB_GEN_VAR);
+		BB_START(op_array->live_range[j].end, ZEND_BB_KILL_VAR);
 	}
 	if (op_array->last_try_catch) {
 		for (j = 0; j < op_array->last_try_catch; j++) {
