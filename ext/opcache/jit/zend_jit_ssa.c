@@ -528,13 +528,7 @@ void zend_jit_dump_ssa_line(zend_op_array *op_array, const zend_jit_basic_block 
 			fprintf(stderr, " .OP_" ZEND_LONG_FMT, ZEND_OFFSET_TO_OPLINE_NUM(op_array, opline, opline->extended_value));
 		}
 	}
-	if (ZEND_VM_OP1_JMP_ABS & flags) {
-		if (b) {
-			fprintf(stderr, " BB%d", b->successors[n++]);
-		} else {
-			fprintf(stderr, " .OP_%d", opline->op1.opline_num);
-		}
-	} else if (ZEND_VM_OP1_JMP_ADDR & flags) {
+	if (ZEND_VM_OP1_JMP_ADDR & flags) {
 		if (b) {
 			fprintf(stderr, " BB%d", b->successors[n++]);
 		} else {
@@ -556,13 +550,7 @@ void zend_jit_dump_ssa_line(zend_op_array *op_array, const zend_jit_basic_block 
 			zend_jit_dump_var(op_array, EX_VAR_TO_NUM(opline->op1.var));
 		}
 	}
-	if (ZEND_VM_OP2_JMP_ABS & flags) {
-		if (b) {
-			fprintf(stderr, " BB%d", b->successors[n]);
-		} else {
-			fprintf(stderr, " .OP_%d", opline->op2.opline_num);
-		}
-	} else if (ZEND_VM_OP2_JMP_ADDR & flags) {
+	if (ZEND_VM_OP2_JMP_ADDR & flags) {
 		if (b) {
 			fprintf(stderr, " BB%d", b->successors[n]);
 		} else {
@@ -928,16 +916,10 @@ int zend_jit_build_cfg(zend_jit_context *ctx, zend_op_array *op_array)
 			case ZEND_FAST_CALL:
 				info->flags |= ZEND_JIT_FUNC_TOO_DYNAMIC;
 				BB_START(OP_JMP_ADDR(opline, opline->op1) - op_array->opcodes, ZEND_BB_TARGET);
-				if (opline->extended_value) {
-					BB_START(opline->op2.opline_num, ZEND_BB_TARGET);
-				}
 				BB_START(i + 1, ZEND_BB_FOLLOW);
 				break;
 			case ZEND_FAST_RET:
 				info->flags |= ZEND_JIT_FUNC_TOO_DYNAMIC;
-				if (opline->extended_value) {
-					BB_START(opline->op2.opline_num, ZEND_BB_TARGET);
-				}
 				if (i + 1 < op_array->last) {
 					BB_START(i + 1, ZEND_BB_TARGET);
 				}
