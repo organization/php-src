@@ -230,7 +230,7 @@ struct _zend_jit_func_info {
 
 typedef struct _zend_jit_context {
 	zend_arena             *arena;
-	zend_persistent_script *main_persistent_script;
+	zend_script            *main_script;
 	int                     op_arrays_count;
 	zend_op_array         **op_arrays;
 	void                   *codegen_ctx;

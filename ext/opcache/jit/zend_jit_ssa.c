@@ -971,8 +971,8 @@ int zend_jit_build_cfg(zend_jit_context *ctx, zend_op_array *op_array)
 			case ZEND_DECLARE_LAMBDA_FUNCTION: {
 					zend_op_array *lambda_op_array;
 
-					if (ctx->main_persistent_script &&
-					    (lambda_op_array = zend_hash_find_ptr(&ctx->main_persistent_script->function_table, Z_STR_P(RT_CONSTANT(op_array, opline->op1)))) != NULL) {
+					if (ctx->main_script &&
+					    (lambda_op_array = zend_hash_find_ptr(&ctx->main_script->function_table, Z_STR_P(RT_CONSTANT(op_array, opline->op1)))) != NULL) {
 						if (lambda_op_array->type == ZEND_USER_FUNCTION &&
 						    lambda_op_array->static_variables) {
 							// FIXME: Really we should try to perform alias

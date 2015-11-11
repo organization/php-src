@@ -3652,7 +3652,7 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 					// class type hinting...
 					zend_string *lcname = zend_string_tolower(arg_info->class_name);
 					tmp |= MAY_BE_OBJECT;
-					ce = zend_hash_find_ptr(&ctx->main_persistent_script->class_table, lcname);
+					ce = zend_hash_find_ptr(&ctx->main_script->class_table, lcname);
 					if (!ce) {
 						ce = zend_hash_find_ptr(CG(class_table), lcname);
 						if (ce && ce->type != ZEND_INTERNAL_CLASS) {
@@ -3728,7 +3728,7 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 		case ZEND_DECLARE_CLASS:
 		case ZEND_DECLARE_INHERITED_CLASS:
 			UPDATE_SSA_TYPE(MAY_BE_CLASS, ssa_op[i].result_def);
-			if ((ce = zend_hash_find_ptr(&ctx->main_persistent_script->class_table, Z_STR_P(RT_CONSTANT(op_array, opline->op1)))) != NULL) {
+			if ((ce = zend_hash_find_ptr(&ctx->main_script->class_table, Z_STR_P(RT_CONSTANT(op_array, opline->op1)))) != NULL) {
 				UPDATE_SSA_OBJ_TYPE(ce, 0, ssa_op[i].result_def);
 			}
 			break;
@@ -3757,7 +3757,7 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 				}
 			} else if (opline->op2_type == IS_CONST) {
 				if (Z_TYPE_P(RT_CONSTANT(op_array, opline->op2)) == IS_STRING) {
-					if ((ce = zend_hash_find_ptr(&ctx->main_persistent_script->class_table, Z_STR_P(RT_CONSTANT(op_array, opline->op2)+1))) != NULL) {
+					if ((ce = zend_hash_find_ptr(&ctx->main_script->class_table, Z_STR_P(RT_CONSTANT(op_array, opline->op2)+1))) != NULL) {
 						UPDATE_SSA_OBJ_TYPE(ce, 0, ssa_op[i].result_def);
 					} else if ((ce = zend_hash_find_ptr(CG(class_table), Z_STR_P(RT_CONSTANT(op_array, opline->op2)+1))) != NULL &&
 					           ce->type == ZEND_INTERNAL_CLASS) {

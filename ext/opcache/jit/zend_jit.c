@@ -32,7 +32,7 @@
 
 int zend_jit_rid = -1;
 
-static zend_jit_context *zend_jit_context_create(zend_persistent_script* main_persistent_script, size_t arena_size)
+static zend_jit_context *zend_jit_context_create(zend_script* main_script, size_t arena_size)
 {
 	zend_jit_context *ctx;
 	zend_arena *arena = zend_arena_create(arena_size);
@@ -49,14 +49,14 @@ static zend_jit_context *zend_jit_context_create(zend_persistent_script* main_pe
 	memset(ctx, 0, sizeof(sizeof(zend_jit_context)));
 
 	ctx->arena = arena;
-	ctx->main_persistent_script = main_persistent_script;
+	ctx->main_script = main_script;
 
 	return ctx;
 }
 
-static zend_jit_context *zend_jit_start_script(zend_persistent_script* main_persistent_script)
+static zend_jit_context *zend_jit_start_script(zend_script* main_script)
 {
-	return zend_jit_context_create(main_persistent_script,
+	return zend_jit_context_create(main_script,
 			 sizeof(void*) * 4 * 1024 * 1024);
 }
 
@@ -194,7 +194,7 @@ static int zend_jit_op_array_analyze_calls(zend_jit_context *ctx, zend_op_array 
 	    	call_info = NULL;
 	    	switch (opline->opcode) {
 	    		case ZEND_INIT_FCALL:
-					if ((func = zend_hash_find_ptr(&ctx->main_persistent_script->function_table, Z_STR_P(RT_CONSTANT(op_array, opline->op2)))) != NULL) {
+					if ((func = zend_hash_find_ptr(&ctx->main_script->function_table, Z_STR_P(RT_CONSTANT(op_array, opline->op2)))) != NULL) {
 				    	zend_jit_func_info *func_info = JIT_DATA(&func->op_array);
 						if (func_info) {
 						    call_info = zend_jit_context_calloc(ctx, sizeof(zend_jit_call_info) + (sizeof(zend_jit_arg_info) * ((int)opline->extended_value - 1)), 1);
@@ -324,7 +324,7 @@ static int zend_jit_op_array_analyze_ssa(zend_jit_context *ctx, zend_op_array *o
 
 typedef int (*zend_jit_op_array_func_t)(zend_jit_context *ctx, zend_op_array *op_array);
 
-static int zend_jit_foreach_op_array(zend_jit_context *ctx, zend_persistent_script *script, zend_jit_op_array_func_t func)
+static int zend_jit_foreach_op_array(zend_jit_context *ctx, zend_script *script, zend_jit_op_array_func_t func)
 {
 	zend_class_entry *ce;
 	zend_op_array *op_array;
@@ -360,9 +360,9 @@ static void zend_jit_sort_op_arrays(zend_jit_context *ctx)
 }
 
 #if HAVE_VALGRIND
-static int zend_jit_int(zend_persistent_script *script)
+static int zend_jit_int(zend_script *script)
 #else
-int zend_jit(zend_persistent_script *script)
+int zend_jit(zend_script *script)
 #endif
 {
 	int i;
@@ -508,7 +508,7 @@ int zend_jit(zend_persistent_script *script)
 }
 
 #if HAVE_VALGRIND
-int zend_jit(zend_persistent_script *script)
+int zend_jit(zend_script *script)
 {
 	int ret;
 
