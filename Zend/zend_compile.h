@@ -173,7 +173,14 @@ typedef struct _zend_try_catch_element {
 	uint32_t finally_end;
 } zend_try_catch_element;
 
+#define ZEND_LIVE_TMPVAR  0
+#define ZEND_LIVE_LOOP    1
+#define ZEND_LIVE_SILENCE 2
+#define ZEND_LIVE_ROPE    3
+#define ZEND_LIVE_MASK    3
+
 typedef struct _zend_live_range {
+	uint32_t var; /* low bits are used for variable type (ZEND_LIVE_* macros) */
 	uint32_t start;
 	uint32_t end;
 } zend_live_range;
@@ -701,7 +708,7 @@ ZEND_API unary_op_type get_unary_op(int opcode);
 ZEND_API binary_op_type get_binary_op(int opcode);
 
 void zend_stop_lexing(void);
-void zend_emit_final_return(zval *zv);
+void zend_emit_final_return(int return_one);
 zend_ast *zend_ast_append_str(zend_ast *left, zend_ast *right);
 uint32_t zend_add_class_modifier(uint32_t flags, uint32_t new_flag);
 uint32_t zend_add_member_modifier(uint32_t flags, uint32_t new_flag);

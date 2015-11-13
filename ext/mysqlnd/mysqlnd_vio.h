@@ -14,20 +14,15 @@
   +----------------------------------------------------------------------+
   | Authors: Andrey Hristov <andrey@mysql.com>                           |
   |          Ulf Wendel <uwendel@mysql.com>                              |
-  |          Georg Richter <georg@mysql.com>                             |
   +----------------------------------------------------------------------+
 */
-#ifndef MYSQLND_RESULT_H
-#define MYSQLND_RESULT_H
+#ifndef MYSQLND_VIO_H
+#define MYSQLND_VIO_H
 
-PHPAPI MYSQLND_RES * mysqlnd_result_init(const unsigned int field_count, const zend_bool persistent);
-PHPAPI MYSQLND_RES_UNBUFFERED * mysqlnd_result_unbuffered_init(const unsigned int field_count, const zend_bool ps, const zend_bool persistent);
-PHPAPI MYSQLND_RES_BUFFERED_ZVAL * mysqlnd_result_buffered_zval_init(const unsigned int field_count, const zend_bool ps, const zend_bool persistent);
-PHPAPI MYSQLND_RES_BUFFERED_C * mysqlnd_result_buffered_c_init(const unsigned int field_count, const zend_bool ps, const zend_bool persistent);
+PHPAPI MYSQLND_VIO * mysqlnd_vio_init(zend_bool persistent, MYSQLND_STATS * stats, MYSQLND_ERROR_INFO * error_info);
+PHPAPI void mysqlnd_vio_free(MYSQLND_VIO * const vio, MYSQLND_STATS * stats, MYSQLND_ERROR_INFO * error_info);
 
-enum_func_status mysqlnd_query_read_result_set_header(MYSQLND_CONN_DATA * conn, MYSQLND_STMT * stmt);
-
-#endif /* MYSQLND_RESULT_H */
+#endif /* MYSQLND_VIO_H */
 
 /*
  * Local variables:
