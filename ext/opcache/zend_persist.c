@@ -932,7 +932,7 @@ zend_persistent_script *zend_accel_script_persist(zend_persistent_script *script
 
 #ifdef PHP_JIT
 	if (ZCG(accel_directives).jit_buffer_size) {
-		zend_jit(script);
+		zend_jit(&script->script);
 	}
 #endif
 
