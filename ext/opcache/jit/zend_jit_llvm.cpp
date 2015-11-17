@@ -17699,8 +17699,8 @@ static int zend_jit_codegen_ex(zend_jit_context *ctx,
 							llvm_ctx,
 							op_array,
 							opline,
-							TARGET_BB(block[b].successors[1]),
 							TARGET_BB(block[b].successors[0]),
+							TARGET_BB(block[b].successors[1]),
 							-1)) return 0;
 					llvm_ctx.valid_opline = 0;
 					break;
@@ -17776,8 +17776,8 @@ static int zend_jit_codegen_ex(zend_jit_context *ctx,
 					    (opline+1)->op1_type == IS_TMP_VAR &&
 					    (opline+1)->op1.var == RES_OP()->var) {
 						if (!zend_jit_cmp(llvm_ctx, op_array, opline,
-							TARGET_BB(block[b].successors[1]),
 							TARGET_BB(block[b].successors[0]),
+							TARGET_BB(block[b].successors[1]),
 							-1)) return 0;
 						i++;
 					} else {
