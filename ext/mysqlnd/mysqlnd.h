@@ -88,7 +88,7 @@ PHPAPI const MYSQLND_CHARSET * mysqlnd_find_charset_name(const char * const char
 #define mysqlnd_connect(conn, host, user, pass, pass_len, db, db_len, port, socket, mysql_flags, client_api_flags) \
 			mysqlnd_connection_connect((conn), (host), (user), (pass), (pass_len), (db), (db_len), (port), (socket), (mysql_flags), (client_api_flags))
 
-PHPAPI MYSQLND * mysqlnd_connection_init(const size_t client_flags, const zend_bool persistent, struct st_mysqlnd_object_factory_methods * object_factory);
+PHPAPI MYSQLND * mysqlnd_connection_init(const size_t client_flags, const zend_bool persistent, MYSQLND_CLASS_METHODS_TYPE(mysqlnd_object_factory) *object_factory);
 PHPAPI MYSQLND * mysqlnd_connection_connect(MYSQLND * conn,
 											const char * const host,
 											const char * const user,
@@ -267,7 +267,7 @@ PHPAPI void			_mysqlnd_get_client_stats(MYSQLND_STATS * stats, zval *return_valu
 #define MYSQLND_INC_GLOBAL_STATISTIC(statistic) \
 	MYSQLND_INC_STATISTIC(MYSQLND_G(collect_statistics), mysqlnd_global_stats, (statistic))
 
-#define MYSQLND_DEC_CONN_STATISTIC(conn_stats, statistic) \
+#define MYSQLND_DEC_GLOBAL_STATISTIC(statistic) \
 	MYSQLND_DEC_STATISTIC(MYSQLND_G(collect_statistics), mysqlnd_global_stats, (statistic))
 
 #define MYSQLND_INC_GLOBAL_STATISTIC_W_VALUE2(statistic1, value1, statistic2, value2) \
@@ -292,7 +292,7 @@ PHPAPI void			_mysqlnd_get_client_stats(MYSQLND_STATS * stats, zval *return_valu
 #else
 
 #define MYSQLND_INC_GLOBAL_STATISTIC(statistic)
-#define MYSQLND_DEC_CONN_STATISTIC(conn_stats, statistic)
+#define MYSQLND_DEC_GLOBAL_STATISTIC(statistic)
 #define MYSQLND_INC_GLOBAL_STATISTIC_W_VALUE2(statistic1, value1, statistic2, value2)
 #define MYSQLND_INC_CONN_STATISTIC(conn_stats, statistic)
 #define MYSQLND_INC_CONN_STATISTIC_W_VALUE(conn_stats, statistic, value)

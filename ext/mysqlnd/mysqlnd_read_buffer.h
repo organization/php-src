@@ -17,19 +17,9 @@
   +----------------------------------------------------------------------+
 */
 
-#ifndef MYSQLND_PROTOCOL_FRAME_CODEC_H
-#define MYSQLND_PROTOCOL_FRAME_CODEC_H
+#ifndef MYSQLND_READ_BUFFER_H
+#define MYSQLND_READ_BUFFER_H
 
-PHPAPI MYSQLND_PFC * mysqlnd_pfc_init(const zend_bool persistent, MYSQLND_STATS * stats, MYSQLND_ERROR_INFO * error_info);
-PHPAPI void mysqlnd_pfc_free(MYSQLND_PFC * const net, MYSQLND_STATS * stats, MYSQLND_ERROR_INFO * error_info);
+PHPAPI MYSQLND_READ_BUFFER * mysqlnd_create_read_buffer(const size_t count);
 
-#endif /* MYSQLND_PROTOCOL_FRAME_CODEC_H */
-
-/*
- * Local variables:
- * tab-width: 4
- * c-basic-offset: 4
- * End:
- * vim600: noet sw=4 ts=4 fdm=marker
- * vim<600: noet sw=4 ts=4
- */
+#endif /* MYSQLND_READ_BUFFER_H */

@@ -1259,9 +1259,9 @@ MYSQLND_METHOD(mysqlnd_conn_data, send_close)(MYSQLND_CONN_DATA * const conn)
 	DBG_INF_FMT("state=%u", state);
 
 	if (state >= CONN_READY) {
-		MYSQLND_DEC_CONN_STATISTIC(conn->stats, STAT_OPENED_CONNECTIONS);
+		MYSQLND_DEC_GLOBAL_STATISTIC(STAT_OPENED_CONNECTIONS);
 		if (conn->persistent) {
-			MYSQLND_DEC_CONN_STATISTIC(conn->stats, STAT_OPENED_PERSISTENT_CONNECTIONS);
+			MYSQLND_DEC_GLOBAL_STATISTIC(STAT_OPENED_PERSISTENT_CONNECTIONS);
 		}
 	}
 	switch (state) {
@@ -2726,9 +2726,9 @@ PHPAPI MYSQLND * mysqlnd_connection_connect(MYSQLND * conn_handle,
 
 /* {{{ mysqlnd_connection_init */
 PHPAPI MYSQLND *
-mysqlnd_connection_init(const size_t client_flags, const zend_bool persistent, struct st_mysqlnd_object_factory_methods * object_factory)
+mysqlnd_connection_init(const size_t client_flags, const zend_bool persistent, MYSQLND_CLASS_METHODS_TYPE(mysqlnd_object_factory) *object_factory)
 {
-	struct st_mysqlnd_object_factory_methods * factory = object_factory? object_factory : &MYSQLND_CLASS_METHOD_TABLE_NAME(mysqlnd_object_factory);
+	MYSQLND_CLASS_METHODS_TYPE(mysqlnd_object_factory) *factory = object_factory? object_factory : &MYSQLND_CLASS_METHOD_TABLE_NAME(mysqlnd_object_factory);
 	MYSQLND * ret;
 	DBG_ENTER("mysqlnd_connection_init");
 	ret = factory->get_connection(factory, persistent);
