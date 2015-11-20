@@ -30,43 +30,7 @@
 #include <zend_exceptions.h>
 #include "zend_arena.h"
 #include "zend_bitset.h"
-
-/* zend_jit_basic_bloc.flags */
-#define ZEND_BB_TARGET           (1<<0)
-#define ZEND_BB_FOLLOW           (1<<1)
-#define ZEND_BB_ENTRY            (1<<2)
-#define ZEND_BB_EXIT             (1<<3)
-#define ZEND_BB_TRY              (1<<4)
-#define ZEND_BB_CATCH            (1<<5)
-#define ZEND_BB_FINALLY          (1<<6)
-#define ZEND_BB_GEN_VAR          (1<<7)
-#define ZEND_BB_KILL_VAR         (1<<8)
-
-
-#define ZEND_BB_LOOP_HEADER      (1<<15)
-#define ZEND_BB_IRREDUCIBLE_LOOP (1<<16)
-
-#define ZEND_BB_REACHABLE        (1<<31)
-
-typedef struct _zend_basic_block {
-	uint32_t               flags;
-	uint32_t               start;              /* first opcode number         */
-	uint32_t               end;                /* last opcode number          */
-	int                    successors[2];      /* up to 2 successor blocks    */
-	int                    predecessors_count; /* number of predecessors      */
-	int                    predecessor_offset; /* offset of 1-st predecessor  */
-	int                    idom;               /* immediate dominator block   */
-	int                    loop_header;        /* closest loop header, or -1  */
-	int                    level;              /* steps away from the entry in the dom. tree */
-	int                    children;           /* list of dominated blocks    */
-	int                    next_child;         /* next dominated block        */
-} zend_basic_block;
-
-typedef struct _zend_cfg {
-	int                    blocks_count;       /* number of basic blocks      */
-	zend_basic_block      *blocks;             /* array of basic blocks       */
-	int                   *predecessors;
-} zend_cfg;
+#include "Optimizer/zend_cfg.h"
 
 typedef struct _zend_jit_range {
 	zend_long              min;
@@ -156,9 +120,9 @@ typedef struct _zend_jit_ssa_var_info {
 	unsigned int           use_as_double : 1;
 } zend_jit_ssa_var_info;
 
-#define ZEND_JIT_FUNC_TOO_DYNAMIC              (1<<0)
-#define ZEND_JIT_FUNC_VARARG                   (1<<1)
-#define ZEND_JIT_FUNC_HAS_CALLS                (1<<2) 
+#define ZEND_JIT_FUNC_TOO_DYNAMIC              ZEND_FUNC_TOO_DYNAMIC
+#define ZEND_JIT_FUNC_HAS_CALLS                ZEND_FUNC_HAS_CALLS
+#define ZEND_JIT_FUNC_VARARG                   ZEND_FUNC_VARARG
 #define ZEND_JIT_FUNC_HAS_PREALLOCATED_CVS     (1<<3) 
 #define ZEND_JIT_FUNC_MAY_COMPILE              (1<<4)
 #define ZEND_JIT_FUNC_RECURSIVE                (1<<5)
