@@ -334,8 +334,8 @@ void zend_jit_dump_ssa_var(zend_op_array *op_array, int ssa_var_num, int var_num
 	zend_jit_dump_var(op_array, var_num);
 	fprintf(stderr, ")");
 
-	if (info->ssa.var) {
-		if (ssa_var_num >= 0 && info->ssa.var[ssa_var_num].no_val) {
+	if (info->ssa.vars) {
+		if (ssa_var_num >= 0 && info->ssa.vars[ssa_var_num].no_val) {
 			fprintf(stderr, " NOVAL");
 		}
 		zend_jit_dump_ssa_var_info(info, ssa_var_num);
@@ -369,7 +369,7 @@ static void zend_jit_dump_var_set(
 
 static void zend_jit_dump_block_info(
 	zend_op_array *op_array,
-	zend_jit_basic_block *block,
+	zend_basic_block *block,
 	int n)
 {
 	(void) op_array;
@@ -424,12 +424,12 @@ static void zend_jit_dump_block_info(
 	}
 	if (block[n].predecessors_count) {
 		zend_jit_func_info *info = JIT_DATA(op_array);
-		int *predecessor = info->cfg.predecessor;
+		int *predecessors = info->cfg.predecessors;
 		int j;
 
 		fprintf(stderr, "    ; predecessors={");
 		for (j = 0; j < block[n].predecessors_count; j++) {
-			fprintf(stderr, j ? ", %d" : "%d", predecessor[block[n].predecessor_offset + j]);
+			fprintf(stderr, j ? ", %d" : "%d", predecessors[block[n].predecessor_offset + j]);
 		}
 		fprintf(stderr, "}\n");
 	}
@@ -454,38 +454,38 @@ static void zend_jit_dump_block_info(
 void zend_jit_dump_ssa_bb_header(zend_op_array *op_array, uint32_t line)
 {
 	zend_jit_func_info *info = JIT_DATA(op_array);
-	zend_jit_basic_block *block = info->cfg.block;
-	zend_jit_ssa_block *ssa_block = info->ssa.block;
-	int blocks = info->cfg.blocks;
+	zend_basic_block *blocks = info->cfg.blocks;
+	zend_jit_ssa_block *ssa_blocks = info->ssa.blocks;
+	int blocks_count = info->cfg.blocks_count;
 	int n;
 
-	if (!block) return;
+	if (!blocks) return;
 
-	for (n = 0; n < blocks; n++) {
-		if (line == block[n].start) break;
+	for (n = 0; n < blocks_count; n++) {
+		if (line == blocks[n].start) break;
 	}
-	if (n < blocks && line == block[n].start) {
-		zend_jit_dump_block_info(op_array, block, n);
-		if (ssa_block && ssa_block[n].phis) {
-			zend_jit_ssa_phi *p = ssa_block[n].phis;
+	if (n < blocks_count && line == blocks[n].start) {
+		zend_jit_dump_block_info(op_array, blocks, n);
+		if (ssa_blocks && ssa_blocks[n].phis) {
+			zend_jit_ssa_phi *p = ssa_blocks[n].phis;
 
 			do {
 				int j;
 
 				fprintf(stderr, "    ");
-				zend_jit_dump_ssa_var(op_array, p->ssa_var, p->var, block[n].start);
+				zend_jit_dump_ssa_var(op_array, p->ssa_var, p->var, blocks[n].start);
 				if (p->pi < 0) {
 					fprintf(stderr, " = Phi(");
-					for (j = 0; j < block[n].predecessors_count; j++) {
+					for (j = 0; j < blocks[n].predecessors_count; j++) {
 						if (j > 0) {
 							fprintf(stderr, ", ");
 						}
-						zend_jit_dump_ssa_var(op_array, p->sources[j], p->var, block[n].start);
+						zend_jit_dump_ssa_var(op_array, p->sources[j], p->var, blocks[n].start);
 					}
 					fprintf(stderr, ")\n");
 				} else {
 					fprintf(stderr, " = Pi(");
-					zend_jit_dump_ssa_var(op_array, p->sources[0], p->var, block[n].start);
+					zend_jit_dump_ssa_var(op_array, p->sources[0], p->var, blocks[n].start);
 					fprintf(stderr, " &");
 					zend_jit_dump_pi_range(op_array, &p->constraint);
 					fprintf(stderr, ")\n");
@@ -496,23 +496,23 @@ void zend_jit_dump_ssa_bb_header(zend_op_array *op_array, uint32_t line)
 	}
 }
 
-void zend_jit_dump_ssa_line(zend_op_array *op_array, const zend_jit_basic_block *b, uint32_t line)
+void zend_jit_dump_ssa_line(zend_op_array *op_array, const zend_basic_block *b, uint32_t line)
 {
 	zend_jit_func_info *info = JIT_DATA(op_array);
-	zend_jit_ssa_op *ssa_op = info->ssa.op;
+	zend_jit_ssa_op *ssa_ops = info->ssa.ops;
 	zend_op *opline = op_array->opcodes + line;
 	const char *name = zend_get_opcode_name(opline->opcode);
 	uint32_t flags = zend_get_opcode_flags(opline->opcode);
 	int n = 0;
 
 	fprintf(stderr, "    ");
-	if (ssa_op) {
-		if (ssa_op[line].result_def >= 0) {
-			if (ssa_op[line].result_use >= 0) {
-				zend_jit_dump_ssa_var(op_array, ssa_op[line].result_use, EX_VAR_TO_NUM(opline->result.var), line);
+	if (ssa_ops) {
+		if (ssa_ops[line].result_def >= 0) {
+			if (ssa_ops[line].result_use >= 0) {
+				zend_jit_dump_ssa_var(op_array, ssa_ops[line].result_use, EX_VAR_TO_NUM(opline->result.var), line);
 				fprintf(stderr, " -> ");
 			}
-			zend_jit_dump_ssa_var(op_array, ssa_op[line].result_def, EX_VAR_TO_NUM(opline->result.var), line);
+			zend_jit_dump_ssa_var(op_array, ssa_ops[line].result_def, EX_VAR_TO_NUM(opline->result.var), line);
 			fprintf(stderr, " = ");
 		}
 	} else if (opline->result_type == IS_CV || opline->result_type == IS_VAR || opline->result_type == IS_TMP_VAR) {
@@ -533,11 +533,11 @@ void zend_jit_dump_ssa_line(zend_op_array *op_array, const zend_jit_basic_block 
 		zend_jit_dump_const(RT_CONSTANT(op_array, opline->op1));
 	} else if (opline->op1_type == IS_CV || opline->op1_type == IS_VAR || opline->op1_type == IS_TMP_VAR) {
 	    fprintf(stderr, " ");
-	    if (ssa_op) {
-			zend_jit_dump_ssa_var(op_array, ssa_op[line].op1_use, EX_VAR_TO_NUM(opline->op1.var), line);
-			if (ssa_op[line].op1_def >= 0) {
+	    if (ssa_ops) {
+			zend_jit_dump_ssa_var(op_array, ssa_ops[line].op1_use, EX_VAR_TO_NUM(opline->op1.var), line);
+			if (ssa_ops[line].op1_def >= 0) {
 			    fprintf(stderr, " -> ");
-				zend_jit_dump_ssa_var(op_array, ssa_op[line].op1_def, EX_VAR_TO_NUM(opline->op1.var), line);
+				zend_jit_dump_ssa_var(op_array, ssa_ops[line].op1_def, EX_VAR_TO_NUM(opline->op1.var), line);
 			}
 		} else {
 			zend_jit_dump_var(op_array, EX_VAR_TO_NUM(opline->op1.var));
@@ -555,11 +555,11 @@ void zend_jit_dump_ssa_line(zend_op_array *op_array, const zend_jit_basic_block 
 		zend_jit_dump_const(RT_CONSTANT(op_array, opline->op2));
 	} else if (opline->op2_type == IS_CV ||  opline->op2_type == IS_VAR || opline->op2_type == IS_TMP_VAR) {
 	    fprintf(stderr, " ");
-	    if (ssa_op) {
-			zend_jit_dump_ssa_var(op_array, ssa_op[line].op2_use, EX_VAR_TO_NUM(opline->op2.var), line);
-			if (ssa_op[line].op2_def >= 0) {
+	    if (ssa_ops) {
+			zend_jit_dump_ssa_var(op_array, ssa_ops[line].op2_use, EX_VAR_TO_NUM(opline->op2.var), line);
+			if (ssa_ops[line].op2_def >= 0) {
 			    fprintf(stderr, " -> ");
-				zend_jit_dump_ssa_var(op_array, ssa_op[line].op2_def, EX_VAR_TO_NUM(opline->op2.var), line);
+				zend_jit_dump_ssa_var(op_array, ssa_ops[line].op2_def, EX_VAR_TO_NUM(opline->op2.var), line);
 			}
 		} else {
 			zend_jit_dump_var(op_array, EX_VAR_TO_NUM(opline->op2.var));
@@ -580,8 +580,8 @@ void zend_jit_dump_ssa_line(zend_op_array *op_array, const zend_jit_basic_block 
 static void zend_jit_dump_ssa(zend_op_array *op_array)
 {
 	zend_jit_func_info *info = JIT_DATA(op_array);
-	int blocks = info->cfg.blocks;
-	int ssa_vars = info->ssa.vars;
+	int blocks_count = info->cfg.blocks_count;
+	int ssa_vars_count = info->ssa.vars_count;
 	uint32_t i, j;
 	int k;
 
@@ -603,8 +603,8 @@ static void zend_jit_dump_ssa(zend_op_array *op_array)
 		info->num_args,
 		op_array->last_var,
 		op_array->T,
-		blocks,
-		ssa_vars);
+		blocks_count,
+		ssa_vars_count);
 	if (info->flags & ZEND_JIT_FUNC_RECURSIVE) {
 		fprintf(stderr, ", recursive");
 		if (info->flags & ZEND_JIT_FUNC_RECURSIVE_DIRECTLY) {
@@ -677,8 +677,8 @@ static void zend_jit_dump_ssa(zend_op_array *op_array)
 		}
 	}
 #endif
-	for (k = 0; k < info->cfg.blocks; k++) {
-		const zend_jit_basic_block *b = info->cfg.block + k;
+	for (k = 0; k < info->cfg.blocks_count; k++) {
+		const zend_basic_block *b = info->cfg.blocks + k;
 
 		zend_jit_dump_ssa_bb_header(op_array,  b->start);
 		for (j = b->start; j <= b->end; j++) {
@@ -692,7 +692,7 @@ static void zend_jit_dump_ssa(zend_op_array *op_array)
 				case ZEND_JMP:
 					break;
 				default:
-					fprintf(stderr, "    JMP BB%d [implicit]\n", info->cfg.block[k].successors[0]);
+					fprintf(stderr, "    JMP BB%d [implicit]\n", info->cfg.blocks[k].successors[0]);
 					break;
 			}
 		}
@@ -703,29 +703,29 @@ void zend_jit_dump(zend_op_array *op_array, uint32_t flags)
 {
 	int j;
 	zend_jit_func_info *info = JIT_DATA(op_array);
-	zend_jit_basic_block *block = info->cfg.block;
-	zend_jit_ssa_block *ssa_block = info->ssa.block;
-	int blocks = info->cfg.blocks;
+	zend_basic_block *blocks = info->cfg.blocks;
+	zend_jit_ssa_block *ssa_blocks = info->ssa.blocks;
+	int blocks_count = info->cfg.blocks_count;
 
 	if (flags & JIT_DUMP_CFG) {
-		fprintf(stderr, "CFG (lines=%d, blocks=%d)\n", op_array->last, blocks);
-		for (j = 0; j < blocks; j++) {
-			zend_jit_dump_block_info(op_array, block, j);
+		fprintf(stderr, "CFG (lines=%d, blocks=%d)\n", op_array->last, blocks_count);
+		for (j = 0; j < blocks_count; j++) {
+			zend_jit_dump_block_info(op_array, blocks, j);
 		}
 	}
 
 	if (flags & JIT_DUMP_DOMINATORS) {
 		fprintf(stderr, "Dominators Tree\n");
-		for (j = 0; j < blocks; j++) {
-			zend_jit_dump_block_info(op_array, block, j);
+		for (j = 0; j < blocks_count; j++) {
+			zend_jit_dump_block_info(op_array, blocks, j);
 		}
 	}
 
 	if (flags & JIT_DUMP_PHI_PLACEMENT) {
 		fprintf(stderr, "SSA Phi() Placement\n");
-		for (j = 0; j < blocks; j++) {
-			if (ssa_block && ssa_block[j].phis) {
-				zend_jit_ssa_phi *p = ssa_block[j].phis;
+		for (j = 0; j < blocks_count; j++) {
+			if (ssa_blocks && ssa_blocks[j].phis) {
+				zend_jit_ssa_phi *p = ssa_blocks[j].phis;
 				int first = 1;
 
 				fprintf(stderr, "  BB%d:\n", j);
@@ -764,7 +764,7 @@ void zend_jit_dump(zend_op_array *op_array, uint32_t flags)
 		}
 	}
 
-	if ((flags & JIT_DUMP_VAR_TYPES) && info->ssa.var) {
+	if ((flags & JIT_DUMP_VAR_TYPES) && info->ssa.vars) {
 		fprintf(stderr, "SSA Variable Types for \"");
 		if (op_array->function_name) {
 			if (op_array->scope && op_array->scope->name) {
@@ -775,17 +775,17 @@ void zend_jit_dump(zend_op_array *op_array, uint32_t flags)
 		} else {
 			fprintf(stderr, "%s\":\n", "$_main");
 		}
-		for (j = 0; j < info->ssa.vars; j++) {
+		for (j = 0; j < info->ssa.vars_count; j++) {
 			fprintf(stderr, "  #%d(", j);
-			zend_jit_dump_var(op_array, info->ssa.var[j].var);
+			zend_jit_dump_var(op_array, info->ssa.vars[j].var);
 			fprintf(stderr, ")");
-			if (info->ssa.var[j].scc >= 0) {
-				if (info->ssa.var[j].scc_entry) {
+			if (info->ssa.vars[j].scc >= 0) {
+				if (info->ssa.vars[j].scc_entry) {
 					fprintf(stderr, " *");
 				}  else {
 					fprintf(stderr, "  ");
 				}
-				fprintf(stderr, "SCC=%d", info->ssa.var[j].scc);
+				fprintf(stderr, "SCC=%d", info->ssa.vars[j].scc);
 			}
 			zend_jit_dump_ssa_var_info(info, j);
 			if (info->ssa_var_info && info->ssa_var_info[j].has_range) {
@@ -801,17 +801,17 @@ void zend_jit_dump(zend_op_array *op_array, uint32_t flags)
 
 }
 
-static void zend_jit_mark_reachable(zend_jit_basic_block *block, int n)
+static void zend_jit_mark_reachable(zend_basic_block *blocks, int n)
 {
 	while (1) {
-		if (block[n].flags & ZEND_BB_REACHABLE) return;
-		block[n].flags |= ZEND_BB_REACHABLE;
-		if (block[n].successors[0] >= 0) {
-			if (block[n].successors[1] >= 0) {
-				zend_jit_mark_reachable(block, block[n].successors[0]);
-				n = block[n].successors[1];
+		if (blocks[n].flags & ZEND_BB_REACHABLE) return;
+		blocks[n].flags |= ZEND_BB_REACHABLE;
+		if (blocks[n].successors[0] >= 0) {
+			if (blocks[n].successors[1] >= 0) {
+				zend_jit_mark_reachable(blocks, blocks[n].successors[0]);
+				n = blocks[n].successors[1];
 			} else {
-				n = block[n].successors[0];
+				n = blocks[n].successors[0];
 			}
 		} else {
 			return;
@@ -819,14 +819,14 @@ static void zend_jit_mark_reachable(zend_jit_basic_block *block, int n)
 	}
 }
 
-static void record_successor(zend_jit_basic_block *block, int pred, int n, int succ)
+static void record_successor(zend_basic_block *blocks, int pred, int n, int succ)
 {
-	block[pred].successors[n] = succ;
-	block[succ].predecessors_count++;
+	blocks[pred].successors[n] = succ;
+	blocks[succ].predecessors_count++;
 }
 
 #define BB_START(i, flag) do { \
-		if (!block_map[i]) { blocks++;} \
+		if (!block_map[i]) { blocks_count++;} \
 		block_map[i] |= (flag); \
 	} while (0)
 
@@ -837,9 +837,9 @@ int zend_jit_build_cfg(zend_jit_context *ctx, zend_op_array *op_array)
 	int j;
 	uint32_t *block_map;
 	zend_function *fn;
-	int blocks = 0;
+	int blocks_count = 0;
 	int edges, predecessor_offset;
-	zend_jit_basic_block *block;
+	zend_basic_block *blocks;
 
 	block_map = alloca(sizeof(uint32_t) * op_array->last);
 	if (!block_map) {
@@ -1025,43 +1025,43 @@ int zend_jit_build_cfg(zend_jit_context *ctx, zend_op_array *op_array)
 		}
 	}
 
-	info->cfg.blocks = blocks;
+	info->cfg.blocks_count = blocks_count;
 
 	/* Build CFG, Step 2: Build Array of Basic Blocks */
-	info->cfg.block = block = zend_jit_context_calloc(ctx, sizeof(zend_jit_basic_block), info->cfg.blocks);
-	if (!block) {
+	info->cfg.blocks = blocks = zend_jit_context_calloc(ctx, sizeof(zend_basic_block), info->cfg.blocks_count);
+	if (!blocks) {
 		return FAILURE;
 	}
 
-	for (i = 0, blocks = -1; i < op_array->last; i++) {
+	for (i = 0, blocks_count = -1; i < op_array->last; i++) {
 		if (block_map[i]) {
-			if (blocks >= 0) {
-				block[blocks].end = i - 1;
+			if (blocks_count >= 0) {
+				blocks[blocks_count].end = i - 1;
 			}
-			blocks++;
-			block[blocks].flags = block_map[i];
-			block[blocks].start = i;
-			block[blocks].successors[0] = -1;
-			block[blocks].successors[1] = -1;
-			block[blocks].predecessors_count = 0;
-			block[blocks].predecessor_offset = -1;
-			block[blocks].idom = -1;
-			block[blocks].loop_header = -1;
-			block[blocks].level = -1;
-			block[blocks].children = -1;
-			block[blocks].next_child = -1;
-			block_map[i] = blocks;
+			blocks_count++;
+			blocks[blocks_count].flags = block_map[i];
+			blocks[blocks_count].start = i;
+			blocks[blocks_count].successors[0] = -1;
+			blocks[blocks_count].successors[1] = -1;
+			blocks[blocks_count].predecessors_count = 0;
+			blocks[blocks_count].predecessor_offset = -1;
+			blocks[blocks_count].idom = -1;
+			blocks[blocks_count].loop_header = -1;
+			blocks[blocks_count].level = -1;
+			blocks[blocks_count].children = -1;
+			blocks[blocks_count].next_child = -1;
+			block_map[i] = blocks_count;
 		} else {
 			block_map[i] = (uint32_t)-1;
 		}
 	}
 
-	block[blocks].end = i - 1;
-	blocks++;
+	blocks[blocks_count].end = i - 1;
+	blocks_count++;
 
 	/* Build CFG, Step 3: Calculate successors */
-	for (j = 0; j < blocks; j++) {
-		zend_op *opline = op_array->opcodes + block[j].end;
+	for (j = 0; j < blocks_count; j++) {
+		zend_op *opline = op_array->opcodes + blocks[j].end;
 		switch(opline->opcode) {
 			case ZEND_FAST_RET:
 			case ZEND_RETURN:
@@ -1069,7 +1069,7 @@ int zend_jit_build_cfg(zend_jit_context *ctx, zend_op_array *op_array)
 			case ZEND_GENERATOR_RETURN:
 			case ZEND_EXIT:
 			case ZEND_THROW:
-				block[j].flags |= ZEND_BB_EXIT;
+				blocks[j].flags |= ZEND_BB_EXIT;
 				break;
 #if 0 // LLVM backend doesn't support generators and stackless VM
 			case ZEND_DO_FCALL:
@@ -1078,20 +1078,20 @@ int zend_jit_build_cfg(zend_jit_context *ctx, zend_op_array *op_array)
 			case ZEND_INCLUDE_OR_EVAL:
 			case ZEND_YIELD:
 			case ZEND_YIELD_FROM:
-				record_successor(block, j, 0, j + 1);
+				record_successor(blocks, j, 0, j + 1);
 				break;
 #endif
 			case ZEND_DECLARE_ANON_CLASS:
 			case ZEND_DECLARE_ANON_INHERITED_CLASS:
-				record_successor(block, j, 0, block_map[OP_JMP_ADDR(opline, opline->op1) - op_array->opcodes]);
-				record_successor(block, j, 1, j + 1);
+				record_successor(blocks, j, 0, block_map[OP_JMP_ADDR(opline, opline->op1) - op_array->opcodes]);
+				record_successor(blocks, j, 1, j + 1);
 				break;
 			case ZEND_JMP:
-				record_successor(block, j, 0, block_map[OP_JMP_ADDR(opline, opline->op1) - op_array->opcodes]);
+				record_successor(blocks, j, 0, block_map[OP_JMP_ADDR(opline, opline->op1) - op_array->opcodes]);
 				break;
 			case ZEND_JMPZNZ:
-				record_successor(block, j, 0, block_map[OP_JMP_ADDR(opline, opline->op2) - op_array->opcodes]);
-				record_successor(block, j, 1, block_map[ZEND_OFFSET_TO_OPLINE_NUM(op_array, opline, opline->extended_value)]);
+				record_successor(blocks, j, 0, block_map[OP_JMP_ADDR(opline, opline->op2) - op_array->opcodes]);
+				record_successor(blocks, j, 1, block_map[ZEND_OFFSET_TO_OPLINE_NUM(op_array, opline, opline->extended_value)]);
 				break;
 			case ZEND_JMPZ:
 			case ZEND_JMPNZ:
@@ -1100,83 +1100,83 @@ int zend_jit_build_cfg(zend_jit_context *ctx, zend_op_array *op_array)
 			case ZEND_JMP_SET:
 			case ZEND_COALESCE:
 			case ZEND_ASSERT_CHECK:
-				record_successor(block, j, 0, block_map[OP_JMP_ADDR(opline, opline->op2) - op_array->opcodes]);
-				record_successor(block, j, 1, j + 1);
+				record_successor(blocks, j, 0, block_map[OP_JMP_ADDR(opline, opline->op2) - op_array->opcodes]);
+				record_successor(blocks, j, 1, j + 1);
 				break;
 			case ZEND_CATCH:
 				if (!opline->result.num) {
-					record_successor(block, j, 0, block_map[ZEND_OFFSET_TO_OPLINE_NUM(op_array, opline, opline->extended_value)]);
-					record_successor(block, j, 1, j + 1);
+					record_successor(blocks, j, 0, block_map[ZEND_OFFSET_TO_OPLINE_NUM(op_array, opline, opline->extended_value)]);
+					record_successor(blocks, j, 1, j + 1);
 				} else {
-					record_successor(block, j, 0, j + 1);
+					record_successor(blocks, j, 0, j + 1);
 				}
 				break;
 			case ZEND_FE_FETCH_R:
 			case ZEND_FE_FETCH_RW:
-				record_successor(block, j, 0, block_map[ZEND_OFFSET_TO_OPLINE_NUM(op_array, opline, opline->extended_value)]);
-				record_successor(block, j, 1, j + 1);
+				record_successor(blocks, j, 0, block_map[ZEND_OFFSET_TO_OPLINE_NUM(op_array, opline, opline->extended_value)]);
+				record_successor(blocks, j, 1, j + 1);
 				break;
 			case ZEND_FE_RESET_R:
 			case ZEND_FE_RESET_RW:
 			case ZEND_NEW:
-				record_successor(block, j, 0, block_map[OP_JMP_ADDR(opline, opline->op2) - op_array->opcodes]);
-				record_successor(block, j, 1, j + 1);
+				record_successor(blocks, j, 0, block_map[OP_JMP_ADDR(opline, opline->op2) - op_array->opcodes]);
+				record_successor(blocks, j, 1, j + 1);
 				break;
 			case ZEND_FAST_CALL:
-				record_successor(block, j, 0, block_map[OP_JMP_ADDR(opline, opline->op1) - op_array->opcodes]);
-				record_successor(block, j, 1, j + 1);
+				record_successor(blocks, j, 0, block_map[OP_JMP_ADDR(opline, opline->op1) - op_array->opcodes]);
+				record_successor(blocks, j, 1, j + 1);
 				break;
 			default:
-				block[j + 1].flags |= ZEND_BB_FOLLOW;
-				record_successor(block, j, 0, j + 1);
+				blocks[j + 1].flags |= ZEND_BB_FOLLOW;
+				record_successor(blocks, j, 0, j + 1);
 				break;
 		}
 	}
 
 	/* Build CFG, Step 4, Mark Reachable Basic Blocks */
-	zend_jit_mark_reachable(block, 0);
+	zend_jit_mark_reachable(blocks, 0);
 	if (op_array->last_try_catch) {
 		for (j = 0; j < op_array->last_try_catch; j++) {
-			if (block[block_map[op_array->try_catch_array[j].try_op]].flags  & ZEND_BB_REACHABLE) {
-				zend_jit_mark_reachable(block, block_map[op_array->try_catch_array[j].catch_op]);
-				zend_jit_mark_reachable(block, block_map[op_array->try_catch_array[j].finally_op]);
+			if (blocks[block_map[op_array->try_catch_array[j].try_op]].flags  & ZEND_BB_REACHABLE) {
+				zend_jit_mark_reachable(blocks, block_map[op_array->try_catch_array[j].catch_op]);
+				zend_jit_mark_reachable(blocks, block_map[op_array->try_catch_array[j].finally_op]);
 			}
 		}
 	}
 
 	/* Build CFG, Step 5: Calculate predecessors */
 	edges = 0;
-	for (j = 0; j < blocks; j++) {
-		if ((block[j].flags & ZEND_BB_REACHABLE) == 0) {
-			block[j].successors[0] = -1;
-			block[j].successors[1] = -1;
-			block[j].predecessors_count = 0;
+	for (j = 0; j < blocks_count; j++) {
+		if ((blocks[j].flags & ZEND_BB_REACHABLE) == 0) {
+			blocks[j].successors[0] = -1;
+			blocks[j].successors[1] = -1;
+			blocks[j].predecessors_count = 0;
 		} else {
-			edges += block[j].predecessors_count;
+			edges += blocks[j].predecessors_count;
 		}
 	}
 
-	info->cfg.predecessor = (int*)zend_jit_context_calloc(ctx, sizeof(int), edges);
+	info->cfg.predecessors = (int*)zend_jit_context_calloc(ctx, sizeof(int), edges);
 
-	if (!info->cfg.predecessor) {
+	if (!info->cfg.predecessors) {
 		return FAILURE;
 	}
 
 	predecessor_offset = 0;
-	for (j = 0; j < blocks; j++) {
-		if (block[j].flags & ZEND_BB_REACHABLE) {
-			block[j].predecessor_offset = predecessor_offset;
-			predecessor_offset += block[j].predecessors_count;
-			block[j].predecessors_count = 0;
+	for (j = 0; j < blocks_count; j++) {
+		if (blocks[j].flags & ZEND_BB_REACHABLE) {
+			blocks[j].predecessor_offset = predecessor_offset;
+			predecessor_offset += blocks[j].predecessors_count;
+			blocks[j].predecessors_count = 0;
 		}
 	}
 
-	for (j = 0; j < blocks; j++) {
-		if ((block[j].flags & ZEND_BB_REACHABLE)) {
+	for (j = 0; j < blocks_count; j++) {
+		if ((blocks[j].flags & ZEND_BB_REACHABLE)) {
 			for (i = 0; i < 2; i++) {
-				if (block[j].successors[i] >= 0) {
-					zend_jit_basic_block *b = &block[block[j].successors[i]];
-					info->cfg.predecessor[b->predecessor_offset + b->predecessors_count] = j;
+				if (blocks[j].successors[i] >= 0) {
+					zend_basic_block *b = &blocks[blocks[j].successors[i]];
+					info->cfg.predecessors[b->predecessor_offset + b->predecessors_count] = j;
 					b->predecessors_count++;
 				}
 			}
@@ -1193,81 +1193,81 @@ int zend_jit_build_cfg(zend_jit_context *ctx, zend_op_array *op_array)
 static int zend_jit_compute_dominators_tree(zend_op_array *op_array)
 {
 	zend_jit_func_info *info = JIT_DATA(op_array);
-	zend_jit_basic_block *block = info->cfg.block;
-	int blocks = info->cfg.blocks;
+	zend_basic_block *blocks = info->cfg.blocks;
+	int blocks_count = info->cfg.blocks_count;
 	int j, k, changed;
 
 	/* FIXME: move declarations */
-	block[0].idom = 0;
+	blocks[0].idom = 0;
 	do {
 		changed = 0;
-		for (j = 1; j < blocks; j++) {
+		for (j = 1; j < blocks_count; j++) {
 			int idom = -1;
 
-			if ((block[j].flags & ZEND_BB_REACHABLE) == 0) {
+			if ((blocks[j].flags & ZEND_BB_REACHABLE) == 0) {
 				continue;
 			}
-			for (k = 0; k < block[j].predecessors_count; k++) {
-				int pred = info->cfg.predecessor[block[j].predecessor_offset + k];
+			for (k = 0; k < blocks[j].predecessors_count; k++) {
+				int pred = info->cfg.predecessors[blocks[j].predecessor_offset + k];
 
 				if (idom < 0) {
-					if (block[pred].idom >= 0)
+					if (blocks[pred].idom >= 0)
 						idom = pred;
 					continue;
 				}
 
-				if (block[pred].idom >= 0) {
+				if (blocks[pred].idom >= 0) {
 					while (idom != pred) {
-						while (pred > idom) pred = block[pred].idom;
-						while (idom > pred) idom = block[idom].idom;
+						while (pred > idom) pred = blocks[pred].idom;
+						while (idom > pred) idom = blocks[idom].idom;
 					}
 				}
 			}
 
-			if (idom >= 0 && block[j].idom != idom) {
-				block[j].idom = idom;
+			if (idom >= 0 && blocks[j].idom != idom) {
+				blocks[j].idom = idom;
 				changed = 1;
 			}
 		}
 	} while (changed);
-	block[0].idom = -1;
+	blocks[0].idom = -1;
 
-	for (j = 1; j < blocks; j++) {
-		if ((block[j].flags & ZEND_BB_REACHABLE) == 0) {
+	for (j = 1; j < blocks_count; j++) {
+		if ((blocks[j].flags & ZEND_BB_REACHABLE) == 0) {
 			continue;
 		}
-		if (block[j].idom >= 0) {
+		if (blocks[j].idom >= 0) {
 			/* Sort by block number to traverse children in pre-order */
-			if (block[block[j].idom].children < 0 ||
-			    j < block[block[j].idom].children) {
-				block[j].next_child = block[block[j].idom].children;
-				block[block[j].idom].children = j;
+			if (blocks[blocks[j].idom].children < 0 ||
+			    j < blocks[blocks[j].idom].children) {
+				blocks[j].next_child = blocks[blocks[j].idom].children;
+				blocks[blocks[j].idom].children = j;
 			} else {
-				int k = block[block[j].idom].children;
-				while (block[k].next_child >=0 && j > block[k].next_child) {
-					k = block[k].next_child;
+				int k = blocks[blocks[j].idom].children;
+				while (blocks[k].next_child >=0 && j > blocks[k].next_child) {
+					k = blocks[k].next_child;
 				}
-				block[j].next_child = block[k].next_child;
-				block[k].next_child = j;
+				blocks[j].next_child = blocks[k].next_child;
+				blocks[k].next_child = j;
 			}
 		}
 	}
 
-	for (j = 0; j < blocks; j++) {
-		int idom = block[j].idom, level = 0;
-		if ((block[j].flags & ZEND_BB_REACHABLE) == 0) {
+	for (j = 0; j < blocks_count; j++) {
+		int idom = blocks[j].idom, level = 0;
+		if ((blocks[j].flags & ZEND_BB_REACHABLE) == 0) {
 			continue;
 		}
 		while (idom >= 0) {
 			level++;
-			if (block[idom].level >= 0) {
-				level += block[idom].level;
+			if (blocks[idom].level >= 0) {
+				level += blocks[idom].level;
 				break;
 			} else {
-				idom = block[idom].idom;
+				idom = blocks[idom].idom;
 			}
 		}
-		block[j].level = level;
+		blocks[j].level = level;
 	}
 
 	if (ZCG(accel_directives).jit_debug & JIT_DEBUG_DUMP_DOMINATORS) {
@@ -1281,8 +1281,8 @@ static int dominates(zend_op_array *op_array, int a, int b)
 {
 	zend_jit_func_info *info = JIT_DATA(op_array);
 
-	while (info->cfg.block[b].level > info->cfg.block[a].level)
-		b = info->cfg.block[b].idom;
+	while (info->cfg.blocks[b].level > info->cfg.blocks[a].level)
+		b = info->cfg.blocks[b].idom;
 	return a == b;
 }
 
@@ -1291,15 +1291,15 @@ static int zend_jit_identify_loops(zend_op_array *op_array)
 	zend_jit_func_info *info = JIT_DATA(op_array);
 	int i, j, k;
 	int depth;
-	zend_jit_basic_block *block = info->cfg.block;
+	zend_basic_block *blocks = info->cfg.blocks;
 	int *dj_spanning_tree;
 	zend_worklist work;
 	int flag = ZEND_JIT_FUNC_NO_LOOPS;
 
-	ZEND_WORKLIST_ALLOCA(&work, info->cfg.blocks);
-	dj_spanning_tree = alloca(sizeof(int) * info->cfg.blocks);
+	ZEND_WORKLIST_ALLOCA(&work, info->cfg.blocks_count);
+	dj_spanning_tree = alloca(sizeof(int) * info->cfg.blocks_count);
 
-	for (i = 0; i < info->cfg.blocks; i++) {
+	for (i = 0; i < info->cfg.blocks_count; i++) {
 		dj_spanning_tree[i] = -1;
 	}
 	zend_worklist_push(&work, 0);
@@ -1307,17 +1307,17 @@ static int zend_jit_identify_loops(zend_op_array *op_array)
 	next:
 		i = zend_worklist_peek(&work);
 		/* Visit blocks immediately dominated by i. */
-		for (j = block[i].children; j >= 0; j = block[j].next_child)
+		for (j = blocks[i].children; j >= 0; j = blocks[j].next_child)
 			if (zend_worklist_push(&work, j)) {
 				dj_spanning_tree[j] = i;
 				goto next;
 			}
 		/* Visit join edges.  */
 		for (j = 0; j < 2; j++) {
-			int succ = block[i].successors[j];
+			int succ = blocks[i].successors[j];
 			if (succ < 0) {
 				continue;
-			} else if (block[succ].idom == i) {
+			} else if (blocks[succ].idom == i) {
 				continue;
 			} else if (zend_worklist_push(&work, succ)) {
 				dj_spanning_tree[succ] = i;
@@ -1330,29 +1330,29 @@ static int zend_jit_identify_loops(zend_op_array *op_array)
 	/* Identify loops.  See Sreedhar et al, "Identifying Loops Using DJ
 	   Graphs".  */
 
-	for (i = 0, depth = 0; i < info->cfg.blocks; i++) {
-		if (block[i].level > depth)
-			depth = block[i].level;
+	for (i = 0, depth = 0; i < info->cfg.blocks_count; i++) {
+		if (blocks[i].level > depth)
+			depth = blocks[i].level;
 	}
 	for (; depth >= 0; depth--) {
-		for (i = 0; i < info->cfg.blocks; i++) {
-			if (block[i].level != depth) {
+		for (i = 0; i < info->cfg.blocks_count; i++) {
+			if (blocks[i].level != depth) {
 				continue;
 			}
-			zend_bitset_clear(work.visited, zend_bitset_len(info->cfg.blocks));
-			for (j = 0; j < block[i].predecessors_count; j++) {
-				int pred = info->cfg.predecessor[block[i].predecessor_offset + j];
+			zend_bitset_clear(work.visited, zend_bitset_len(info->cfg.blocks_count));
+			for (j = 0; j < blocks[i].predecessors_count; j++) {
+				int pred = info->cfg.predecessors[blocks[i].predecessor_offset + j];
 
 				/* A join edge is one for which the predecessor does not
 				   immediately dominate the successor.  */
-				if (block[i].idom == pred) {
+				if (blocks[i].idom == pred) {
 					continue;
 				}
 
 				/* In a loop back-edge (back-join edge), the successor dominates
 				   the predecessor.  */
 				if (dominates(op_array, i, pred)) {
-					block[i].flags |= ZEND_BB_LOOP_HEADER;
+					blocks[i].flags |= ZEND_BB_LOOP_HEADER;
 					flag &= ~ZEND_JIT_FUNC_NO_LOOPS;
 					zend_worklist_push(&work, pred);
 				} else {
@@ -1362,7 +1362,7 @@ static int zend_jit_identify_loops(zend_op_array *op_array)
 					while (dj_parent >= 0) {
 						if (dj_parent == i) {
 							/* An sp-back edge: mark as irreducible.  */
-							block[i].flags |= ZEND_BB_IRREDUCIBLE_LOOP;
+							blocks[i].flags |= ZEND_BB_IRREDUCIBLE_LOOP;
 							flag |= ZEND_JIT_FUNC_IRREDUCIBLE;
 							flag &= ~ZEND_JIT_FUNC_NO_LOOPS;
 							break;
@@ -1374,10 +1374,10 @@ static int zend_jit_identify_loops(zend_op_array *op_array)
 			}
 			while (zend_worklist_len(&work)) {
 				j = zend_worklist_pop(&work);
-				if (block[j].loop_header < 0 && j != i) {
-					block[j].loop_header = i;
-					for (k = 0; k < block[j].predecessors_count; k++) {
-						zend_worklist_push(&work, info->cfg.predecessor[block[j].predecessor_offset + k]);
+				if (blocks[j].loop_header < 0 && j != i) {
+					blocks[j].loop_header = i;
+					for (k = 0; k < blocks[j].predecessors_count; k++) {
+						zend_worklist_push(&work, info->cfg.predecessors[blocks[j].predecessor_offset + k]);
 					}
 				}
 			}
@@ -1393,8 +1393,8 @@ static int zend_jit_compute_dfg(zend_jit_dfg *dfg, zend_op_array *op_array)
 {
 	zend_jit_func_info *info = JIT_DATA(op_array);
 	int set_size;
-	zend_jit_basic_block *block = info->cfg.block;
-	int blocks = info->cfg.blocks;
+	zend_basic_block *blocks = info->cfg.blocks;
+	int blocks_count = info->cfg.blocks_count;
 	zend_bitset tmp, gen, def, use, in, out;
 	zend_op *opline;
 	uint32_t k;
@@ -1410,15 +1410,15 @@ static int zend_jit_compute_dfg(zend_jit_dfg *dfg, zend_op_array *op_array)
 	out = dfg->out;
 
 	/* Collect "gen", "def" and "use" sets */
-	for (j = 0; j < blocks; j++) {
-		if ((block[j].flags & ZEND_BB_REACHABLE) == 0) {
+	for (j = 0; j < blocks_count; j++) {
+		if ((blocks[j].flags & ZEND_BB_REACHABLE) == 0) {
 			continue;
 		}
-		for (k = block[j].start; k <= block[j].end; k++) {
+		for (k = blocks[j].start; k <= blocks[j].end; k++) {
 			opline = op_array->opcodes + k;
 			if (opline->opcode != ZEND_OP_DATA) {
 				zend_op *next = opline + 1;
-				if (k < block[j].end &&
+				if (k < blocks[j].end &&
 					next->opcode == ZEND_OP_DATA) {
 					if (next->op1_type & (IS_CV|IS_VAR|IS_TMP_VAR)) {
 						if (!zend_bitset_in(def + (j * set_size), EX_VAR_TO_NUM(next->op1.var))) {
@@ -1573,14 +1573,14 @@ static int zend_jit_compute_dfg(zend_jit_dfg *dfg, zend_op_array *op_array)
 	/* Calculate "in" and "out" sets */
 	do {
 		changed = 0;
-		for (j = 0; j < blocks; j++) {
-			if ((block[j].flags & ZEND_BB_REACHABLE) == 0) {
+		for (j = 0; j < blocks_count; j++) {
+			if ((blocks[j].flags & ZEND_BB_REACHABLE) == 0) {
 				continue;
 			}
-			if (block[j].successors[0] >= 0) {
-				zend_bitset_copy(out + (j * set_size), in + (block[j].successors[0] * set_size), set_size);
-				if (block[j].successors[1] >= 0) {
-					zend_bitset_union(out + (j * set_size), in + (block[j].successors[1] * set_size), set_size);
+			if (blocks[j].successors[0] >= 0) {
+				zend_bitset_copy(out + (j * set_size), in + (blocks[j].successors[0] * set_size), set_size);
+				if (blocks[j].successors[1] >= 0) {
+					zend_bitset_union(out + (j * set_size), in + (blocks[j].successors[1] * set_size), set_size);
 				}
 			} else {
 				zend_bitset_clear(out + (j * set_size), set_size);
@@ -1595,7 +1595,7 @@ static int zend_jit_compute_dfg(zend_jit_dfg *dfg, zend_op_array *op_array)
 
 	if (ZCG(accel_directives).jit_debug & JIT_DEBUG_DUMP_LIVENESS) {
 		fprintf(stderr, "Variable Liveness\n");
-		for (j = 0; j < blocks; j++) {
+		for (j = 0; j < blocks_count; j++) {
 			fprintf(stderr, "  BB%d:\n", j);
 			zend_jit_dump_var_set(op_array, "gen", dfg->gen + (j * dfg->size));
 			zend_jit_dump_var_set(op_array, "def", dfg->def + (j * dfg->size));
@@ -1611,29 +1611,29 @@ static int zend_jit_compute_dfg(zend_jit_dfg *dfg, zend_op_array *op_array)
 static int zend_jit_ssa_rename(zend_op_array *op_array, int *var, int n)
 {
 	zend_jit_func_info *info = JIT_DATA(op_array);
-	zend_jit_basic_block *block = info->cfg.block;
-	zend_jit_ssa_block *ssa_block = info->ssa.block;
-	zend_jit_ssa_op *ssa_op = info->ssa.op;
-	int ssa_var = info->ssa.vars;
+	zend_basic_block *blocks = info->cfg.blocks;
+	zend_jit_ssa_block *ssa_blocks = info->ssa.blocks;
+	zend_jit_ssa_op *ssa_ops = info->ssa.ops;
+	int ssa_vars_count = info->ssa.vars_count;
 	int i, j;
 	uint32_t k;
 	zend_op *opline;
 	int *tmp = NULL;
 
 	// FIXME: Can we optimize this copying out in some cases?
-	if (block[n].next_child >= 0) {
+	if (blocks[n].next_child >= 0) {
 		tmp = alloca(sizeof(int) * (op_array->last_var + op_array->T));
 		memcpy(tmp, var, sizeof(int) * (op_array->last_var + op_array->T));
 		var = tmp;
 	}
 
-	if (ssa_block[n].phis) {
-		zend_jit_ssa_phi *phi = ssa_block[n].phis;
+	if (ssa_blocks[n].phis) {
+		zend_jit_ssa_phi *phi = ssa_blocks[n].phis;
 		do {
 			if (phi->ssa_var < 0) {
-				phi->ssa_var = ssa_var;
-				var[phi->var] = ssa_var;
-				ssa_var++;
+				phi->ssa_var = ssa_vars_count;
+				var[phi->var] = ssa_vars_count;
+				ssa_vars_count++;
 			} else {
 				var[phi->var] = phi->ssa_var;
 			}
@@ -1641,22 +1641,22 @@ static int zend_jit_ssa_rename(zend_op_array *op_array, int *var, int n)
 		} while (phi);
 	}
 
-	for (k = block[n].start; k <= block[n].end; k++) {
+	for (k = blocks[n].start; k <= blocks[n].end; k++) {
 		opline = op_array->opcodes + k;
 		if (opline->opcode != ZEND_OP_DATA) {
 			zend_op *next = opline + 1;
-			if (k < block[n].end &&
+			if (k < blocks[n].end &&
 			    next->opcode == ZEND_OP_DATA) {
 				if (next->op1_type == IS_CV) {
-					ssa_op[k + 1].op1_use = var[EX_VAR_TO_NUM(next->op1.var)];
+					ssa_ops[k + 1].op1_use = var[EX_VAR_TO_NUM(next->op1.var)];
 					//USE_SSA_VAR(next->op1.var);
 				} else if (next->op1_type == IS_VAR ||
 				           next->op1_type == IS_TMP_VAR) {
-					ssa_op[k + 1].op1_use = var[EX_VAR_TO_NUM(next->op1.var)];
+					ssa_ops[k + 1].op1_use = var[EX_VAR_TO_NUM(next->op1.var)];
 					//USE_SSA_VAR(op_array->last_var + next->op1.var);
 				}
 				if (next->op2_type == IS_CV) {
-					ssa_op[k + 1].op2_use = var[EX_VAR_TO_NUM(next->op2.var)];
+					ssa_ops[k + 1].op2_use = var[EX_VAR_TO_NUM(next->op2.var)];
 					//USE_SSA_VAR(next->op2.var);
 				} else if (next->op2_type == IS_VAR ||
 				           next->op2_type == IS_TMP_VAR) {
@@ -1680,87 +1680,87 @@ static int zend_jit_ssa_rename(zend_op_array *op_array, int *var, int n)
 						case ZEND_ASSIGN_POW:
 							break;
 						default:
-							ssa_op[k + 1].op2_use = var[EX_VAR_TO_NUM(next->op2.var)];
+							ssa_ops[k + 1].op2_use = var[EX_VAR_TO_NUM(next->op2.var)];
 							//USE_SSA_VAR(op_array->last_var + next->op2.var);
 					}
 				}
 			}
 			if (opline->op1_type & (IS_CV|IS_VAR|IS_TMP_VAR)) {
-				ssa_op[k].op1_use = var[EX_VAR_TO_NUM(opline->op1.var)];
+				ssa_ops[k].op1_use = var[EX_VAR_TO_NUM(opline->op1.var)];
 				//USE_SSA_VAR(op_array->last_var + opline->op1.var)
 			}
 			if (opline->opcode == ZEND_FE_FETCH_R || opline->opcode == ZEND_FE_FETCH_RW) {
 				if (opline->op2_type == IS_CV) {
-					ssa_op[k].op2_use = var[EX_VAR_TO_NUM(opline->op2.var)];
+					ssa_ops[k].op2_use = var[EX_VAR_TO_NUM(opline->op2.var)];
 				}
-				ssa_op[k].op2_def = ssa_var;
-				var[EX_VAR_TO_NUM(opline->op2.var)] = ssa_var;
-				ssa_var++;
+				ssa_ops[k].op2_def = ssa_vars_count;
+				var[EX_VAR_TO_NUM(opline->op2.var)] = ssa_vars_count;
+				ssa_vars_count++;
 				//NEW_SSA_VAR(opline->op2.var)
 			} else if (opline->op2_type & (IS_CV|IS_VAR|IS_TMP_VAR)) {
-				ssa_op[k].op2_use = var[EX_VAR_TO_NUM(opline->op2.var)];
+				ssa_ops[k].op2_use = var[EX_VAR_TO_NUM(opline->op2.var)];
 				//USE_SSA_VAR(op_array->last_var + opline->op2.var)
 			}
 			switch (opline->opcode) {
 				case ZEND_ASSIGN:
 					if (opline->op1_type == IS_CV) {
-						ssa_op[k].op1_def = ssa_var;
-						var[EX_VAR_TO_NUM(opline->op1.var)] = ssa_var;
-						ssa_var++;
+						ssa_ops[k].op1_def = ssa_vars_count;
+						var[EX_VAR_TO_NUM(opline->op1.var)] = ssa_vars_count;
+						ssa_vars_count++;
 						//NEW_SSA_VAR(opline->op1.var)
 					}
 					if (opline->op2_type == IS_CV) {
-						ssa_op[k].op2_def = ssa_var;
-						var[EX_VAR_TO_NUM(opline->op2.var)] = ssa_var;
-						ssa_var++;
+						ssa_ops[k].op2_def = ssa_vars_count;
+						var[EX_VAR_TO_NUM(opline->op2.var)] = ssa_vars_count;
+						ssa_vars_count++;
 						//NEW_SSA_VAR(opline->op2.var)
 					}
 					break;
 				case ZEND_ASSIGN_REF:
 //TODO: ???
 					if (opline->op1_type == IS_CV) {
-						ssa_op[k].op1_def = ssa_var;
-						var[EX_VAR_TO_NUM(opline->op1.var)] = ssa_var;
-						ssa_var++;
+						ssa_ops[k].op1_def = ssa_vars_count;
+						var[EX_VAR_TO_NUM(opline->op1.var)] = ssa_vars_count;
+						ssa_vars_count++;
 						//NEW_SSA_VAR(opline->op1.var)
 					}
 					if (opline->op2_type == IS_CV) {
-						ssa_op[k].op2_def = ssa_var;
-						var[EX_VAR_TO_NUM(opline->op2.var)] = ssa_var;
-						ssa_var++;
+						ssa_ops[k].op2_def = ssa_vars_count;
+						var[EX_VAR_TO_NUM(opline->op2.var)] = ssa_vars_count;
+						ssa_vars_count++;
 						//NEW_SSA_VAR(opline->op2.var)
 					}
 					break;
 				case ZEND_BIND_GLOBAL:
 					if (opline->op1_type == IS_CV) {
-						ssa_op[k].op1_def = ssa_var;
-						var[EX_VAR_TO_NUM(opline->op1.var)] = ssa_var;
-						ssa_var++;
+						ssa_ops[k].op1_def = ssa_vars_count;
+						var[EX_VAR_TO_NUM(opline->op1.var)] = ssa_vars_count;
+						ssa_vars_count++;
 						//NEW_SSA_VAR(opline->op1.var)
 					}
 					break;
 				case ZEND_ASSIGN_DIM:
 				case ZEND_ASSIGN_OBJ:
 					if (opline->op1_type == IS_CV) {
-						ssa_op[k].op1_def = ssa_var;
-						var[EX_VAR_TO_NUM(opline->op1.var)] = ssa_var;
-						ssa_var++;
+						ssa_ops[k].op1_def = ssa_vars_count;
+						var[EX_VAR_TO_NUM(opline->op1.var)] = ssa_vars_count;
+						ssa_vars_count++;
 						//NEW_SSA_VAR(opline->op1.var)
 					}
 					if (next->op1_type == IS_CV) {
-						ssa_op[k + 1].op1_def = ssa_var;
-						var[EX_VAR_TO_NUM(next->op1.var)] = ssa_var;
-						ssa_var++;
+						ssa_ops[k + 1].op1_def = ssa_vars_count;
+						var[EX_VAR_TO_NUM(next->op1.var)] = ssa_vars_count;
+						ssa_vars_count++;
 						//NEW_SSA_VAR(next->op1.var)
 					}
 					break;
 				case ZEND_ADD_ARRAY_ELEMENT:
-					ssa_op[k].result_use = var[EX_VAR_TO_NUM(opline->result.var)];
+					ssa_ops[k].result_use = var[EX_VAR_TO_NUM(opline->result.var)];
 				case ZEND_INIT_ARRAY:
 					if (opline->op1_type == IS_CV) {
-						ssa_op[k].op1_def = ssa_var;
-						var[EX_VAR_TO_NUM(opline->op1.var)] = ssa_var;
-						ssa_var++;
+						ssa_ops[k].op1_def = ssa_vars_count;
+						var[EX_VAR_TO_NUM(opline->op1.var)] = ssa_vars_count;
+						ssa_vars_count++;
 						//NEW_SSA_VAR(opline+->op1.var)
 					}
 					break;
@@ -1771,9 +1771,9 @@ static int zend_jit_ssa_rename(zend_op_array *op_array, int *var, int n)
 				case ZEND_FE_RESET_RW:
 //TODO: ???
 					if (opline->op1_type == IS_CV) {
-						ssa_op[k].op1_def = ssa_var;
-						var[EX_VAR_TO_NUM(opline->op1.var)] = ssa_var;
-						ssa_var++;
+						ssa_ops[k].op1_def = ssa_vars_count;
+						var[EX_VAR_TO_NUM(opline->op1.var)] = ssa_vars_count;
+						ssa_vars_count++;
 						//NEW_SSA_VAR(opline->op1.var)
 					}
 					break;
@@ -1794,17 +1794,17 @@ static int zend_jit_ssa_rename(zend_op_array *op_array, int *var, int n)
 				case ZEND_POST_INC:
 				case ZEND_POST_DEC:
 					if (opline->op1_type == IS_CV) {
-						ssa_op[k].op1_def = ssa_var;
-						var[EX_VAR_TO_NUM(opline->op1.var)] = ssa_var;
-						ssa_var++;
+						ssa_ops[k].op1_def = ssa_vars_count;
+						var[EX_VAR_TO_NUM(opline->op1.var)] = ssa_vars_count;
+						ssa_vars_count++;
 						//NEW_SSA_VAR(opline->op1.var)
 					}
 					break;
 				case ZEND_UNSET_VAR:
 					if (opline->extended_value & ZEND_QUICK_SET) {
-						ssa_op[k].op1_def = ssa_var;
+						ssa_ops[k].op1_def = ssa_vars_count;
 						var[EX_VAR_TO_NUM(opline->op1.var)] = EX_VAR_TO_NUM(opline->op1.var);
-						ssa_var++;
+						ssa_vars_count++;
 					}
 					break;
 				case ZEND_UNSET_DIM:
@@ -1818,9 +1818,9 @@ static int zend_jit_ssa_rename(zend_op_array *op_array, int *var, int n)
 				case ZEND_FETCH_OBJ_FUNC_ARG:
 				case ZEND_FETCH_OBJ_UNSET:
 					if (opline->op1_type == IS_CV) {
-						ssa_op[k].op1_def = ssa_var;
-						var[EX_VAR_TO_NUM(opline->op1.var)] = ssa_var;
-						ssa_var++;
+						ssa_ops[k].op1_def = ssa_vars_count;
+						var[EX_VAR_TO_NUM(opline->op1.var)] = ssa_vars_count;
+						ssa_vars_count++;
 						//NEW_SSA_VAR(opline->op1.var)
 					}
 					break;
@@ -1828,25 +1828,25 @@ static int zend_jit_ssa_rename(zend_op_array *op_array, int *var, int n)
 					break;
 			}
 			if (opline->result_type == IS_CV) {
-				ssa_op[k].result_def = ssa_var;
-				var[EX_VAR_TO_NUM(opline->result.var)] = ssa_var;
-				ssa_var++;
+				ssa_ops[k].result_def = ssa_vars_count;
+				var[EX_VAR_TO_NUM(opline->result.var)] = ssa_vars_count;
+				ssa_vars_count++;
 				//NEW_SSA_VAR(opline->result.var)
 			} else if (opline->result_type == IS_VAR ||
 			           opline->result_type == IS_TMP_VAR) {
-				ssa_op[k].result_def = ssa_var;
-				var[EX_VAR_TO_NUM(opline->result.var)] = ssa_var;
-				ssa_var++;
+				ssa_ops[k].result_def = ssa_vars_count;
+				var[EX_VAR_TO_NUM(opline->result.var)] = ssa_vars_count;
+				ssa_vars_count++;
 				//NEW_SSA_VAR(op_array->last_var + opline->result.var)
 			}
 		}
 	}
 
 	for (i = 0; i < 2; i++) {
-		int succ = block[n].successors[i];
+		int succ = blocks[n].successors[i];
 		if (succ >= 0) {
 			zend_jit_ssa_phi *p;
-			for (p = ssa_block[succ].phis; p; p = p->next) {
+			for (p = ssa_blocks[succ].phis; p; p = p->next) {
 				if (p->pi == n) {
 					/* e-SSA Pi */
 					if (p->constraint.min_var >= 0) {
@@ -1855,33 +1855,33 @@ static int zend_jit_ssa_rename(zend_op_array *op_array, int *var, int n)
 					if (p->constraint.max_var >= 0) {
 						p->constraint.max_ssa_var = var[p->constraint.max_var];
 					}
-					for (j = 0; j < block[succ].predecessors_count; j++) {
+					for (j = 0; j < blocks[succ].predecessors_count; j++) {
 						p->sources[j] = var[p->var];
 					}
 					if (p->ssa_var < 0) {
-						p->ssa_var = ssa_var;
-						ssa_var++;
+						p->ssa_var = ssa_vars_count;
+						ssa_vars_count++;
 					}
 				} else if (p->pi < 0) {
 					/* Normal Phi */
-					for (j = 0; j < block[succ].predecessors_count; j++)
-						if (info->cfg.predecessor[block[succ].predecessor_offset + j] == n)
+					for (j = 0; j < blocks[succ].predecessors_count; j++)
+						if (info->cfg.predecessors[blocks[succ].predecessor_offset + j] == n)
 							break;
-					ZEND_ASSERT(j < block[succ].predecessors_count);
+					ZEND_ASSERT(j < blocks[succ].predecessors_count);
 					p->sources[j] = var[p->var];
 				}
 			}
-			for (p = ssa_block[succ].phis; p && (p->pi >= 0); p = p->next) {
+			for (p = ssa_blocks[succ].phis; p && (p->pi >= 0); p = p->next) {
 				if (p->pi == n) {
 					zend_jit_ssa_phi *q = p->next;
 					while (q) {
 						if (q->pi < 0 && q->var == p->var) {
-							for (j = 0; j < block[succ].predecessors_count; j++) {
-								if (info->cfg.predecessor[block[succ].predecessor_offset + j] == n) {
+							for (j = 0; j < blocks[succ].predecessors_count; j++) {
+								if (info->cfg.predecessors[blocks[succ].predecessor_offset + j] == n) {
 									break;
 								}
 							}
-							ZEND_ASSERT(j < block[succ].predecessors_count);
+							ZEND_ASSERT(j < blocks[succ].predecessors_count);
 							q->sources[j] = p->ssa_var;
 						}
 						q = q->next;
@@ -1891,14 +1891,14 @@ static int zend_jit_ssa_rename(zend_op_array *op_array, int *var, int n)
 		}
 	}
 
-	info->ssa.vars = ssa_var;
+	info->ssa.vars_count = ssa_vars_count;
 
-	j = block[n].children;
+	j = blocks[n].children;
 	while (j >= 0) {
 		// FIXME: Tail call optimization?
 		if (zend_jit_ssa_rename(op_array, var, j) != SUCCESS)
 			return FAILURE;
-		j = block[j].next_child;
+		j = blocks[j].next_child;
 	}
 
 	return SUCCESS;
@@ -1908,8 +1908,8 @@ static int needs_pi(zend_op_array *op_array, zend_jit_dfg *dfg, int from, int to
 {
 	zend_jit_func_info *info = JIT_DATA(op_array);
 
-	if (from == to || info->cfg.block[to].predecessors_count != 1) {
-		zend_jit_ssa_phi *p = info->ssa.block[to].phis;
+	if (from == to || info->cfg.blocks[to].predecessors_count != 1) {
+		zend_jit_ssa_phi *p = info->ssa.blocks[to].phis;
 		while (p) {
 			if (p->pi < 0 && p->var == var) {
 				return 1;
@@ -1927,14 +1927,14 @@ static int add_pi(zend_jit_context *ctx, zend_op_array *op_array, zend_jit_dfg *
 		zend_jit_func_info *info = JIT_DATA(op_array);
 		zend_jit_ssa_phi *phi = zend_jit_context_calloc(ctx,
 			sizeof(zend_jit_ssa_phi) +
-			sizeof(int) * info->cfg.block[to].predecessors_count +
-			sizeof(void*) * info->cfg.block[to].predecessors_count, 1);
+			sizeof(int) * info->cfg.blocks[to].predecessors_count +
+			sizeof(void*) * info->cfg.blocks[to].predecessors_count, 1);
 
 		if (!phi)
 			return FAILURE;
 		phi->sources = (int*)(((char*)phi) + sizeof(zend_jit_ssa_phi));
-		memset(phi->sources, 0xff, sizeof(int) * info->cfg.block[to].predecessors_count);
-		phi->use_chains = (zend_jit_ssa_phi**)(((char*)phi->sources) + sizeof(int) * info->cfg.block[to].predecessors_count);
+		memset(phi->sources, 0xff, sizeof(int) * info->cfg.blocks[to].predecessors_count);
+		phi->use_chains = (zend_jit_ssa_phi**)(((char*)phi->sources) + sizeof(int) * info->cfg.blocks[to].predecessors_count);
 
 		phi->pi = from;
 		phi->constraint.min_var = min_var;
@@ -1948,8 +1948,8 @@ static int add_pi(zend_jit_context *ctx, zend_op_array *op_array, zend_jit_dfg *
 		phi->constraint.negative = negative ? NEG_INIT : NEG_NONE;
 		phi->var = var;
 		phi->ssa_var = -1;
-		phi->next = info->ssa.block[to].phis;
-		info->ssa.block[to].phis = phi;
+		phi->next = info->ssa.blocks[to].phis;
+		info->ssa.blocks[to].phis = phi;
 	}
 	return SUCCESS;
 }
@@ -1957,31 +1957,31 @@ static int add_pi(zend_jit_context *ctx, zend_op_array *op_array, zend_jit_dfg *
 static int zend_jit_build_ssa(zend_jit_context *ctx, zend_op_array *op_array)
 {
 	zend_jit_func_info *info = JIT_DATA(op_array);
-	zend_jit_basic_block *block = info->cfg.block;
-	zend_jit_ssa_block *ssa_block;
-	int blocks = info->cfg.blocks;
+	zend_basic_block *blocks = info->cfg.blocks;
+	zend_jit_ssa_block *ssa_blocks;
+	int blocks_count = info->cfg.blocks_count;
 	uint32_t set_size;
 	zend_bitset tmp, gen, in;
 	int *var = 0;
 	int i, j, k, changed;
 	zend_jit_dfg dfg;
 
-	ZEND_JIT_CONTEXT_CALLOC(ctx, ssa_block, blocks);
-	if (!ssa_block) {
+	ZEND_JIT_CONTEXT_CALLOC(ctx, ssa_blocks, blocks_count);
+	if (!ssa_blocks) {
 		return FAILURE;
 	}
-	info->ssa.block = ssa_block;
+	info->ssa.blocks = ssa_blocks;
 	
 	/* Compute Variable Liveness */
 	dfg.vars = op_array->last_var + op_array->T;
 	dfg.size = set_size = zend_bitset_len(dfg.vars);
-	dfg.tmp = alloca((set_size * sizeof(zend_ulong)) * (blocks * 5 + 1));
-	memset(dfg.tmp, 0, (set_size * sizeof(zend_ulong)) * (blocks * 5 + 1));
+	dfg.tmp = alloca((set_size * sizeof(zend_ulong)) * (blocks_count * 5 + 1));
+	memset(dfg.tmp, 0, (set_size * sizeof(zend_ulong)) * (blocks_count * 5 + 1));
 	dfg.gen = dfg.tmp + set_size;
-	dfg.def = dfg.gen + set_size * blocks;
-	dfg.use = dfg.def + set_size * blocks;
-	dfg.in  = dfg.use + set_size * blocks;
-	dfg.out = dfg.in  + set_size * blocks;
+	dfg.def = dfg.gen + set_size * blocks_count;
+	dfg.use = dfg.def + set_size * blocks_count;
+	dfg.in  = dfg.use + set_size * blocks_count;
+	dfg.out = dfg.in  + set_size * blocks_count;
 	if (zend_jit_compute_dfg(&dfg, op_array) != SUCCESS) {
 		return FAILURE;
 	}
@@ -1993,17 +1993,17 @@ static int zend_jit_build_ssa(zend_jit_context *ctx, zend_op_array *op_array)
 	/* SSA construction, Step 1: Propagate "gen" sets in merge points */
 	do {
 		changed = 0;
-		for (j = 0; j < blocks; j++) {
-			if ((block[j].flags & ZEND_BB_REACHABLE) == 0) {
+		for (j = 0; j < blocks_count; j++) {
+			if ((blocks[j].flags & ZEND_BB_REACHABLE) == 0) {
 				continue;
 			}
-			if (j >= 0 && (block[j].predecessors_count > 1 || j == 0)) {
+			if (j >= 0 && (blocks[j].predecessors_count > 1 || j == 0)) {
 				zend_bitset_copy(tmp, gen + (j * set_size), set_size);
-				for (k = 0; k < block[j].predecessors_count; k++) {
-					i = info->cfg.predecessor[block[j].predecessor_offset + k];
-					while (i != block[j].idom) {
+				for (k = 0; k < blocks[j].predecessors_count; k++) {
+					i = info->cfg.predecessors[blocks[j].predecessor_offset + k];
+					while (i != blocks[j].idom) {
 						zend_bitset_union_with_intersection(tmp, tmp, gen + (i * set_size), in + (j * set_size), set_size);
-						i = block[i].idom;
+						i = blocks[i].idom;
 					}
 				}
 				if (!zend_bitset_equal(gen + (j * set_size), tmp, set_size)) {
@@ -2020,23 +2020,23 @@ static int zend_jit_build_ssa(zend_jit_context *ctx, zend_op_array *op_array)
 		return FAILURE;
 	zend_bitset_clear(tmp, set_size);
 
-	for (j = 0; j < blocks; j++) {
-		if ((block[j].flags & ZEND_BB_REACHABLE) == 0) {
+	for (j = 0; j < blocks_count; j++) {
+		if ((blocks[j].flags & ZEND_BB_REACHABLE) == 0) {
 			continue;
 		}
-		if (block[j].predecessors_count > 1) {
+		if (blocks[j].predecessors_count > 1) {
 			zend_bitset_clear(tmp, set_size);
-			if (block[j].flags & ZEND_BB_IRREDUCIBLE_LOOP) {
+			if (blocks[j].flags & ZEND_BB_IRREDUCIBLE_LOOP) {
 				/* Prevent any values from flowing into irreducible loops by
 				   replacing all incoming values with explicit phis.  The
 				   register allocator depends on this property.  */
 				zend_bitset_copy(tmp, in + (j * set_size), set_size);
 			} else {
-				for (k = 0; k < block[j].predecessors_count; k++) {
-					i = info->cfg.predecessor[block[j].predecessor_offset + k];
-					while (i != block[j].idom) {
+				for (k = 0; k < blocks[j].predecessors_count; k++) {
+					i = info->cfg.predecessors[blocks[j].predecessor_offset + k];
+					while (i != blocks[j].idom) {
 						zend_bitset_union_with_intersection(tmp, tmp, gen + (i * set_size), in + (j * set_size), set_size);
-						i = block[i].idom;
+						i = blocks[i].idom;
 					}
 				}
 			}
@@ -2048,20 +2048,20 @@ static int zend_jit_build_ssa(zend_jit_context *ctx, zend_op_array *op_array)
 					if (zend_bitset_in(tmp, i)) {
 						zend_jit_ssa_phi *phi = zend_jit_context_calloc(ctx,
 							sizeof(zend_jit_ssa_phi) +
-							sizeof(int) * block[j].predecessors_count +
-							sizeof(void*) * block[j].predecessors_count, 1);
+							sizeof(int) * blocks[j].predecessors_count +
+							sizeof(void*) * blocks[j].predecessors_count, 1);
 
 						if (!phi)
 							return FAILURE;
 						phi->sources = (int*)(((char*)phi) + sizeof(zend_jit_ssa_phi));
-						memset(phi->sources, 0xff, sizeof(int) * block[j].predecessors_count);
-						phi->use_chains = (zend_jit_ssa_phi**)(((char*)phi->sources) + sizeof(int) * info->cfg.block[j].predecessors_count);
+						memset(phi->sources, 0xff, sizeof(int) * blocks[j].predecessors_count);
+						phi->use_chains = (zend_jit_ssa_phi**)(((char*)phi->sources) + sizeof(int) * info->cfg.blocks[j].predecessors_count);
 
 					    phi->pi = -1;
 						phi->var = i;
 						phi->ssa_var = -1;
-						phi->next = ssa_block[j].phis;
-						ssa_block[j].phis = phi;
+						phi->next = ssa_blocks[j].phis;
+						ssa_blocks[j].phis = phi;
 					}
 				}
 			}
@@ -2072,12 +2072,12 @@ static int zend_jit_build_ssa(zend_jit_context *ctx, zend_op_array *op_array)
 	 * source and constraint).
 	 * Order of Phis is importent, Pis must be placed before Phis
 	 */
-	for (j = 0; j < blocks; j++) {
-		zend_op *opline = op_array->opcodes + info->cfg.block[j].end;
+	for (j = 0; j < blocks_count; j++) {
+		zend_op *opline = op_array->opcodes + info->cfg.blocks[j].end;
 		int bt; /* successor block number if a condition is true */
 		int bf; /* successor block number if a condition is false */
 
-		if ((block[j].flags & ZEND_BB_REACHABLE) == 0) {
+		if ((blocks[j].flags & ZEND_BB_REACHABLE) == 0) {
 			continue;
 		}
 		/* the last instruction of basic block is conditional branch,
@@ -2085,30 +2085,30 @@ static int zend_jit_build_ssa(zend_jit_context *ctx, zend_op_array *op_array)
 		 */
 		switch (opline->opcode) {
 			case ZEND_JMPZ:
-				if (info->cfg.block[info->cfg.block[j].successors[0]].start == OP_JMP_ADDR(opline, opline->op2) - op_array->opcodes) {
-					bf = info->cfg.block[j].successors[0];
-					bt = info->cfg.block[j].successors[1];
+				if (info->cfg.blocks[info->cfg.blocks[j].successors[0]].start == OP_JMP_ADDR(opline, opline->op2) - op_array->opcodes) {
+					bf = info->cfg.blocks[j].successors[0];
+					bt = info->cfg.blocks[j].successors[1];
 				} else {
-					bt = info->cfg.block[j].successors[0];
-					bf = info->cfg.block[j].successors[1];
+					bt = info->cfg.blocks[j].successors[0];
+					bf = info->cfg.blocks[j].successors[1];
 				}
 				break;
 			case ZEND_JMPNZ:
-				if (info->cfg.block[info->cfg.block[j].successors[0]].start == OP_JMP_ADDR(opline, opline->op2) - op_array->opcodes) {
-					bt = info->cfg.block[j].successors[0];
-					bf = info->cfg.block[j].successors[1];
+				if (info->cfg.blocks[info->cfg.blocks[j].successors[0]].start == OP_JMP_ADDR(opline, opline->op2) - op_array->opcodes) {
+					bt = info->cfg.blocks[j].successors[0];
+					bf = info->cfg.blocks[j].successors[1];
 				} else {
-					bf = info->cfg.block[j].successors[0];
-					bt = info->cfg.block[j].successors[1];
+					bf = info->cfg.blocks[j].successors[0];
+					bt = info->cfg.blocks[j].successors[1];
 				}
 				break;
 		    case ZEND_JMPZNZ:
-				if (info->cfg.block[info->cfg.block[j].successors[0]].start == OP_JMP_ADDR(opline, opline->op2) - op_array->opcodes) {
-					bf = info->cfg.block[j].successors[0];
-					bt = info->cfg.block[j].successors[1];
+				if (info->cfg.blocks[info->cfg.blocks[j].successors[0]].start == OP_JMP_ADDR(opline, opline->op2) - op_array->opcodes) {
+					bf = info->cfg.blocks[j].successors[0];
+					bt = info->cfg.blocks[j].successors[1];
 				} else {
-					bt = info->cfg.block[j].successors[0];
-					bf = info->cfg.block[j].successors[1];
+					bt = info->cfg.blocks[j].successors[0];
+					bf = info->cfg.blocks[j].successors[1];
 				}
 		    	break;
 			default:
@@ -2340,22 +2340,22 @@ static int zend_jit_build_ssa(zend_jit_context *ctx, zend_op_array *op_array)
 	}
 
 	/* SSA construction, Step ?: Phi after Pi placement based on Dominance Frontiers */
-	for (j = 0; j < blocks; j++) {
-		if ((block[j].flags & ZEND_BB_REACHABLE) == 0) {
+	for (j = 0; j < blocks_count; j++) {
+		if ((blocks[j].flags & ZEND_BB_REACHABLE) == 0) {
 			continue;
 		}
-		if (block[j].predecessors_count > 1) {
+		if (blocks[j].predecessors_count > 1) {
 			zend_bitset_clear(tmp, set_size);
-			if (block[j].flags & ZEND_BB_IRREDUCIBLE_LOOP) {
+			if (blocks[j].flags & ZEND_BB_IRREDUCIBLE_LOOP) {
 				/* Prevent any values from flowing into irreducible loops by
 				   replacing all incoming values with explicit phis.  The
 				   register allocator depends on this property.  */
 				zend_bitset_copy(tmp, in + (j * set_size), set_size);
 			} else {
-				for (k = 0; k < block[j].predecessors_count; k++) {
-					i = info->cfg.predecessor[block[j].predecessor_offset + k];
-					while (i != block[j].idom) {
-						zend_jit_ssa_phi *p = ssa_block[i].phis;
+				for (k = 0; k < blocks[j].predecessors_count; k++) {
+					i = info->cfg.predecessors[blocks[j].predecessor_offset + k];
+					while (i != blocks[j].idom) {
+						zend_jit_ssa_phi *p = ssa_blocks[i].phis;
 						while (p) {
 							if (p) {
 								if (p->pi >= 0) {
@@ -2369,7 +2369,7 @@ static int zend_jit_build_ssa(zend_jit_context *ctx, zend_op_array *op_array)
 							}
 							p = p->next;
 						}
-						i = block[i].idom;
+						i = blocks[i].idom;
 					}
 				}
 			}
@@ -2379,7 +2379,7 @@ static int zend_jit_build_ssa(zend_jit_context *ctx, zend_op_array *op_array)
 				while (i > 0) {
 					i--;
 					if (zend_bitset_in(tmp, i)) {
-						zend_jit_ssa_phi **pp = &ssa_block[j].phis;
+						zend_jit_ssa_phi **pp = &ssa_blocks[j].phis;
 						while (*pp) {
 							if ((*pp)->pi <= 0 && (*pp)->var == i) {
 								break;
@@ -2389,14 +2389,14 @@ static int zend_jit_build_ssa(zend_jit_context *ctx, zend_op_array *op_array)
 						if (*pp == NULL) {
 							zend_jit_ssa_phi *phi = zend_jit_context_calloc(ctx,
 								sizeof(zend_jit_ssa_phi) +
-								sizeof(int) * block[j].predecessors_count +
-								sizeof(void*) * block[j].predecessors_count, 1);
+								sizeof(int) * blocks[j].predecessors_count +
+								sizeof(void*) * blocks[j].predecessors_count, 1);
 
 							if (!phi)
 								return FAILURE;
 							phi->sources = (int*)(((char*)phi) + sizeof(zend_jit_ssa_phi));
-							memset(phi->sources, 0xff, sizeof(int) * block[j].predecessors_count);
-							phi->use_chains = (zend_jit_ssa_phi**)(((char*)phi->sources) + sizeof(int) * info->cfg.block[j].predecessors_count);
+							memset(phi->sources, 0xff, sizeof(int) * blocks[j].predecessors_count);
+							phi->use_chains = (zend_jit_ssa_phi**)(((char*)phi->sources) + sizeof(int) * info->cfg.blocks[j].predecessors_count);
 
 						    phi->pi = -1;
 							phi->var = i;
@@ -2415,14 +2415,14 @@ static int zend_jit_build_ssa(zend_jit_context *ctx, zend_op_array *op_array)
 	}
 
 	/* SSA construction, Step 3: Renaming */
-	ZEND_JIT_CONTEXT_CALLOC(ctx, info->ssa.op, op_array->last);
-	memset(info->ssa.op, 0xff, op_array->last * sizeof(zend_jit_ssa_op));
+	ZEND_JIT_CONTEXT_CALLOC(ctx, info->ssa.ops, op_array->last);
+	memset(info->ssa.ops, 0xff, op_array->last * sizeof(zend_jit_ssa_op));
 	memset(var, 0xff, (op_array->last_var + op_array->T) * sizeof(int));
 	/* Create uninitialized SSA variables for each CV */
 	for (j = 0; j < op_array->last_var; j++) {
 		var[j] = j;
 	}
-	info->ssa.vars = op_array->last_var;
+	info->ssa.vars_count = op_array->last_var;
 	if (zend_jit_ssa_rename(op_array, var, 0) != SUCCESS)
 		return FAILURE;
 

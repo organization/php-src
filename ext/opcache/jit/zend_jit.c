@@ -122,7 +122,6 @@ static int zend_jit_op_array_analyze_cfg(zend_jit_context *ctx, zend_op_array *o
 
 static void zend_jit_collect_args_info(zend_jit_call_info *call_info)
 {
-	zend_op_array *op_array = call_info->caller_op_array;
 	zend_op *opline = call_info->caller_init_opline;
 	zend_op *end = call_info->caller_call_opline;
 	uint32_t i;
@@ -309,7 +308,7 @@ static int zend_jit_op_array_analyze_ssa(zend_jit_context *ctx, zend_op_array *o
 {
     zend_jit_func_info *info = JIT_DATA(op_array);
 	
-	if (info && info->cfg.block) {
+	if (info && info->cfg.blocks) {
 		if ((info->flags & ZEND_JIT_FUNC_TOO_DYNAMIC) == 0) {
 			if (zend_jit_parse_ssa(ctx, op_array) != SUCCESS) {
 				return FAILURE;
@@ -462,7 +461,7 @@ int zend_jit(zend_script *script)
 
 	for (i = 0; i < ctx->op_arrays_count; i++) {
 		info = JIT_DATA(ctx->op_arrays[i]);
-		if (info && info->cfg.block && zend_jit_codegen_may_compile(ctx->op_arrays[i])) {
+		if (info && info->cfg.blocks && zend_jit_codegen_may_compile(ctx->op_arrays[i])) {
 			info->flags |= ZEND_JIT_FUNC_MAY_COMPILE;
 			if (info->clone) {
 				zend_jit_func_info *clone = info->clone;
@@ -475,7 +474,7 @@ int zend_jit(zend_script *script)
 	}
 	for (i = 0; i < ctx->op_arrays_count; i++) {
 		info = JIT_DATA(ctx->op_arrays[i]);
-		if (info && info->cfg.block && (info->flags & ZEND_JIT_FUNC_MAY_COMPILE)) {
+		if (info && info->cfg.blocks && (info->flags & ZEND_JIT_FUNC_MAY_COMPILE)) {
 			zend_jit_codegen(ctx, ctx->op_arrays[i]);
 //			num_compiled_funcs++;
 			/* compile clones */
