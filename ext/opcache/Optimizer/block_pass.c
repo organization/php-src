@@ -753,13 +753,15 @@ optimize_const_unary_op:
 /* Rebuild plain (optimized) op_array from CFG */
 static void assemble_code_blocks(zend_cfg *cfg, zend_op_array *op_array)
 {
-	int n;
 	zend_basic_block *blocks = cfg->blocks;
 	zend_basic_block *end = blocks + cfg->blocks_count;
 	zend_basic_block *b;
 	zend_op *new_opcodes;
 	zend_op *opline;
-	int len = 0;
+	uint32_t len = 0;
+#if DEBUG_BLOCKPASS
+	int n;
+#endif
 
 	for (b = blocks; b < end; b++) {
 		if (b->flags & ZEND_BB_REACHABLE) {
@@ -774,8 +776,15 @@ static void assemble_code_blocks(zend_cfg *cfg, zend_op_array *op_array)
 				if (next < end && next == blocks + b->successors[0]) {
 					/* JMP to the next block - strip it */
 					MAKE_NOP(opline);
-					b->end--;
+					if (b->end == 0) {
+						b->start++;
+					} else {
+						b->end--;
+					}
 				}
+			} else if (b->start == b->end && opline->opcode == ZEND_NOP) {
+				/* skip empty block */
+				b->start++;
 			}
 			len += b->end - b->start + 1;
 		} else if (b->start <= b->end) {
@@ -799,14 +808,15 @@ static void assemble_code_blocks(zend_cfg *cfg, zend_op_array *op_array)
 	/* Copy code of reachable blocks into a single buffer */
 	for (b = blocks; b < end; b++) {
 		if (b->flags & ZEND_BB_REACHABLE) {
-			uint32_t len;
-
-			ZEND_ASSERT(b->start <= b->end);
-			len = b->end - b->start + 1;
-			memcpy(opline, op_array->opcodes + b->start, len * sizeof(zend_op));
-			b->start = opline - new_opcodes;
-			b->end = opline - new_opcodes + len - 1;
-			opline += len;
+			if (b->start <= b->end) {
+				uint32_t n = b->end - b->start + 1;
+				memcpy(opline, op_array->opcodes + b->start, n * sizeof(zend_op));
+				b->start = opline - new_opcodes;
+				b->end = opline - new_opcodes + n - 1;
+				opline += n;
+			} else {
+				b->start = b->end = opline - new_opcodes;
+			}
 		}
 	}
 
@@ -816,7 +826,7 @@ static void assemble_code_blocks(zend_cfg *cfg, zend_op_array *op_array)
 	op_array->last = len;
 
 	for (b = blocks; b < end; b++) {
-		if (!(b->flags & ZEND_BB_REACHABLE)) {
+		if (!(b->flags & ZEND_BB_REACHABLE) || b->start > b->end) {
 			continue;
 		}
 		opline = op_array->opcodes + b->end;
@@ -911,11 +921,22 @@ static void assemble_code_blocks(zend_cfg *cfg, zend_op_array *op_array)
 		map = (uint32_t *)do_alloca(sizeof(uint32_t) * op_array->last_live_range, use_heap);
 
 		for (i = 0, j = 0; i < op_array->last_live_range; i++) {
+			if (op_array->live_range[i].var == (uint32_t)-1) {
+				/* this live range already removed */
+				continue;
+			}
 			if (!(blocks[cfg->map[op_array->live_range[i].start]].flags & ZEND_BB_REACHABLE)) {
 				ZEND_ASSERT(!(blocks[cfg->map[op_array->live_range[i].end]].flags & ZEND_BB_REACHABLE));
 			} else {
-				op_array->live_range[i].start = blocks[cfg->map[op_array->live_range[i].start]].start;
-				op_array->live_range[i].end = blocks[cfg->map[op_array->live_range[i].end]].start;
+				uint32_t start_op = blocks[cfg->map[op_array->live_range[i].start]].start;
+				uint32_t end_op = blocks[cfg->map[op_array->live_range[i].end]].start;
+
+				if (start_op == end_op) {
+					/* skip empty live range */
+					continue;
+				}
+				op_array->live_range[i].start = start_op;
+				op_array->live_range[i].end = end_op;
 				map[i] = j;
 				if (i != j) {
 					op_array->live_range[j]  = op_array->live_range[i];
@@ -938,6 +959,7 @@ static void assemble_code_blocks(zend_cfg *cfg, zend_op_array *op_array)
 				opline++;
 			}
 		}
+		free_alloca(map, use_heap);
 	}
 
 	/* adjust early binding list */
