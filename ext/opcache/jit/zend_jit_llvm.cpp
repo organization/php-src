@@ -3523,7 +3523,7 @@ static int zend_jit_separate_array(zend_llvm_ctx  &llvm_ctx,
 	Value *refcount_addr = NULL;
 	Value *refcount = NULL;
 
-	if (info && MAY_BE_RCN) {
+	if (info & (MAY_BE_RC1|MAY_BE_RCN)) {
 		//JIT: if (Z_REFCOUNT_P(_zv) > 1) {
 		BasicBlock *bb_cont = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
 		BasicBlock *bb_skip = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
