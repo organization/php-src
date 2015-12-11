@@ -30,8 +30,6 @@
 #include "zend_cfg.h"
 #include "zend_dump.h"
 
-#define DEBUG_BLOCKPASS 0
-
 /* Checks if a constant (like "true") may be replaced by its value */
 int zend_optimizer_get_persistent_constant(zend_string *name, zval *result, int copy)
 {
@@ -129,8 +127,6 @@ static void zend_optimize_block(zend_basic_block *block, zend_op_array *op_array
 	/* remove leading NOPs */
 	strip_leading_nops(op_array, block);
 
-	/* we track data dependencies only insight a single basic block */
-	memset(Tsource, 0, (op_array->last_var + op_array->T) * sizeof(zend_op *));
 	opline = op_array->opcodes + block->start;
 	end = op_array->opcodes + block->end + 1;
 	while (opline < end) {
@@ -326,9 +322,17 @@ static void zend_optimize_block(zend_basic_block *block, zend_op_array *op_array
 		}
 #endif
 
+			case ZEND_FETCH_LIST:
+				if (opline->op1_type & (IS_TMP_VAR|IS_VAR)) {
+					/* LIST variable will be deleted later by FREE */
+					Tsource[VAR_NUM(opline->op1.var)] = NULL;
+				}
+				break;
+
 			case ZEND_CASE:
 				if (opline->op1_type & (IS_TMP_VAR|IS_VAR)) {
 					/* CASE variable will be deleted later by FREE, so we can't optimize it */
+					Tsource[VAR_NUM(opline->op1.var)] = NULL;
 					break;
 				}
 				if (opline->op1_type == IS_CONST &&
@@ -813,6 +817,7 @@ static void assemble_code_blocks(zend_cfg *cfg, zend_op_array *op_array)
 				b->end = opline - new_opcodes + n - 1;
 				opline += n;
 			} else {
+				b->flags |= ZEND_BB_EMPTY;
 				b->start = b->end = opline - new_opcodes;
 			}
 		}
@@ -1460,7 +1465,7 @@ next_target_znz:
 static void zend_t_usage(zend_cfg *cfg, zend_op_array *op_array, zend_bitset used_ext, zend_optimizer_ctx *ctx)
 {
 	int n;
-	zend_basic_block *block;
+	zend_basic_block *block, *next_block;
 	uint32_t var_num;
 	uint32_t bitset_len;
 	zend_bitset usage;
@@ -1476,9 +1481,9 @@ static void zend_t_usage(zend_cfg *cfg, zend_op_array *op_array, zend_bitset use
 
 	checkpoint = zend_arena_checkpoint(ctx->arena);
 	bitset_len = zend_bitset_len(op_array->last_var + op_array->T);
-	usage = zend_arena_calloc(&ctx->arena, bitset_len, ZEND_BITSET_ELM_SIZE);
 	defined_here = zend_arena_alloc(&ctx->arena, bitset_len * ZEND_BITSET_ELM_SIZE);
 
+	zend_bitset_clear(defined_here, bitset_len);
 	for (n = 1; n < cfg->blocks_count; n++) {
 		block = cfg->blocks + n;
 
@@ -1488,7 +1493,11 @@ static void zend_t_usage(zend_cfg *cfg, zend_op_array *op_array, zend_bitset use
 
 		opline = op_array->opcodes + block->start;
 		end = op_array->opcodes + block->end + 1;
-		zend_bitset_clear(defined_here, bitset_len);
+		if (!(block->flags & ZEND_BB_FOLLOW) ||
+		    (block->flags & ZEND_BB_TARGET)) {
+			/* Skip continuation of "extended" BB */
+			zend_bitset_clear(defined_here, bitset_len);
+		}
 
 		while (opline<end) {
 			if (opline->op1_type == IS_VAR || opline->op1_type == IS_TMP_VAR) {
@@ -1534,15 +1543,14 @@ static void zend_t_usage(zend_cfg *cfg, zend_op_array *op_array, zend_bitset use
 		}
 	}
 
-#if DEBUG_BLOCKPASS > 2
-	{
+	if (ctx->debug_level & ZEND_DUMP_BLOCK_PASS_VARS) {
 		int printed = 0;
 		uint32_t i;
 
 		for (i = op_array->last_var; i< op_array->T; i++) {
 			if (zend_bitset_in(used_ext, i)) {
 				if (!printed) {
-					fprintf(stderr, "NON-LOCAL-VARS: %s: %d", op_array->function_name ? op_array->function_name->val : "(null)", i);
+					fprintf(stderr, "NON-LOCAL-VARS: %d", i);
 					printed = 1;
 				} else {
 					fprintf(stderr, ", %d", i);
@@ -1551,13 +1559,13 @@ static void zend_t_usage(zend_cfg *cfg, zend_op_array *op_array, zend_bitset use
 		}
 		if (printed) {
 			fprintf(stderr, "\n");
-			zend_dump_op_array(op_array, cfg, 0);
 		}
 	}
-#endif
 
-	for (n = 0; n < cfg->blocks_count; n++) {
-		block = cfg->blocks + n;
+	usage = defined_here;
+	next_block = NULL;
+	for (n = cfg->blocks_count; n > 0;) {
+		block = cfg->blocks + (--n);
 
 		if (!(block->flags & ZEND_BB_REACHABLE)) {
 			continue;
@@ -1565,7 +1573,15 @@ static void zend_t_usage(zend_cfg *cfg, zend_op_array *op_array, zend_bitset use
 
 		opline = op_array->opcodes + block->end;
 		end = op_array->opcodes + block->start;
-		zend_bitset_copy(usage, used_ext, bitset_len);
+		if (!next_block ||
+		    !(next_block->flags & ZEND_BB_FOLLOW) ||
+		    (next_block->flags & ZEND_BB_TARGET)) {
+			/* Skip continuation of "extended" BB */
+			zend_bitset_copy(usage, used_ext, bitset_len);
+		} else if (block->successors[1] != -1) {
+			zend_bitset_union(usage, used_ext, bitset_len);
+		}
+		next_block = block;
 
 		while (opline >= end) {
 			/* usage checks */
@@ -1758,9 +1774,16 @@ void optimize_cfg(zend_op_array *op_array, zend_optimizer_ctx *ctx)
 
 		/* optimize each basic block separately */
 		for (b = blocks; b < end; b++) {
-			if (b->flags & ZEND_BB_REACHABLE) {
-				zend_optimize_block(b, op_array, usage, &cfg, Tsource);
+			if (!(b->flags & ZEND_BB_REACHABLE)) {
+				continue;
 			}
+			/* we track data dependencies only insight a single basic block */
+			if (!(b->flags & ZEND_BB_FOLLOW) ||
+			    (b->flags & ZEND_BB_TARGET)) {
+				/* Skip continuation of "extended" BB */
+				memset(Tsource, 0, (op_array->last_var + op_array->T) * sizeof(zend_op *));
+			}
+			zend_optimize_block(b, op_array, usage, &cfg, Tsource);
 		}
 
 		/* Jump optimization for each block */

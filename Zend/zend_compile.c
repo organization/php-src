@@ -2616,6 +2616,7 @@ zend_op *zend_compile_static_prop_common(znode *result, zend_ast *ast, uint32_t 
 		opline = zend_emit_op(result, ZEND_FETCH_STATIC_PROP_R, &prop_node, NULL);
 	}
 	if (opline->op1_type == IS_CONST) {
+		convert_to_string(CT_CONSTANT(opline->op1));
 		zend_alloc_polymorphic_cache_slot(opline->op1.constant);
 	}
 	if (class_node.op_type == IS_CONST) {
@@ -2625,7 +2626,6 @@ zend_op *zend_compile_static_prop_common(znode *result, zend_ast *ast, uint32_t 
 	} else {
 		SET_NODE(opline->op2, &class_node);
 	}
-	opline->extended_value |= ZEND_FETCH_STATIC_MEMBER;
 
 	return opline;
 }
@@ -2903,7 +2903,6 @@ void zend_compile_compound_assign(znode *result, zend_ast *ast) /* {{{ */
 
 uint32_t zend_compile_args(zend_ast *ast, zend_function *fbc) /* {{{ */
 {
-	/* TODO.AST &var error */
 	zend_ast_list *args = zend_ast_get_list(ast);
 	uint32_t i;
 	zend_bool uses_arg_unpack = 0;
@@ -3622,7 +3621,7 @@ void zend_compile_clone(znode *result, zend_ast *ast) /* {{{ */
 	znode obj_node;
 	zend_compile_expr(&obj_node, obj_ast);
 
-	zend_emit_op(result, ZEND_CLONE, &obj_node, NULL);
+	zend_emit_op_tmp(result, ZEND_CLONE, &obj_node, NULL);
 }
 /* }}} */
 
@@ -3642,12 +3641,16 @@ void zend_compile_global_var(zend_ast *ast) /* {{{ */
 		zend_op *opline = zend_emit_op(NULL, ZEND_BIND_GLOBAL, &result, &name_node);
 		zend_alloc_cache_slot(opline->op2.constant);
 	} else {
-		zend_emit_op(&result, ZEND_FETCH_W, &name_node, NULL);
+		/* name_ast should be evaluated only. FETCH_GLOBAL_LOCK instructs FETCH_W
+		 * to not free the name_node operand, so it can be reused in the following
+		 * ASSIGN_REF, which then frees it. */
+		zend_op *opline = zend_emit_op(&result, ZEND_FETCH_W, &name_node, NULL);
+		opline->extended_value = ZEND_FETCH_GLOBAL_LOCK;
 
-		// TODO.AST Avoid double fetch
-		//opline->extended_value = ZEND_FETCH_GLOBAL_LOCK;
-
-		zend_emit_assign_ref_znode(var_ast, &result);
+		zend_emit_assign_ref_znode(
+			zend_ast_create(ZEND_AST_VAR, zend_ast_create_znode(&name_node)),
+			&result
+		);
 	}
 }
 /* }}} */
@@ -5228,10 +5231,7 @@ void zend_compile_class_const_decl(zend_ast *ast) /* {{{ */
 		zend_const_expr_to_zval(&value_zv, value_ast);
 
 		name = zend_new_interned_string_safe(name);
-		if (zend_declare_class_constant_ex(ce, name, &value_zv, ast->attr, doc_comment) != SUCCESS) {
-			zend_error_noreturn(E_COMPILE_ERROR, "Cannot redefine class constant %s::%s",
-				ZSTR_VAL(ce->name), ZSTR_VAL(name));
-		}
+		zend_declare_class_constant_ex(ce, name, &value_zv, ast->attr, doc_comment);
 	}
 }
 /* }}} */
@@ -5488,7 +5488,6 @@ void zend_compile_class_decl(zend_ast *ast) /* {{{ */
 	opline = get_next_op(CG(active_op_array));
 	zend_make_var_result(&declare_node, opline);
 
-	// TODO.AST drop this
 	GET_NODE(&FC(implementing_class), opline->result);
 
 	opline->op2_type = IS_CONST;
