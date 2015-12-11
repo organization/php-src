@@ -27,7 +27,7 @@
 #include "jit/zend_jit_context.h"
 #include "jit/zend_jit_codegen.h"
 #include "jit/zend_jit_helpers.h"
-#include "jit/zend_worklist.h"
+#include "Optimizer/zend_worklist.h"
 
 #define ZEND_LLVM_DEBUG                0x0303
 
@@ -4671,7 +4671,7 @@ static zend_class_entry* zend_jit_load_operand_scope(zend_llvm_ctx    &llvm_ctx,
 		}
 		zend_string_release(lcname);
 	} else {
-		zend_jit_ssa_var_info *op_info = (ssa_var >= 0)? &JIT_DATA(llvm_ctx.op_array)->ssa_var_info[ssa_var] : NULL;
+		zend_ssa_var_info *op_info = (ssa_var >= 0)? &JIT_DATA(llvm_ctx.op_array)->ssa_var_info[ssa_var] : NULL;
 		if (op_info && op_info->ce && !op_info->is_instanceof) {
 			scope = op_info->ce;
 		}
@@ -15817,7 +15817,7 @@ static void collect_depended_phi_vars(zend_bitset         worklist,
 	zend_bitset_incl(worklist, var);
 
 	if (info->ssa.vars[var].phi_use_chain) {		
-		zend_jit_ssa_phi *p = info->ssa.vars[var].phi_use_chain;
+		zend_ssa_phi *p = info->ssa.vars[var].phi_use_chain;
 		do {
 			if (!zend_bitset_in(worklist, p->ssa_var)) {
 				collect_depended_phi_vars(worklist, info, p->ssa_var);
@@ -17447,7 +17447,7 @@ static BasicBlock *zend_jit_ssa_target(zend_llvm_ctx    &llvm_ctx,
 	if (info && info->ssa_var_info) {
 		BasicBlock *bb_start = NULL;
 		zend_basic_block *b = info->cfg.blocks + to_block;
-		zend_jit_ssa_phi *p = info->ssa.blocks[to_block].phis;
+		zend_ssa_phi *p = info->ssa.blocks[to_block].phis;
 		int to_var, from_var;
 		uint32_t to_info, from_info;
 		BasicBlock *orig_bb;
@@ -18563,7 +18563,7 @@ int zend_opline_supports_jit(zend_op_array    *op_array,
 /* {{{ int zend_opline_supports_reg_alloc */
 int zend_opline_supports_reg_alloc(zend_op_array    *op_array,
                                    zend_op          *opline,
-                                   zend_jit_ssa_var *ssa_var)
+                                   zend_ssa_var *ssa_var)
 {
 	if (zend_opline_supports_jit(op_array, opline)) {
 		switch (opline->opcode) {
@@ -18600,9 +18600,9 @@ void zend_jit_mark_reg_zvals(zend_op_array *op_array) /* {{{ */
 {
 	zend_jit_func_info    *info         = JIT_DATA(op_array);
 //	zend_basic_block      *blocks       = info->cfg.blocks;
-	zend_jit_ssa_op       *ssa_ops      = info->ssa.ops;
-	zend_jit_ssa_var      *ssa_vars     = info->ssa.vars;
-	zend_jit_ssa_var_info *ssa_var_info = info->ssa_var_info;
+	zend_ssa_op       *ssa_ops      = info->ssa.ops;
+	zend_ssa_var      *ssa_vars     = info->ssa.vars;
+	zend_ssa_var_info *ssa_var_info = info->ssa_var_info;
 	int                    ssa_vars_count = info->ssa.vars_count;
 	int i, j;
 

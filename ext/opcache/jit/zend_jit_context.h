@@ -31,123 +31,30 @@
 #include "zend_arena.h"
 #include "zend_bitset.h"
 #include "Optimizer/zend_cfg.h"
+#include "Optimizer/zend_dfg.h"
+#include "Optimizer/zend_ssa.h"
 
-typedef struct _zend_jit_range {
-	zend_long              min;
-	zend_long              max;
-	zend_bool              underflow;
-	zend_bool              overflow;
-} zend_jit_range;
-
-typedef enum _negative_lat {
-	NEG_NONE      = 0,
-	NEG_INIT      = 1,
-	NEG_INVARIANT = 2,
-	NEG_USE_LT    = 3,
-	NEG_USE_GT    = 4,
-	NEG_UNKNOWN   = 5
-} negative_lat;
-
-/* Special kind of SSA Phi function used in eSSA */
-typedef struct _zend_jit_pi_range {
-	zend_jit_range         range;       /* simple range constraint */
-	int                    min_var;
-	int                    max_var;
-	int                    min_ssa_var; /* ((min_var>0) ? MIN(ssa_var) : 0) + range.min */
-	int                    max_ssa_var; /* ((man_var>0) ? MAX(ssa_var) : 0) + range.man */
-	negative_lat           negative;
-} zend_jit_pi_range;
-
-/* SSA Phi - ssa_var = Phi(source0, source1, ...sourceN) */
-typedef struct _zend_jit_ssa_phi zend_jit_ssa_phi;
-struct _zend_jit_ssa_phi {
-	zend_jit_ssa_phi      *next;          /* next Phi in the same BB */
-	int                    pi;            /* if >= 0 this is actually a e-SSA Pi */
-	zend_jit_pi_range      constraint;    /* e-SSA Pi constraint */
-	int                    var;           /* Original CV, VAR or TMP variable index */
-	int                    ssa_var;       /* SSA variable index */
-	int                    block;         /* current BB index */
-	int                    visited;       /* flag to avoid recursive processing */
-	zend_jit_ssa_phi     **use_chains;
-	zend_jit_ssa_phi      *sym_use_chain;
-	int                   *sources;       /* Array of SSA IDs that produce this var.
-									         As many as this block has
-									         predecessors.  */
-};
-
-typedef struct _zend_jit_ssa_block {
-	zend_jit_ssa_phi      *phis;
-} zend_jit_ssa_block;
-
-typedef struct _zend_jit_ssa_op {
-	int                    op1_use;
-	int                    op2_use;
-	int                    result_use;
-	int                    op1_def;
-	int                    op2_def;
-	int                    result_def;
-	int                    op1_use_chain;
-	int                    op2_use_chain;
-	int                    res_use_chain;
-} zend_jit_ssa_op;
-
-typedef struct _zend_jit_ssa_var {
-	int                    var;            /* original var number; op.var for CVs and following numbers for VARs and TMP_VARs */
-	int                    scc;            /* strongly connected component */
-	int                    definition;     /* opcode that defines this value */
-	zend_jit_ssa_phi      *definition_phi; /* phi that defines this value */
-	int                    use_chain;      /* uses of this value, linked through opN_use_chain */
-	zend_jit_ssa_phi      *phi_use_chain;  /* uses of this value in Phi, linked through use_chain */
-	zend_jit_ssa_phi      *sym_use_chain;  /* uses of this value in Pi constaints */
-	unsigned int           no_val : 1;     /* value doesn't mater (used as op1 in ZEND_ASSIGN) */
-	unsigned int           scc_entry : 1;
-} zend_jit_ssa_var;
-
-typedef struct _zend_jit_ssa {
-	int                    vars_count;     /* number of SSA variables        */
-	zend_jit_ssa_block    *blocks;         /* array of SSA blocks            */
-	zend_jit_ssa_op       *ops;            /* array of SSA instructions      */
-	zend_jit_ssa_var      *vars;           /* use/def chain of SSA variables */
-} zend_jit_ssa;
-
-typedef struct _zend_jit_ssa_var_info {
+typedef struct _zend_ssa_var_info {
 	uint32_t               type; /* inferred type */
-	zend_jit_range         range;
+	zend_ssa_range         range;
 	zend_class_entry      *ce;
 	unsigned int           has_range : 1;
 	unsigned int           is_instanceof : 1; /* 0 - class == "ce", 1 - may be child of "ce" */
 	unsigned int           recursive : 1;
 	unsigned int           use_as_double : 1;
-} zend_jit_ssa_var_info;
+} zend_ssa_var_info;
 
-#define ZEND_JIT_FUNC_TOO_DYNAMIC              ZEND_FUNC_TOO_DYNAMIC
-#define ZEND_JIT_FUNC_HAS_CALLS                ZEND_FUNC_HAS_CALLS
-#define ZEND_JIT_FUNC_VARARG                   ZEND_FUNC_VARARG
-#define ZEND_JIT_FUNC_HAS_PREALLOCATED_CVS     (1<<3) 
-#define ZEND_JIT_FUNC_MAY_COMPILE              (1<<4)
-#define ZEND_JIT_FUNC_RECURSIVE                (1<<5)
-#define ZEND_JIT_FUNC_RECURSIVE_DIRECTLY       (1<<6)
-#define ZEND_JIT_FUNC_RECURSIVE_INDIRECTLY     (1<<7)
-#define ZEND_JIT_FUNC_IRREDUCIBLE              (1<<8)
-#define ZEND_JIT_FUNC_NO_LOOPS                 (1<<9)
+#define ZEND_JIT_FUNC_HAS_PREALLOCATED_CVS     (1<<5) 
+#define ZEND_JIT_FUNC_MAY_COMPILE              (1<<6)
+#define ZEND_JIT_FUNC_RECURSIVE                (1<<7)
+#define ZEND_JIT_FUNC_RECURSIVE_DIRECTLY       (1<<8)
+#define ZEND_JIT_FUNC_RECURSIVE_INDIRECTLY     (1<<9)
 #define ZEND_JIT_FUNC_NO_IN_MEM_CVS            (1<<10)
 #define ZEND_JIT_FUNC_NO_USED_ARGS             (1<<11)
 #define ZEND_JIT_FUNC_NO_SYMTAB                (1<<12)
 #define ZEND_JIT_FUNC_NO_FRAME                 (1<<13)
 #define ZEND_JIT_FUNC_INLINE                   (1<<14)
 #define ZEND_JIT_FUNC_HAS_REG_ARGS             (1<<15)
-
-/* Data Flow Graph */
-typedef struct _zend_jit_dfg {
-	int         vars;
-	uint32_t    size;
-	zend_bitset tmp;
-	zend_bitset gen;
-	zend_bitset def;
-	zend_bitset use;
-	zend_bitset in;
-	zend_bitset out;
-} zend_jit_dfg;
 
 typedef struct _zend_jit_func_info zend_jit_func_info;
 typedef struct _zend_jit_call_info zend_jit_call_info;
@@ -158,7 +65,7 @@ typedef struct _zend_jit_arg_info {
 
 typedef struct _zend_jit_recv_arg_info {
 	int                     ssa_var;
-	zend_jit_ssa_var_info   info;
+	zend_ssa_var_info       info;
 } zend_jit_recv_arg_info;
 
 struct _zend_jit_call_info {
@@ -178,14 +85,14 @@ struct _zend_jit_func_info {
 	int                     num;
 	uint32_t                flags;
 	zend_cfg                cfg;          /* Control Flow Graph            */
-	zend_jit_ssa            ssa;          /* Static Single Assignmnt Form  */
-	zend_jit_ssa_var_info  *ssa_var_info; /* type/range of SSA variales    */
+	zend_ssa                ssa;          /* Static Single Assignmnt Form  */
+	zend_ssa_var_info      *ssa_var_info; /* type/range of SSA variales    */
 	int                     sccs;         /* number of SCCs                */
 	zend_jit_call_info     *caller_info;  /* where this function is called from */
 	zend_jit_call_info     *callee_info;  /* which functions are called from this one */
 	int                     num_args;     /* (-1 - unknown) */
 	zend_jit_recv_arg_info *arg_info;
-	zend_jit_ssa_var_info   return_info;
+	zend_ssa_var_info       return_info;
 	zend_jit_func_info     *clone;
 	int                     clone_num;
 	int                     return_value_used; /* -1 unknown, 0 no, 1 yes */
@@ -310,7 +217,7 @@ extern int zend_jit_rid;
 #define FUNC_MAY_WARN               (1<<30)
 #define FUNC_MAY_INLINE             (1<<31)
 
-static inline int next_use(zend_jit_ssa_op *ssa_op, int var, int use)
+static inline int next_use(zend_ssa_op *ssa_op, int var, int use)
 {
 	ssa_op += use;
 	if (ssa_op->result_use == var) {
@@ -319,7 +226,7 @@ static inline int next_use(zend_jit_ssa_op *ssa_op, int var, int use)
 	return (ssa_op->op1_use == var) ? ssa_op->op1_use_chain : ssa_op->op2_use_chain;
 }
 
-static inline zend_jit_ssa_phi* next_use_phi(zend_jit_func_info *info, int var, zend_jit_ssa_phi *p)
+static inline zend_ssa_phi* next_use_phi(zend_jit_func_info *info, int var, zend_ssa_phi *p)
 {
 	if (p->pi >= 0) {
 		return p->use_chains[0];
@@ -579,8 +486,6 @@ zend_jit_context_calloc(zend_jit_context *ctx, size_t unit_size, size_t count)
 extern "C" {
 #endif
 
-int zend_jit_build_cfg(zend_jit_context *ctx, zend_op_array *op_array) ZEND_HIDDEN;
-int zend_jit_parse_ssa(zend_jit_context *ctx, zend_op_array *op_array) ZEND_HIDDEN;
 int zend_jit_optimize_ssa(zend_jit_context *ctx, zend_op_array *op_array) ZEND_HIDDEN;
 int zend_jit_optimize_vars(zend_jit_context *ctx, zend_op_array *op_array) ZEND_HIDDEN;
 int zend_jit_optimize_calls(zend_jit_context *ctx) ZEND_HIDDEN;

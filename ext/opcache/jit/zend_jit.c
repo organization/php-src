@@ -102,8 +102,16 @@ static int zend_jit_op_array_analyze_cfg(zend_jit_context *ctx, zend_op_array *o
 		return FAILURE;
 	}
 
-	if (zend_jit_build_cfg(ctx, op_array) != SUCCESS) {
+	if (zend_build_cfg(&ctx->arena, op_array, 1, 0, &info->cfg, &info->flags) != SUCCESS) {
 		return FAILURE;
+	}
+
+	if (zend_cfg_build_predecessors(&ctx->arena, &info->cfg) != SUCCESS) {
+		return FAILURE;
+	}
+
+	if (ZCG(accel_directives).jit_debug & JIT_DEBUG_DUMP_CFG) {
+		zend_jit_dump(op_array, JIT_DUMP_CFG);
 	}
 
 //???
@@ -181,7 +189,7 @@ static int zend_jit_op_array_analyze_calls(zend_jit_context *ctx, zend_op_array 
 {
     zend_jit_func_info *info = JIT_DATA(op_array);
 
-	if (info && (info->flags & ZEND_JIT_FUNC_HAS_CALLS)) {
+	if (info && (info->flags & ZEND_FUNC_HAS_CALLS)) {
 	    zend_op *opline = op_array->opcodes;
     	zend_op *end = opline + op_array->last;
 	    zend_function *func;
@@ -309,9 +317,21 @@ static int zend_jit_op_array_analyze_ssa(zend_jit_context *ctx, zend_op_array *o
     zend_jit_func_info *info = JIT_DATA(op_array);
 	
 	if (info && info->cfg.blocks) {
-		if ((info->flags & ZEND_JIT_FUNC_TOO_DYNAMIC) == 0) {
-			if (zend_jit_parse_ssa(ctx, op_array) != SUCCESS) {
+		if (!(info->flags & ZEND_FUNC_TOO_DYNAMIC)) {
+			if (zend_cfg_compute_dominators_tree(op_array, &info->cfg) != SUCCESS) {
 				return FAILURE;
+			}
+			if (zend_cfg_identify_loops(op_array, &info->cfg, &info->flags) != SUCCESS) {
+				return FAILURE;
+			}
+			if (ZCG(accel_directives).jit_debug & JIT_DEBUG_DUMP_DOMINATORS) {
+				zend_jit_dump(op_array, JIT_DUMP_DOMINATORS);
+			}
+			if (zend_build_ssa(&ctx->arena, op_array, &info->cfg, 1, &info->ssa, &info->flags) != SUCCESS) {
+				return FAILURE;
+			}
+			if (ZCG(accel_directives).jit_debug & JIT_DEBUG_DUMP_SSA) {
+				zend_jit_dump(op_array, JIT_DUMP_SSA);
 			}
 			if (zend_jit_optimize_ssa(ctx, op_array) != SUCCESS) {
 				return FAILURE;

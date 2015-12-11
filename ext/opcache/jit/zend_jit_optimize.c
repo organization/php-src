@@ -25,7 +25,7 @@
 #include "jit/zend_jit_config.h"
 #include "jit/zend_jit_context.h"
 #include "jit/zend_jit_codegen.h"
-#include "jit/zend_worklist.h"
+#include "Optimizer/zend_worklist.h"
 
 #include "zend_generators.h"
 
@@ -194,7 +194,7 @@ static int zend_jit_sort_blocks(zend_jit_context *ctx, zend_op_array *op_array)
 	for (i = 0; i < info->cfg.blocks_count; i++) {
 		if (block_map[i] >= 0) {
 			zend_basic_block *bb = &blocks[block_map[i]];
-			zend_jit_ssa_phi *p;
+			zend_ssa_phi *p;
 
 			*bb = info->cfg.blocks[i];
 			bb->flags &= ~(ZEND_BB_TARGET | ZEND_BB_FOLLOW);
@@ -355,8 +355,8 @@ static int zend_jit_sort_blocks(zend_jit_context *ctx, zend_op_array *op_array)
 static int zend_jit_compute_use_def_chains(zend_jit_context *ctx, zend_op_array *op_array)
 {
 	zend_jit_func_info *info = JIT_DATA(op_array);
-	zend_jit_ssa_var *ssa_vars;
-	zend_jit_ssa_var_info *ssa_var_info;
+	zend_ssa_var *ssa_vars;
+	zend_ssa_var_info *ssa_var_info;
 	int i;
 
 	if (!info->ssa.vars) {
@@ -394,7 +394,7 @@ static int zend_jit_compute_use_def_chains(zend_jit_context *ctx, zend_op_array 
 	}
 
 	for (i = op_array->last - 1; i >= 0; i--) {
-		zend_jit_ssa_op *op = info->ssa.ops + i;
+		zend_ssa_op *op = info->ssa.ops + i;
 
 		if (op->op1_use >= 0) {
 			op->op1_use_chain = ssa_vars[op->op1_use].use_chain;
@@ -423,14 +423,14 @@ static int zend_jit_compute_use_def_chains(zend_jit_context *ctx, zend_op_array 
 	}
 
 	for (i = 0; i < info->cfg.blocks_count; i++) {
-		zend_jit_ssa_phi *phi = info->ssa.blocks[i].phis;
+		zend_ssa_phi *phi = info->ssa.blocks[i].phis;
 		while (phi) {
 			phi->block = i;
 			ssa_vars[phi->ssa_var].var = phi->var;
 			ssa_vars[phi->ssa_var].definition_phi = phi;
 			if (phi->pi >= 0) {
 				if (phi->sources[0] >= 0) {
-					zend_jit_ssa_phi *p = ssa_vars[phi->sources[0]].phi_use_chain;
+					zend_ssa_phi *p = ssa_vars[phi->sources[0]].phi_use_chain;
 					while (p && p != phi) {
 						p = next_use_phi(info, phi->sources[0], p);
 					}
@@ -452,7 +452,7 @@ static int zend_jit_compute_use_def_chains(zend_jit_context *ctx, zend_op_array 
 
 				for (j = 0; j < info->cfg.blocks[i].predecessors_count; j++) {
 					if (phi->sources[j] >= 0) {
-						zend_jit_ssa_phi *p = ssa_vars[phi->sources[j]].phi_use_chain;
+						zend_ssa_phi *p = ssa_vars[phi->sources[j]].phi_use_chain;
 						while (p && p != phi) {
 							p = next_use_phi(info, phi->sources[j], p);
 						}
@@ -474,12 +474,12 @@ static int zend_jit_compute_false_dependencies(zend_op_array *op_array)
 {
 		
 	zend_jit_func_info *info = JIT_DATA(op_array);
-	zend_jit_ssa_var *ssa_vars = info->ssa.vars;
-	zend_jit_ssa_op *ssa_ops = info->ssa.ops;
+	zend_ssa_var *ssa_vars = info->ssa.vars;
+	zend_ssa_op *ssa_ops = info->ssa.ops;
 	int ssa_vars_count = info->ssa.vars_count;
 	zend_bitset worklist;
 	int i, j, use;
-	zend_jit_ssa_phi *p;
+	zend_ssa_phi *p;
 
 	if (!op_array->function_name || !info->ssa.vars || !info->ssa.ops)
 		return SUCCESS;
@@ -539,7 +539,7 @@ static int zend_jit_compute_preallocated_cvs(zend_op_array *op_array)
 {
 	zend_jit_func_info *info = JIT_DATA(op_array);
 	int i;
-	zend_jit_ssa_phi *phi;
+	zend_ssa_phi *phi;
 
 	if (!op_array->function_name || !info->ssa.vars || !info->ssa.ops)
 		return SUCCESS;
@@ -587,8 +587,8 @@ static void zend_jit_determine_preallocated_cv_type(zend_op_array *op_array, int
 {
 	zend_jit_func_info *info = JIT_DATA(op_array);
 	zend_op *opline;
-	zend_jit_ssa_op *op;
-	zend_jit_ssa_phi *phi;
+	zend_ssa_op *op;
+	zend_ssa_phi *phi;
 
 	if (info->ssa.vars[v].use_chain >= 0) {
 		opline = &op_array->opcodes[info->ssa.vars[v].use_chain];
@@ -622,7 +622,7 @@ static void zend_jit_determine_preallocated_cv_type(zend_op_array *op_array, int
 
 static void zend_jit_correct_phi_type(zend_jit_func_info *info, int v)
 {
-	zend_jit_ssa_phi *phi = info->ssa.vars[v].phi_use_chain;
+	zend_ssa_phi *phi = info->ssa.vars[v].phi_use_chain;
 
 	if (phi && !phi->visited) {
 		phi->visited = 1;
@@ -748,7 +748,7 @@ static int zend_jit_compute_preallocated_cvs_types(zend_op_array *op_array)
 
 #define FOR_EACH_VAR_USAGE(_var, MACRO) \
 	do { \
-		zend_jit_ssa_phi *p = info->ssa.vars[_var].phi_use_chain; \
+		zend_ssa_phi *p = info->ssa.vars[_var].phi_use_chain; \
 		int use = info->ssa.vars[_var].use_chain; \
 		while (use >= 0) { \
 			FOR_EACH_DEFINED_VAR(use, MACRO); \
@@ -879,7 +879,7 @@ c: - - + + 1 1 0 0 => 1 1 - min/max
 e: - - - + 1 1 1 0 => 1 1 - a/-1
 f  - - - - 1 1 1 1 => 1 1 - min/max
 */
-static void zend_jit_range_or(long a, long b, long c, long d, zend_jit_range *tmp)
+static void zend_ssa_range_or(long a, long b, long c, long d, zend_ssa_range *tmp)
 {
 	int x = ((a < 0) ? 8 : 0) | 
 	        ((b < 0) ? 4 : 0) |
@@ -927,7 +927,7 @@ c: - - + + 1 1 0 0 => 1 1 - min/max
 e: - - - + 1 1 1 0 => 1 0 ? min(a,b,c,-1)/max(a,b,0,d)
 f  - - - - 1 1 1 1 => 1 1 - min/max
 */
-static void zend_jit_range_and(long a, long b, long c, long d, zend_jit_range *tmp)
+static void zend_ssa_range_and(long a, long b, long c, long d, zend_ssa_range *tmp)
 {
 	int x = ((a < 0) ? 8 : 0) | 
 	        ((b < 0) ? 4 : 0) |
@@ -964,7 +964,7 @@ static void zend_jit_range_and(long a, long b, long c, long d, zend_jit_range *t
 	}
 }								
 
-static int zend_jit_calc_range(zend_jit_context *ctx, zend_op_array *op_array, int var, int widening, int narrowing, zend_jit_range *tmp)
+static int zend_jit_calc_range(zend_jit_context *ctx, zend_op_array *op_array, int var, int widening, int narrowing, zend_ssa_range *tmp)
 {
 	zend_jit_func_info *info = JIT_DATA(op_array);
 	uint32_t line;
@@ -972,7 +972,7 @@ static int zend_jit_calc_range(zend_jit_context *ctx, zend_op_array *op_array, i
 	long op1_min, op2_min, op1_max, op2_max, t1, t2, t3, t4;
 
 	if (info->ssa.vars[var].definition_phi) {
-		zend_jit_ssa_phi *p = info->ssa.vars[var].definition_phi;
+		zend_ssa_phi *p = info->ssa.vars[var].definition_phi;
 		int i;
 
 		tmp->underflow = 0;
@@ -1321,7 +1321,7 @@ static int zend_jit_calc_range(zend_jit_context *ctx, zend_op_array *op_array, i
 						op2_min = OP2_MIN_RANGE();
 						op1_max = OP1_MAX_RANGE();
 						op2_max = OP2_MAX_RANGE();
-						zend_jit_range_or(op1_min, op1_max, op2_min, op2_max, tmp);
+						zend_ssa_range_or(op1_min, op1_max, op2_min, op2_max, tmp);
 					}
 					return 1;
 				}
@@ -1341,7 +1341,7 @@ static int zend_jit_calc_range(zend_jit_context *ctx, zend_op_array *op_array, i
 						op2_min = OP2_MIN_RANGE();
 						op1_max = OP1_MAX_RANGE();
 						op2_max = OP2_MAX_RANGE();
-						zend_jit_range_and(op1_min, op1_max, op2_min, op2_max, tmp);
+						zend_ssa_range_and(op1_min, op1_max, op2_min, op2_max, tmp);
 					}
 					return 1;
 				}
@@ -1988,7 +1988,7 @@ static int zend_jit_calc_range(zend_jit_context *ctx, zend_op_array *op_array, i
 							op2_min = OP2_MIN_RANGE();
 							op1_max = OP1_MAX_RANGE();
 							op2_max = OP2_MAX_RANGE();
-							zend_jit_range_or(op1_min, op1_max, op2_min, op2_max, tmp);
+							zend_ssa_range_or(op1_min, op1_max, op2_min, op2_max, tmp);
 						}
 						return 1;
 					}
@@ -2021,7 +2021,7 @@ static int zend_jit_calc_range(zend_jit_context *ctx, zend_op_array *op_array, i
 							op2_min = OP2_MIN_RANGE();
 							op1_max = OP1_MAX_RANGE();
 							op2_max = OP2_MAX_RANGE();
-							zend_jit_range_and(op1_min, op1_max, op2_min, op2_max, tmp);
+							zend_ssa_range_and(op1_min, op1_max, op2_min, op2_max, tmp);
 						}
 						return 1;
 					}
@@ -2139,7 +2139,7 @@ static void zend_jit_check_scc_var(zend_op_array *op_array, int var, int *index,
 {
 	zend_jit_func_info *info = JIT_DATA(op_array);
 #ifdef SYM_RANGE
-	zend_jit_ssa_phi *p;
+	zend_ssa_phi *p;
 #endif
 
 	dfs[var] = *index;
@@ -2232,8 +2232,8 @@ static void zend_jit_init_range(zend_op_array *op_array, int var, zend_bool unde
 #endif
 }
 
-static int zend_jit_widening_meet(zend_jit_ssa_var_info *var_info,
-                                  zend_jit_range        *r)
+static int zend_jit_widening_meet(zend_ssa_var_info *var_info,
+                                  zend_ssa_range        *r)
 {
 	if (!var_info->has_range) {
 		var_info->has_range = 1;
@@ -2261,10 +2261,10 @@ static int zend_jit_widening_meet(zend_jit_ssa_var_info *var_info,
 	return 1;
 }
 
-static int zend_jit_range_widening(zend_jit_context *ctx, zend_op_array *op_array, int var, int scc)
+static int zend_ssa_range_widening(zend_jit_context *ctx, zend_op_array *op_array, int var, int scc)
 {
 	zend_jit_func_info *info = JIT_DATA(op_array);
-	zend_jit_range tmp;
+	zend_ssa_range tmp;
 
 	if (zend_jit_calc_range(ctx, op_array, var, 1, 0, &tmp)) {
 		if (zend_jit_widening_meet(&info->ssa_var_info[var], &tmp)) {
@@ -2277,8 +2277,8 @@ static int zend_jit_range_widening(zend_jit_context *ctx, zend_op_array *op_arra
 	return 0;
 }
 
-static int zend_jit_narrowing_meet(zend_jit_ssa_var_info *var_info,
-                                   zend_jit_range        *r)
+static int zend_jit_narrowing_meet(zend_ssa_var_info *var_info,
+                                   zend_ssa_range        *r)
 {
 	if (!var_info->has_range) {
 		var_info->has_range = 1;
@@ -2310,10 +2310,10 @@ static int zend_jit_narrowing_meet(zend_jit_ssa_var_info *var_info,
 	return 1;
 }
 
-static int zend_jit_range_narrowing(zend_jit_context *ctx, zend_op_array *op_array, int var, int scc)
+static int zend_ssa_range_narrowing(zend_jit_context *ctx, zend_op_array *op_array, int var, int scc)
 {
 	zend_jit_func_info *info = JIT_DATA(op_array);
-	zend_jit_range tmp;
+	zend_ssa_range tmp;
 
 	if (zend_jit_calc_range(ctx, op_array, var, 0, 1, &tmp)) {
 		if (zend_jit_narrowing_meet(&info->ssa_var_info[var], &tmp)) {
@@ -2358,7 +2358,7 @@ static void zend_jit_infer_ranges_warmup(zend_jit_context *ctx, zend_op_array *o
 	zend_bitset worklist = alloca(sizeof(zend_ulong) * worklist_len);
 	zend_bitset visited = alloca(sizeof(zend_ulong) * worklist_len);
 	int j, n;
-	zend_jit_range tmp;
+	zend_ssa_range tmp;
 #ifdef NEG_RANGE
 	int has_inner_cycles = 0;
 	
@@ -2465,8 +2465,8 @@ static int zend_jit_infer_ranges(zend_jit_context *ctx, zend_op_array *op_array)
 	zend_bitset worklist = alloca(sizeof(zend_ulong) * worklist_len);
 	int *next_scc_var = alloca(sizeof(int) * info->ssa.vars_count);
 	int *scc_var = alloca(sizeof(int) * info->sccs);
-	zend_jit_ssa_phi *p;
-	zend_jit_range tmp;
+	zend_ssa_phi *p;
+	zend_ssa_range tmp;
 	int scc, j;
 
 #ifdef LOG_SSA_RANGE
@@ -2514,7 +2514,7 @@ static int zend_jit_infer_ranges(zend_jit_context *ctx, zend_op_array *op_array)
 			while (!zend_bitset_empty(worklist, worklist_len)) {
 				j = zend_bitset_first(worklist, worklist_len);
 				zend_bitset_excl(worklist, j);
-				if (zend_jit_range_widening(ctx, op_array, j, scc)) {
+				if (zend_ssa_range_widening(ctx, op_array, j, scc)) {
 					FOR_EACH_VAR_USAGE(j, ADD_SCC_VAR);
 				}
 			}
@@ -2531,7 +2531,7 @@ static int zend_jit_infer_ranges(zend_jit_context *ctx, zend_op_array *op_array)
 			while (!zend_bitset_empty(worklist, worklist_len)) {
 				j = zend_bitset_first(worklist, worklist_len);
 				zend_bitset_excl(worklist, j);
-				if (zend_jit_range_narrowing(ctx, op_array, j, scc)) {
+				if (zend_ssa_range_narrowing(ctx, op_array, j, scc)) {
 					FOR_EACH_VAR_USAGE(j, ADD_SCC_VAR);
 #ifdef SYM_RANGE
 					/* Process symbolic control-flow constraints */
@@ -2554,7 +2554,7 @@ static void add_usages(zend_op_array *op_array, zend_bitset worklist, int var)
 	zend_jit_func_info *info = JIT_DATA(op_array);
 
 	if (info->ssa.vars[var].phi_use_chain) {
-		zend_jit_ssa_phi *p = info->ssa.vars[var].phi_use_chain;
+		zend_ssa_phi *p = info->ssa.vars[var].phi_use_chain;
 		do {
 			zend_bitset_incl(worklist, p->ssa_var);
 			p = next_use_phi(info, var, p);
@@ -2591,10 +2591,10 @@ static void add_usages(zend_op_array *op_array, zend_bitset worklist, int var)
 static void reset_dependent_vars(zend_op_array *op_array, zend_bitset worklist, int var)
 {
 	zend_jit_func_info *info = JIT_DATA(op_array);
-	zend_jit_ssa_op *ssa_ops = info->ssa.ops;
-	zend_jit_ssa_var *ssa_vars = info->ssa.vars;
-	zend_jit_ssa_var_info *ssa_var_info = info->ssa_var_info;
-	zend_jit_ssa_phi *p;
+	zend_ssa_op *ssa_ops = info->ssa.ops;
+	zend_ssa_var *ssa_vars = info->ssa.vars;
+	zend_ssa_var_info *ssa_var_info = info->ssa_var_info;
+	zend_ssa_phi *p;
 	int use;
 	
 	p = ssa_vars[var].phi_use_chain;
@@ -2752,9 +2752,9 @@ static void zend_jit_update_type_info(zend_jit_context *ctx,
 	uint32_t tmp, orig;
 	zend_op *opline = op_array->opcodes + i;
 	zend_jit_func_info *info = JIT_DATA(op_array);
-	zend_jit_ssa_op *ssa_ops = info->ssa.ops;
-	zend_jit_ssa_var *ssa_vars = info->ssa.vars;
-	zend_jit_ssa_var_info *ssa_var_info = info->ssa_var_info;
+	zend_ssa_op *ssa_ops = info->ssa.ops;
+	zend_ssa_var *ssa_vars = info->ssa.vars;
+	zend_ssa_var_info *ssa_var_info = info->ssa_var_info;
 	zend_class_entry *ce;
 	int j;
 
@@ -4167,8 +4167,8 @@ static int zend_jit_infer_types_ex(zend_jit_context *ctx, zend_op_array *op_arra
 {
 	zend_jit_func_info *info = JIT_DATA(op_array);
 	zend_basic_block *blocks = info->cfg.blocks;
-	zend_jit_ssa_var *ssa_vars = info->ssa.vars;
-	zend_jit_ssa_var_info *ssa_var_info = info->ssa_var_info;
+	zend_ssa_var *ssa_vars = info->ssa.vars;
+	zend_ssa_var_info *ssa_var_info = info->ssa_var_info;
 	int ssa_vars_count = info->ssa.vars_count;
 	uint i;
 	int j;
@@ -4178,7 +4178,7 @@ static int zend_jit_infer_types_ex(zend_jit_context *ctx, zend_op_array *op_arra
 		j = zend_bitset_first(worklist, zend_bitset_len(ssa_vars_count));
 		zend_bitset_excl(worklist, j);
 		if (ssa_vars[j].definition_phi) {
-			zend_jit_ssa_phi *p = ssa_vars[j].definition_phi;
+			zend_ssa_phi *p = ssa_vars[j].definition_phi;
 			if (p->pi >= 0) {
 				tmp = get_ssa_var_info(info, p->sources[0]);
 				UPDATE_SSA_TYPE(tmp, j);
@@ -4280,7 +4280,7 @@ static void zend_jit_func_return_info(zend_jit_context      *ctx,
                                       zend_op_array         *op_array,
                                       int                    recursive,
                                       int                    widening,
-                                      zend_jit_ssa_var_info *ret)
+                                      zend_ssa_var_info *ret)
 {
 	zend_jit_func_info *info = JIT_DATA(op_array);
 	int blocks_count = info->cfg.blocks_count;
@@ -4292,7 +4292,7 @@ static void zend_jit_func_return_info(zend_jit_context      *ctx,
 	int tmp_is_instanceof = -1;
 	zend_class_entry *arg_ce;
 	int arg_is_instanceof;
-	zend_jit_range tmp_range = {0, 0, 0, 0};
+	zend_ssa_range tmp_range = {0, 0, 0, 0};
 	int tmp_has_range = -1;
 
 	if (op_array->fn_flags & ZEND_ACC_GENERATOR) {
@@ -4470,14 +4470,14 @@ static void zend_jit_func_arg_info(zend_jit_context      *ctx,
                                    int                    num,
                                    int                    recursive,
                                    int                    widening,
-                                   zend_jit_ssa_var_info *ret)
+                                   zend_ssa_var_info *ret)
 {
 	zend_jit_func_info *info = JIT_DATA(op_array);
 	uint32_t tmp = 0;
 	zend_class_entry *tmp_ce = NULL;
 	int tmp_is_instanceof = -1; /* unknown */
 	int tmp_has_range = -1;
-	zend_jit_range tmp_range = {0,0,0,0};
+	zend_ssa_range tmp_range = {0,0,0,0};
 
 	if (info && info->caller_info) {
 		zend_jit_call_info *call_info = info->caller_info;
@@ -4656,9 +4656,9 @@ static int zend_jit_may_be_used_as_double(zend_op_array *op_array, int var)
 static int zend_jit_type_narrowing(zend_jit_context *ctx, zend_op_array *op_array)
 {
 	zend_jit_func_info *info = JIT_DATA(op_array);
-	zend_jit_ssa_op *ssa_ops = info->ssa.ops;
-	zend_jit_ssa_var *ssa_vars = info->ssa.vars;
-	zend_jit_ssa_var_info *ssa_var_info = info->ssa_var_info;
+	zend_ssa_op *ssa_ops = info->ssa.ops;
+	zend_ssa_var *ssa_vars = info->ssa.vars;
+	zend_ssa_var_info *ssa_var_info = info->ssa_var_info;
 	int ssa_vars_count = info->ssa.vars_count;
 	int j;
 	zend_bitset worklist, types;
@@ -4747,7 +4747,7 @@ static int zend_jit_type_narrowing(zend_jit_context *ctx, zend_op_array *op_arra
 static int zend_jit_infer_types(zend_jit_context *ctx, zend_op_array *op_array)
 {
 	zend_jit_func_info *info = JIT_DATA(op_array);
-	zend_jit_ssa_var_info *ssa_var_info = info->ssa_var_info;
+	zend_ssa_var_info *ssa_var_info = info->ssa_var_info;
 	int ssa_vars_count = info->ssa.vars_count;
 	int j;
 	zend_bitset worklist;
@@ -4820,7 +4820,7 @@ static void zend_jit_check_no_used_args(zend_op_array *op_array)
 	zend_jit_func_info *info = JIT_DATA(op_array);
 	int i, num_args;
 
-	if (info->flags & ZEND_JIT_FUNC_VARARG) {
+	if (info->flags & ZEND_FUNC_VARARG) {
 		return;
 	}
 
@@ -4844,7 +4844,7 @@ static void zend_jit_check_no_symtab(zend_op_array *op_array)
 	if (!info ||
 	    !op_array->function_name ||
 	    !info->ssa_var_info ||
-	    (info->flags & ZEND_JIT_FUNC_TOO_DYNAMIC)) {
+	    (info->flags & ZEND_FUNC_TOO_DYNAMIC)) {
 		return;
 	}
 	for (b = 0; b < info->cfg.blocks_count; b++) {
@@ -5106,11 +5106,11 @@ static zend_jit_func_info* zend_jit_create_clone(zend_jit_context *ctx, zend_jit
 	memcpy(clone, info, sizeof(zend_jit_func_info));
 	/* TODO: support for multiple clones */
 	clone->clone_num = 1;
-	clone->ssa_var_info = zend_jit_context_calloc(ctx, sizeof(zend_jit_ssa_var_info), info->ssa.vars_count);
+	clone->ssa_var_info = zend_jit_context_calloc(ctx, sizeof(zend_ssa_var_info), info->ssa.vars_count);
 	if (!clone->ssa_var_info) {
 		return NULL;
 	}
-	memcpy(clone->ssa_var_info, info->ssa_var_info, sizeof(zend_jit_ssa_var_info) * info->ssa.vars_count);
+	memcpy(clone->ssa_var_info, info->ssa_var_info, sizeof(zend_ssa_var_info) * info->ssa.vars_count);
 	return clone;
 }
 
@@ -5203,7 +5203,7 @@ static void zend_jit_check_no_frame(zend_jit_context *ctx, zend_op_array *op_arr
 
 		info->clone = zend_jit_create_clone(ctx, info);
 		info->clone->return_value_used = zend_jit_is_return_value_used(op_array);
-		if (info->num_args == 0 && !(info->flags & ZEND_JIT_FUNC_VARARG)) {
+		if (info->num_args == 0 && !(info->flags & ZEND_FUNC_VARARG)) {
 			info->clone->flags |= ZEND_JIT_FUNC_NO_USED_ARGS;			
 		}
 		info->clone->flags |= ZEND_JIT_FUNC_NO_FRAME;
@@ -5222,7 +5222,7 @@ static void zend_jit_check_inlining(zend_op_array *op_array)
 	zend_jit_func_info *info = JIT_DATA(op_array);
 
 	if (info->caller_info &&
-	    (info->flags & (ZEND_JIT_FUNC_TOO_DYNAMIC|ZEND_JIT_FUNC_RECURSIVE)) == 0 &&
+	    (info->flags & (ZEND_FUNC_TOO_DYNAMIC|ZEND_JIT_FUNC_RECURSIVE)) == 0 &&
 	    !(op_array->fn_flags & ZEND_ACC_GENERATOR) &&
 	    !(op_array->fn_flags & ZEND_ACC_RETURN_REFERENCE) &&
 	    !op_array->last_try_catch &&
@@ -5231,7 +5231,7 @@ static void zend_jit_check_inlining(zend_op_array *op_array)
 		if (info->clone) {
 			info = info->clone;
 		}
-		if ((info->flags & ZEND_JIT_FUNC_NO_LOOPS) &&
+		if ((info->flags & ZEND_FUNC_NO_LOOPS) &&
 		    (info->flags & ZEND_JIT_FUNC_NO_IN_MEM_CVS) &&
 		    (info->flags & ZEND_JIT_FUNC_NO_SYMTAB) && 
 		    (info->flags & ZEND_JIT_FUNC_NO_FRAME)) { 
@@ -5249,7 +5249,7 @@ static void zend_jit_mark_reg_args(zend_op_array *op_array)
 	    info->clone_num &&
 	    info->num_args &&
 	    !(info->flags & ZEND_JIT_FUNC_NO_USED_ARGS) &&
-		!(info->flags & ZEND_JIT_FUNC_VARARG)) {
+		!(info->flags & ZEND_FUNC_VARARG)) {
 		for (i = 0; i < info->num_args; i++) {
 			if (info->arg_info[i].ssa_var >= 0 &&
 				(info->ssa_var_info[info->arg_info[i].ssa_var].type & MAY_BE_DEF)) {
@@ -5380,7 +5380,7 @@ static void zend_jit_infer_return_types(zend_jit_context *ctx)
 	int i;
 	int worklist_len;
 	zend_bitset worklist, visited;
-	zend_jit_ssa_var_info tmp;
+	zend_ssa_var_info tmp;
 	zend_bitset *varlist;
 
 	worklist_len = zend_bitset_len(ctx->op_arrays_count);
@@ -5689,7 +5689,7 @@ static void zend_jit_ip_find_vars(zend_jit_context *ctx,
 				call_info = call_info->next_caller;
 			}
 		} else if (ip_var[n].kind == IP_VAR) { 
-			zend_jit_ssa_phi *p;
+			zend_ssa_phi *p;
 			int use;
 
 			j = ip_var[n].num;
@@ -5836,7 +5836,7 @@ static void zend_jit_ip_infer_ranges_warmup(zend_jit_context *ctx, zend_jit_ip_v
 			op_array = ctx->op_arrays[ip_var[j].op_array_num];
 			info = JIT_DATA(op_array);
 			if (ip_var[j].kind == IP_VAR) {
-				zend_jit_range tmp;
+				zend_ssa_range tmp;
 
 				if (zend_jit_calc_range(ctx, op_array, ip_var[j].num, 0, 0, &tmp)) {
 #ifdef NEG_RANGE
@@ -5914,7 +5914,7 @@ static void zend_jit_ip_infer_ranges_warmup(zend_jit_context *ctx, zend_jit_ip_v
 					}
 				}
 			} else if (ip_var[j].kind == IP_RET) {
-				zend_jit_ssa_var_info tmp;
+				zend_ssa_var_info tmp;
 
 				zend_jit_func_return_info(ctx, op_array, 1, 1, &tmp);
 				if (tmp.has_range) {
@@ -5932,7 +5932,7 @@ static void zend_jit_ip_infer_ranges_warmup(zend_jit_context *ctx, zend_jit_ip_v
 					}
 				}
 			} else if (ip_var[j].kind == IP_ARG) {
-				zend_jit_ssa_var_info tmp;
+				zend_ssa_var_info tmp;
 
 				zend_jit_func_arg_info(ctx, op_array, ip_var[j].num, 1, 1, &tmp);
 				if (tmp.has_range) {
@@ -6015,7 +6015,7 @@ static void zend_jit_ip_infer_ranges(zend_jit_context *ctx, int with_args)
 			info = JIT_DATA(op_array);
 			
 			if (info->ssa.vars[ip_var[j].num].definition_phi) {
-				zend_jit_ssa_phi *p = info->ssa.vars[ip_var[j].num].definition_phi;
+				zend_ssa_phi *p = info->ssa.vars[ip_var[j].num].definition_phi;
 
 				if (p->pi >= 0) {
 					if (!info->ssa.vars[p->sources[0]].no_val &&
@@ -6108,7 +6108,7 @@ static void zend_jit_ip_infer_ranges(zend_jit_context *ctx, int with_args)
 			info = JIT_DATA(op_array);
 			
 			if (ip_var[j].kind == IP_VAR) {
-				zend_jit_range tmp;
+				zend_ssa_range tmp;
 
 				if (zend_jit_calc_range(ctx, op_array, ip_var[j].num, 0, 1, &tmp)) {
 					zend_jit_init_range(op_array, ip_var[j].num, tmp.underflow, tmp.min, tmp.max, tmp.overflow);
@@ -6116,7 +6116,7 @@ static void zend_jit_ip_infer_ranges(zend_jit_context *ctx, int with_args)
 					zend_jit_init_range(op_array, ip_var[j].num, 1, LONG_MIN, LONG_MAX, 1);
 				}
 			} else if (ip_var[j].kind == IP_RET) {
-				zend_jit_ssa_var_info tmp;
+				zend_ssa_var_info tmp;
 
 				zend_jit_func_return_info(ctx, op_array, 1, 0, &tmp);
 				if (tmp.has_range) {
@@ -6130,7 +6130,7 @@ static void zend_jit_ip_infer_ranges(zend_jit_context *ctx, int with_args)
 					info->return_info.range.overflow = 1;
 				}
 			} else if (ip_var[j].kind == IP_ARG) {
-				zend_jit_ssa_var_info tmp;
+				zend_ssa_var_info tmp;
 
 				zend_jit_func_arg_info(ctx, op_array, ip_var[j].num, 1, 0, &tmp);
 				if (tmp.has_range) {
@@ -6171,7 +6171,7 @@ static void zend_jit_ip_infer_ranges(zend_jit_context *ctx, int with_args)
 			info = JIT_DATA(op_array);
 
 			if (ip_var[j].kind == IP_VAR) {
-				zend_jit_range tmp;
+				zend_ssa_range tmp;
 
 				if (zend_jit_calc_range(ctx, op_array, ip_var[j].num, 1, 0, &tmp)) {
 					if (zend_jit_widening_meet(&info->ssa_var_info[ip_var[j].num], &tmp)) {
@@ -6191,7 +6191,7 @@ static void zend_jit_ip_infer_ranges(zend_jit_context *ctx, int with_args)
 					}
 				}
 			} else if (ip_var[j].kind == IP_RET) {
-				zend_jit_ssa_var_info tmp;
+				zend_ssa_var_info tmp;
 
 				zend_jit_func_return_info(ctx, op_array, 1, 1, &tmp);
 				if (tmp.has_range) {
@@ -6205,7 +6205,7 @@ static void zend_jit_ip_infer_ranges(zend_jit_context *ctx, int with_args)
 					}
 				}
 			} else if (ip_var[j].kind == IP_ARG) {
-				zend_jit_ssa_var_info tmp;
+				zend_ssa_var_info tmp;
 
 				zend_jit_func_arg_info(ctx, op_array, ip_var[j].num, 1, 1, &tmp);
 				if (tmp.has_range) {
@@ -6258,7 +6258,7 @@ static void zend_jit_ip_infer_ranges(zend_jit_context *ctx, int with_args)
 			info = JIT_DATA(op_array);
 
 			if (ip_var[j].kind == IP_VAR) {
-				zend_jit_range tmp;
+				zend_ssa_range tmp;
 
 				if (zend_jit_calc_range(ctx, op_array, ip_var[j].num, 0, 1, &tmp)) {
 					if (zend_jit_narrowing_meet(&info->ssa_var_info[ip_var[j].num], &tmp)) {
@@ -6271,7 +6271,7 @@ static void zend_jit_ip_infer_ranges(zend_jit_context *ctx, int with_args)
 					}
 				}
 			} else if (ip_var[j].kind == IP_RET) {
-				zend_jit_ssa_var_info tmp;
+				zend_ssa_var_info tmp;
 
 				zend_jit_func_return_info(ctx, op_array, 1, 0, &tmp);
 				if (tmp.has_range) {
@@ -6285,7 +6285,7 @@ static void zend_jit_ip_infer_ranges(zend_jit_context *ctx, int with_args)
 					}
 				}
 			} else if (ip_var[j].kind == IP_ARG) {
-				zend_jit_ssa_var_info tmp;
+				zend_ssa_var_info tmp;
 
 				zend_jit_func_arg_info(ctx, op_array, ip_var[j].num, 1, 0, &tmp);
 				if (tmp.has_range) {
@@ -6359,7 +6359,7 @@ static void zend_jit_infer_arg_and_return_types(zend_jit_context *ctx, int recur
 	int i, j;
 	int worklist_len;
 	zend_bitset worklist, visited;
-	zend_jit_ssa_var_info tmp;
+	zend_ssa_var_info tmp;
 	zend_bitset *varlist;
 
 	worklist_len = zend_bitset_len(ctx->op_arrays_count);
@@ -6392,7 +6392,7 @@ static void zend_jit_infer_arg_and_return_types(zend_jit_context *ctx, int recur
 			int num_args = MIN(info->num_args, ctx->op_arrays[i]->num_args);
 
 			for (j = 0; j < num_args; j++) {
-				zend_jit_ssa_var_info tmp;
+				zend_ssa_var_info tmp;
 
 				zend_jit_func_arg_info(ctx, ctx->op_arrays[i], j, recursive, 0, &tmp);
 				if (tmp.type != 0) {
