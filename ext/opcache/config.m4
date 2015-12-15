@@ -448,9 +448,7 @@ fi
     PHP_SUBST(OPCACHE_SHARED_LIBADD)
     PHP_ADD_SOURCES_X(PHP_EXT_DIR(opcache),
     	jit/zend_jit.c \
-    	jit/zend_jit_ssa.c \
     	jit/zend_jit_optimize.c \
-    	jit/zend_jit_func_info.c \
     	jit/zend_jit_helpers.c,,
     	shared_objects_opcache, yes)
     PHP_ADD_SOURCES_X(PHP_EXT_DIR(opcache),
