@@ -8,6 +8,10 @@ Core:
     Reeze Xia, Dmitry)
   . Added void return type. (Andrea)
 
+- FTP:
+  . Implemented FR #55651 (Option to ignore the returned FTP PASV address).
+    (abrender at elitehosts dot com)
+
 Hash:
   . Added SHA3 fixed mode algorithms (224, 256, 384, and 512 bit). (Sara)
 
@@ -15,6 +19,8 @@ PDO_Firebird:
   . Fixed bug #60052 (Integer returned as a 64bit integer on X64_86). (Mariuz)
 
 Standard:
+  . Fixed bug #71100 (long2ip() doesn't accept integers in strict mode).
+    (Laruence)
   . Implemented FR #55716 (Add an option to pass a custom stream context to
     get_headers()). (Ferenc)
   . Implemented FR #69359 (Provide a way to fetch the current environment
