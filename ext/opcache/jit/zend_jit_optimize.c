@@ -99,10 +99,11 @@ static int compute_block_order(zend_op_array *op_array, struct block_order *orde
 	int blocks_count = info->ssa.cfg.blocks_count;
 	int i;
 	int visit_count = 0;
+	ALLOCA_FLAG(use_heap);
 
 	ZEND_ASSERT(blocks_count);
 
-	ZEND_WORKLIST_ALLOCA(&in, blocks_count);
+	ZEND_WORKLIST_ALLOCA(&in, blocks_count, use_heap);
 
 	for (i = 0; i < blocks_count; i++) {
 		order[i].block_num = i;
@@ -142,6 +143,8 @@ static int compute_block_order(zend_op_array *op_array, struct block_order *orde
 	qsort(order, blocks_count, sizeof(*order), compare_blocks);
 
 	*live_blocks = compute_block_map(info, order, block_map);
+
+	ZEND_WORKLIST_FREE_ALLOCA(&in, use_heap);
 
 	return SUCCESS;
 }
@@ -1331,8 +1334,9 @@ static int zend_jit_ip_find_sccs(zend_jit_ip_var *ip_var, int ip_vars)
 	zend_worklist_stack stack;
 	int *root = alloca(sizeof(int) * ip_vars);
 	int *dfs = alloca(sizeof(int) * ip_vars);
+	ALLOCA_FLAG(stack_use_heap);
 
-	ZEND_WORKLIST_STACK_ALLOCA(&stack, ip_vars);
+	ZEND_WORKLIST_STACK_ALLOCA(&stack, ip_vars, stack_use_heap);
 	memset(dfs, -1, sizeof(int) * ip_vars);
 
 	/* Find SCCs */
@@ -1364,6 +1368,8 @@ static int zend_jit_ip_find_sccs(zend_jit_ip_var *ip_var, int ip_vars)
 		}
 	}
 
+	ZEND_WORKLIST_STACK_FREE_ALLOCA(&stack, stack_use_heap);
+
 	return sccs;
 }
 
@@ -1382,8 +1388,9 @@ static void zend_jit_ip_find_vars(zend_jit_context *ctx,
 	int deps; /* number of dependent variables */
 	zend_worklist_stack stack;
 	int *dep = alloca(sizeof(int) * ip_vars);
+	ALLOCA_FLAG(stack_use_heap);
 
-	ZEND_WORKLIST_STACK_ALLOCA(&stack, ip_vars);
+	ZEND_WORKLIST_STACK_ALLOCA(&stack, ip_vars, stack_use_heap);
 	if (with_args) {
 		for (i = 0; i < ctx->call_graph.op_arrays_count; i++) {
 			op_array = ctx->call_graph.op_arrays[i];
@@ -1541,6 +1548,8 @@ static void zend_jit_ip_find_vars(zend_jit_context *ctx,
 			memcpy(ip_var[n].dep, dep, sizeof(int) * deps);
 		}
 	}
+
+	ZEND_WORKLIST_STACK_FREE_ALLOCA(&stack, stack_use_heap);
 }
 
 #ifdef NEG_RANGE
