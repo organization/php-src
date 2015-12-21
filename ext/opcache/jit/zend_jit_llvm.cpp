@@ -18158,7 +18158,7 @@ static int zend_jit_codegen_ex(zend_jit_context *ctx,
 				case ZEND_DECLARE_ANON_CLASS:
 				case ZEND_DECLARE_ANON_INHERITED_CLASS:
 					if (!zend_jit_handler(llvm_ctx, opline)) return 0;
-					if (!zend_jit_cond_jmp(llvm_ctx, opline, OP_JMP_ADDR(opline, *OP1_OP()), TARGET_BB(blocks[b].successors[0]), TARGET_BB(blocks[b].successors[1]))) return 0;
+					if (!zend_jit_cond_jmp(llvm_ctx, opline, ZEND_OFFSET_TO_OPLINE(opline, opline->extended_value), TARGET_BB(blocks[b].successors[0]), TARGET_BB(blocks[b].successors[1]))) return 0;
 					break;
 				case ZEND_BIND_GLOBAL:
 					if (!zend_jit_bind_global(llvm_ctx, op_array, opline)) return 0;
