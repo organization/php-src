@@ -448,7 +448,11 @@ static void zend_init_call_trampoline_op(void) /* {{{ */
 
 static void auto_global_dtor(zval *zv) /* {{{ */
 {
-	free(Z_PTR_P(zv));
+	zend_auto_global *ag = Z_PTR_P(zv);
+
+	zend_string_release(ag->name);
+
+	free(ag);
 }
 /* }}} */
 
@@ -467,7 +471,7 @@ static void auto_global_copy_ctor(zval *zv) /* {{{ */
 	zend_auto_global *old_ag = (zend_auto_global *) Z_PTR_P(zv);
 	zend_auto_global *new_ag = pemalloc(sizeof(zend_auto_global), 1);
 
-	new_ag->name = old_ag->name;
+	new_ag->name = zend_string_dup(old_ag->name, 1);
 	new_ag->auto_global_callback = old_ag->auto_global_callback;
 	new_ag->jit = old_ag->jit;
 
@@ -983,7 +987,6 @@ ZEND_API void zend_deactivate(void) /* {{{ */
 	fprintf(stderr, "        Root    Buffered     buffer     grey\n");
 	fprintf(stderr, "      --------  --------  -----------  ------\n");
 	fprintf(stderr, "ZVAL  %8d  %8d  %9d  %8d\n", GC_G(zval_possible_root), GC_G(zval_buffered), GC_G(zval_remove_from_buffer), GC_G(zval_marked_grey));
-	fprintf(stderr, "ZOBJ  %8d  %8d  %9d  %8d\n", GC_G(zobj_possible_root), GC_G(zobj_buffered), GC_G(zobj_remove_from_buffer), GC_G(zobj_marked_grey));
 #endif
 
 	zend_try {
