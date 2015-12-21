@@ -3623,13 +3623,13 @@ static Value* zend_jit_load_cv(zend_llvm_ctx &llvm_ctx,
 	PHI_DCL(cv, 2);
 
 	// JIT: ret = EX_VAR(var)
-	if ((info & MAY_BE_DEF) || mode == BP_VAR_RW || mode == BP_VAR_W) {
+	if ((info & (MAY_BE_ANY|MAY_BE_REF)) || mode == BP_VAR_RW || mode == BP_VAR_W) {
 		zval_addr = zend_jit_load_cv_addr(llvm_ctx, var);
 	}
 	if (info & MAY_BE_UNDEF) {
 		BasicBlock *bb_def = NULL;
 
-		if (info & MAY_BE_DEF && mode != BP_VAR_IS) {
+		if ((info & (MAY_BE_ANY|MAY_BE_REF)) && mode != BP_VAR_IS) {
 			if (mode == BP_VAR_R || mode == BP_VAR_UNSET) {
 				PHI_ADD(cv, zval_addr);
 			}
@@ -12014,7 +12014,7 @@ static int zend_jit_strlen(zend_llvm_ctx  &llvm_ctx,
 
 		if (OP1_OP_TYPE() == IS_CV && (op1_info & MAY_BE_UNDEF)) {
 			BasicBlock *bb_follow = NULL;
-			if (op1_info & MAY_BE_DEF) {
+			if (OP1_INFO() & (MAY_BE_ANY|MAY_BE_REF)) {
 				BasicBlock *bb_undef = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
 				bb_follow = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
 				//JIT: if (UNEXPECTED(Z_TYPE_P(value) == IS_UNDEF)) {
@@ -14288,7 +14288,7 @@ static int zend_jit_bind_global(zend_llvm_ctx     &llvm_ctx,
 		llvm_ctx.builder.SetInsertPoint(bb_follow);
 	}
 
-	if (OP1_MAY_BE(MAY_BE_DEF)) {
+	if (OP1_MAY_BE(MAY_BE_ANY|MAY_BE_REF)) {
 		JIT_CHECK(zend_jit_check_exception(llvm_ctx, opline));
 	}
 	llvm_ctx.valid_opline = 0;

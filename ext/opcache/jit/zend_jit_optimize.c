@@ -618,7 +618,7 @@ static void zend_jit_check_no_used_args(zend_op_array *op_array)
 		num_args = MIN(op_array->num_args, info->num_args);
 		for (i = 0; i < num_args; i++) {
 			if (info->arg_info[i].ssa_var < 0 ||
-				(info->ssa.var_info[info->arg_info[i].ssa_var].type & MAY_BE_DEF)) {
+				(info->ssa.var_info[info->arg_info[i].ssa_var].type & (MAY_BE_ANY | MAY_BE_REF))) {
 				return;
 			}
 		}
@@ -1043,7 +1043,7 @@ static void zend_jit_mark_reg_args(zend_op_array *op_array)
 		!(info->flags & ZEND_FUNC_VARARG)) {
 		for (i = 0; i < info->num_args; i++) {
 			if (info->arg_info[i].ssa_var >= 0 &&
-				(info->ssa.var_info[info->arg_info[i].ssa_var].type & MAY_BE_DEF)) {
+				(info->ssa.var_info[info->arg_info[i].ssa_var].type & (MAY_BE_ANY | MAY_BE_REF))) {
 				if ((info->ssa.var_info[info->arg_info[i].ssa_var].type & MAY_BE_IN_REG)) {
 					if (info->ssa.var_info[info->arg_info[i].ssa_var].type & (MAY_BE_LONG|MAY_BE_FALSE|MAY_BE_TRUE)) {
 						info->arg_info[i].info.type |= MAY_BE_IN_REG;
