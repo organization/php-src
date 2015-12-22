@@ -121,7 +121,7 @@ static int zend_jit_op_array_analyze_ssa(zend_jit_context *ctx, zend_op_array *o
 			if (ZCG(accel_directives).jit_debug & JIT_DEBUG_DUMP_DOMINATORS) {
 				zend_dump_dominators(op_array, &info->ssa.cfg);
 			}
-			build_flags = ZEND_RT_CONSTANTS;
+			build_flags = ZEND_RT_CONSTANTS | ZEND_SSA_RC_INFERENCE;
 			if (ZCG(accel_directives).jit_debug & JIT_DEBUG_DUMP_LIVENESS) {
 				build_flags |= ZEND_SSA_DEBUG_LIVENESS;
 			}
