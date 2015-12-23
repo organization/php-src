@@ -6173,6 +6173,24 @@ static Value* zend_jit_fetch_dimension_address_read(zend_llvm_ctx     &llvm_ctx,
 }
 /* }}} */
 
+static void zend_jit_wrong_string_offset(zend_llvm_ctx &llvm_ctx) {
+	Function *_helper = zend_jit_get_helper(
+			llvm_ctx,
+			(void*)zend_jit_helper_wrong_string_offset,
+			ZEND_JIT_SYM("zend_jit_helper_wrong_string_offset"),
+			ZEND_JIT_HELPER_FAST_CALL,
+			Type::getVoidTy(llvm_ctx.context),
+			NULL,
+			NULL,
+			NULL,
+			NULL,
+			NULL);
+
+	CallInst *call = llvm_ctx.builder.CreateCall(_helper);
+	call->setCallingConv(CallingConv::X86_FastCall);
+}
+/* }}} */
+
 /* {{{ static Value* zend_jit_fetch_dimension_address */
 static Value* zend_jit_fetch_dimension_address(zend_llvm_ctx     &llvm_ctx,
                                                zend_class_entry  *scope,
@@ -6385,7 +6403,18 @@ static Value* zend_jit_fetch_dimension_address(zend_llvm_ctx     &llvm_ctx,
 					opline);
 			if (allow_str_offset) {
 				*offset = index;
-			} 
+			} else {
+				/* save opline */
+				Constant *_opline = LLVM_GET_LONG((zend_uintptr_t)opline);
+				llvm_ctx.builder.CreateAlignedStore(_opline, 
+					zend_jit_GEP(
+						llvm_ctx,
+						llvm_ctx._execute_data,
+						offsetof(zend_execute_data, opline),
+						PointerType::getUnqual(LLVM_GET_LONG_TY(llvm_ctx.context))), 4);
+				/* throw exception */
+				zend_jit_wrong_string_offset(llvm_ctx);
+			}
 			if (!*bb_str_offset) {
 				*bb_str_offset = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
 			}
@@ -10491,24 +10520,6 @@ static int zend_jit_incdec(zend_llvm_ctx    &llvm_ctx,
 	BasicBlock *bb_finish = NULL;
 	Value *res;
 
-	if (OP1_OP_TYPE() == IS_VAR) { //TODO: MAY_BE_STRING_OFFSET
-		//JIT: if (UNEXPECTED(var_ptr == NULL)) {
-		BasicBlock *bb_null = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
-		BasicBlock *bb_not_null = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
-		zend_jit_unexpected_br(llvm_ctx,
-				llvm_ctx.builder.CreateIsNull(op1_addr),
-					bb_null,
-					bb_not_null);
-		llvm_ctx.builder.SetInsertPoint(bb_null);
-		//JIT: zend_error_noreturn(E_ERROR, "Cannot increment/decrement overloaded objects nor string offsets");
-		zend_jit_error_noreturn(
-			llvm_ctx,
-			opline,
-			E_ERROR,
-			"Cannot increment/decrement overloaded objects nor string offsets");
-		llvm_ctx.builder.SetInsertPoint(bb_not_null);
-	}
-
 	if (op1_info & MAY_BE_LONG) {
  		BasicBlock *bb_nolong = NULL;
  		if (op1_info & (MAY_BE_ERROR | (MAY_BE_ANY - MAY_BE_LONG))) {
@@ -11746,21 +11757,6 @@ static int zend_jit_fetch_dim(zend_llvm_ctx     &llvm_ctx,
 		op1_addr = zend_jit_reload_from_reg(llvm_ctx, OP1_SSA_VAR(), OP1_INFO());
 	}
 
-	if (opline->op1_type == IS_VAR) {
-		BasicBlock *bb_error = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
-		BasicBlock *bb_follow = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
-		//JIT: if (UNEXPECTED(object_ptr == NULL)) {
-		zend_jit_unexpected_br(llvm_ctx,
-				llvm_ctx.builder.CreateIsNull(op1_addr),
-				bb_error,
-				bb_follow);
-		llvm_ctx.builder.SetInsertPoint(bb_error);
-		//JIT: zend_error_noreturn(E_ERROR, "Cannot use string offset as an array");
-		zend_jit_error_noreturn(llvm_ctx, opline, E_ERROR,
-				"Cannot use string offset as an array");
-		llvm_ctx.builder.SetInsertPoint(bb_follow);
-	}
-
 	var_ptr = zend_jit_deref(llvm_ctx, op1_addr, OP1_SSA_VAR(), OP1_INFO());
 
 	if (OP2_OP_TYPE() != IS_UNUSED) {
@@ -12186,21 +12182,6 @@ static int zend_jit_assign_dim(zend_llvm_ctx     &llvm_ctx,
 
 	if (OP1_MAY_BE(MAY_BE_IN_REG)) {
 		op1_addr = zend_jit_reload_from_reg(llvm_ctx, OP1_SSA_VAR(), OP1_INFO());
-	}
-
-	if (opline->op1_type == IS_VAR) {
-		BasicBlock *bb_error = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
-		BasicBlock *bb_follow = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
-		//JIT: if (UNEXPECTED(object_ptr == NULL)) {
-		zend_jit_unexpected_br(llvm_ctx,
-				llvm_ctx.builder.CreateIsNull(op1_addr),
-				bb_error,
-				bb_follow);
-		llvm_ctx.builder.SetInsertPoint(bb_error);
-		//JIT: zend_error_noreturn(E_ERROR, "Cannot use string offset as an array");
-		zend_jit_error_noreturn(llvm_ctx, opline, E_ERROR,
-				"Cannot use string offset as an array");
-		llvm_ctx.builder.SetInsertPoint(bb_follow);
 	}
 
 	//JIT: ZVAL_DEREF(object_ptr);
@@ -12767,13 +12748,10 @@ static int zend_jit_assign_op(zend_llvm_ctx     &llvm_ctx,
 
 					if (bb_string_offset) {
 						llvm_ctx.builder.SetInsertPoint(bb_string_offset);
-						zend_jit_error_noreturn(
-								llvm_ctx,
-								opline,
-								E_ERROR,
-								"%s",
-								LLVM_GET_CONST_STRING(
-									"Cannot use assign-op operators with overloaded objects nor string offsets"));
+						if (!bb_finish) {
+							bb_finish = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
+						}
+						llvm_ctx.builder.CreateBr(bb_finish);
 					}
 
 					if (bb_error) {

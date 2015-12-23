@@ -296,6 +296,120 @@ ZEND_FASTCALL void* zend_jit_helper_arena_calloc(size_t size)
 	return ret;
 }
 
+ZEND_FASTCALL void zend_jit_helper_wrong_string_offset(void)
+{
+	const char *msg = NULL;
+	const zend_op *opline = EG(current_execute_data)->opline;
+	const zend_op *end;
+	uint32_t var;
+
+	switch (opline->opcode) {
+		case ZEND_ASSIGN_ADD:
+		case ZEND_ASSIGN_SUB:
+		case ZEND_ASSIGN_MUL:
+		case ZEND_ASSIGN_DIV:
+		case ZEND_ASSIGN_MOD:
+		case ZEND_ASSIGN_SL:
+		case ZEND_ASSIGN_SR:
+		case ZEND_ASSIGN_CONCAT:
+		case ZEND_ASSIGN_BW_OR:
+		case ZEND_ASSIGN_BW_AND:
+		case ZEND_ASSIGN_BW_XOR:
+		case ZEND_ASSIGN_POW:
+			msg = "Cannot use assign-op operators with string offsets";
+			break;
+		case ZEND_FETCH_DIM_W:
+		case ZEND_FETCH_DIM_RW:
+		case ZEND_FETCH_DIM_FUNC_ARG:
+		case ZEND_FETCH_DIM_UNSET:
+			/* TODO: Encode the "reason" into opline->extended_value??? */
+			var = opline->result.var;
+			opline++;
+			end = EG(current_execute_data)->func->op_array.opcodes +
+				EG(current_execute_data)->func->op_array.last;
+			while (opline < end) {
+				if (opline->op1_type == IS_VAR && opline->op1.var == var) {
+					switch (opline->opcode) {
+						case ZEND_ASSIGN_ADD:
+						case ZEND_ASSIGN_SUB:
+						case ZEND_ASSIGN_MUL:
+						case ZEND_ASSIGN_DIV:
+						case ZEND_ASSIGN_MOD:
+						case ZEND_ASSIGN_SL:
+						case ZEND_ASSIGN_SR:
+						case ZEND_ASSIGN_CONCAT:
+						case ZEND_ASSIGN_BW_OR:
+						case ZEND_ASSIGN_BW_AND:
+						case ZEND_ASSIGN_BW_XOR:
+						case ZEND_ASSIGN_POW:
+							if (opline->extended_value == ZEND_ASSIGN_OBJ) {
+								msg = "Cannot use string offset as an object";
+							} else if (opline->extended_value == ZEND_ASSIGN_DIM) {
+								msg = "Cannot use string offset as an array";
+							} else {
+								msg = "Cannot use assign-op operators with string offsets";
+							}
+							break;
+						case ZEND_PRE_INC_OBJ:
+						case ZEND_PRE_DEC_OBJ:
+						case ZEND_POST_INC_OBJ:
+						case ZEND_POST_DEC_OBJ:
+						case ZEND_PRE_INC:
+						case ZEND_PRE_DEC:
+						case ZEND_POST_INC:
+						case ZEND_POST_DEC:
+							msg = "Cannot increment/decrement string offsets";
+							break;
+						case ZEND_FETCH_DIM_W:
+						case ZEND_FETCH_DIM_RW:
+						case ZEND_FETCH_DIM_FUNC_ARG:
+						case ZEND_FETCH_DIM_UNSET:
+						case ZEND_ASSIGN_DIM:
+							msg = "Cannot use string offset as an array";
+							break;
+						case ZEND_FETCH_OBJ_W:
+						case ZEND_FETCH_OBJ_RW:
+						case ZEND_FETCH_OBJ_FUNC_ARG:
+						case ZEND_FETCH_OBJ_UNSET:
+						case ZEND_ASSIGN_OBJ:
+							msg = "Cannot use string offset as an object";
+							break;
+						case ZEND_ASSIGN_REF:
+						case ZEND_ADD_ARRAY_ELEMENT:
+						case ZEND_INIT_ARRAY:
+							msg = "Cannot create references to/from string offsets";
+							break;
+						case ZEND_RETURN_BY_REF:
+							msg = "Cannot return string offsets by reference";
+							break;
+						case ZEND_UNSET_DIM:
+						case ZEND_UNSET_OBJ:
+							msg = "Cannot unset string offsets";
+							break;
+						case ZEND_YIELD:
+							msg = "Cannot yield string offsets by reference";
+							break;
+						case ZEND_SEND_REF:
+						case ZEND_SEND_VAR_EX:
+							msg = "Only variables can be passed by reference";
+							break;
+						EMPTY_SWITCH_DEFAULT_CASE();
+					}
+					break;
+				}
+				if (opline->op2_type == IS_VAR && opline->op2.var == var) {
+					ZEND_ASSERT(opline->opcode == ZEND_ASSIGN_REF);
+					msg = "Cannot create references to/from string offsets";
+					break;
+				}
+			}
+			break;
+		EMPTY_SWITCH_DEFAULT_CASE();
+	}
+	ZEND_ASSERT(msg != NULL);
+	zend_throw_error(NULL, msg);
+}
+
 /*
  * Local variables:
  * tab-width: 4
