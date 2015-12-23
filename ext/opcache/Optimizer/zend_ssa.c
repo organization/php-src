@@ -278,7 +278,9 @@ static int zend_ssa_rename(const zend_op_array *op_array, uint32_t build_flags, 
 				case ZEND_ADD_ARRAY_ELEMENT:
 					ssa_ops[k].result_use = var[EX_VAR_TO_NUM(opline->result.var)];
 				case ZEND_INIT_ARRAY:
-					if ((build_flags & ZEND_SSA_RC_INFERENCE) && opline->op1_type == IS_CV) {
+					if (((build_flags & ZEND_SSA_RC_INFERENCE)
+								|| (opline->extended_value & ZEND_ARRAY_ELEMENT_REF))
+							&& opline->op1_type == IS_CV) {
 						ssa_ops[k].op1_def = ssa_vars_count;
 						var[EX_VAR_TO_NUM(opline->op1.var)] = ssa_vars_count;
 						ssa_vars_count++;
@@ -493,7 +495,7 @@ int zend_build_ssa(zend_arena **arena, const zend_op_array *op_array, uint32_t b
 				zend_bitset_copy(tmp, gen + (j * set_size), set_size);
 				for (k = 0; k < blocks[j].predecessors_count; k++) {
 					i = ssa->cfg.predecessors[blocks[j].predecessor_offset + k];
-					while (i != blocks[j].idom) {
+					while (i != -1 && i != blocks[j].idom) {
 						zend_bitset_union_with_intersection(tmp, tmp, gen + (i * set_size), in + (j * set_size), set_size);
 						i = blocks[i].idom;
 					}
@@ -528,7 +530,7 @@ int zend_build_ssa(zend_arena **arena, const zend_op_array *op_array, uint32_t b
 			} else {
 				for (k = 0; k < blocks[j].predecessors_count; k++) {
 					i = ssa->cfg.predecessors[blocks[j].predecessor_offset + k];
-					while (i != blocks[j].idom) {
+					while (i != -1 && i != blocks[j].idom) {
 						zend_bitset_union_with_intersection(tmp, tmp, gen + (i * set_size), in + (j * set_size), set_size);
 						i = blocks[i].idom;
 					}
@@ -800,7 +802,7 @@ int zend_build_ssa(zend_arena **arena, const zend_op_array *op_array, uint32_t b
 			} else {
 				for (k = 0; k < blocks[j].predecessors_count; k++) {
 					i = ssa->cfg.predecessors[blocks[j].predecessor_offset + k];
-					while (i != blocks[j].idom) {
+					while (i != -1 && i != blocks[j].idom) {
 						zend_ssa_phi *p = ssa_blocks[i].phis;
 						while (p) {
 							if (p) {
