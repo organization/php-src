@@ -2786,6 +2786,8 @@ file_cache_fallback:
 		zend_accel_blacklist_load(&accel_blacklist, ZCG(accel_directives.user_blacklist_filename));
 	}
 
+	zend_optimizer_startup();
+
 	return SUCCESS;
 }
 
@@ -2808,6 +2810,8 @@ void accel_shutdown(void)
 		zend_jit_shutdown();
 	}
 #endif
+
+	zend_optimizer_shutdown();
 
 	zend_accel_blacklist_shutdown(&accel_blacklist);
 

@@ -300,16 +300,12 @@ int zend_jit_startup(size_t size)
 //???		}
 //???	}
 
-	if (zend_func_info_startup() != SUCCESS) {
-		return FAILURE;
-	}
 	return zend_jit_codegen_startup(size);
 }
 
 void zend_jit_shutdown(void)
 {
 	zend_jit_codegen_shutdown();
-	zend_func_info_shutdown();
 }
 
 /*
