@@ -2019,6 +2019,7 @@ static int _php_curl_setopt(php_curl *ch, zend_long option, zval *zvalue) /* {{{
 	CURLcode error = CURLE_OK;
 	zend_long lval;
 
+	ZVAL_DEREF(zvalue);
 	switch (option) {
 		/* Long options */
 		case CURLOPT_SSL_VERIFYHOST:
@@ -2187,7 +2188,7 @@ static int _php_curl_setopt(php_curl *ch, zend_long option, zval *zvalue) /* {{{
 #endif
 # if defined(ZTS)
 			if (option == CURLOPT_DNS_USE_GLOBAL_CACHE) {
-				php_error_docref(NULL TSRMLS_CC, E_WARNING, "CURLOPT_DNS_USE_GLOBAL_CACHE cannot be activated when thread safety is enabled");
+				php_error_docref(NULL, E_WARNING, "CURLOPT_DNS_USE_GLOBAL_CACHE cannot be activated when thread safety is enabled");
 				return 1;
 			}
 # endif
@@ -2464,6 +2465,7 @@ static int _php_curl_setopt(php_curl *ch, zend_long option, zval *zvalue) /* {{{
 			}
 
 			ZEND_HASH_FOREACH_VAL(ph, current) {
+				ZVAL_DEREF(current);
 				val = zval_get_string(current);
 				slist = curl_slist_append(slist, ZSTR_VAL(val));
 				zend_string_release(val);
@@ -2531,6 +2533,7 @@ static int _php_curl_setopt(php_curl *ch, zend_long option, zval *zvalue) /* {{{
 						zend_string_addref(string_key);
 					}
 
+					ZVAL_DEREF(current);
 					if (Z_TYPE_P(current) == IS_OBJECT &&
 							instanceof_function(Z_OBJCE_P(current), curl_CURLFile_class)) {
 						/* new-style file upload */
