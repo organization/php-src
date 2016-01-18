@@ -2,7 +2,7 @@
    +----------------------------------------------------------------------+
    | Zend Engine, Bytecode Visualisation                                  |
    +----------------------------------------------------------------------+
-   | Copyright (c) 1998-2015 The PHP Group                                |
+   | Copyright (c) 1998-2016 The PHP Group                                |
    +----------------------------------------------------------------------+
    | This source file is subject to version 3.01 of the PHP license,      |
    | that is bundled with this package in the file LICENSE, and is        |
@@ -509,9 +509,6 @@ static void zend_dump_op(const zend_op_array *op_array, const zend_basic_block *
 					break;
 				case ZEND_FETCH_LOCAL:
 					fprintf(stderr, " (local)");
-					break;
-				case ZEND_FETCH_STATIC:
-					fprintf(stderr, " (static)");
 					break;
 				case ZEND_FETCH_GLOBAL_LOCK:
 					fprintf(stderr, " (global+lock)");

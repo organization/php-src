@@ -2,7 +2,7 @@
    +----------------------------------------------------------------------+
    | Zend Engine                                                          |
    +----------------------------------------------------------------------+
-   | Copyright (c) 1998-2015 Zend Technologies Ltd. (http://www.zend.com) |
+   | Copyright (c) 1998-2016 Zend Technologies Ltd. (http://www.zend.com) |
    +----------------------------------------------------------------------+
    | This source file is subject to version 2.00 of the Zend license,     |
    | that is bundled with this package in the file LICENSE, and is        |
@@ -890,7 +890,6 @@ ZEND_API void zend_assert_valid_class_name(const zend_string *const_name);
 /* global/local fetches */
 #define ZEND_FETCH_GLOBAL			0x00000000
 #define ZEND_FETCH_LOCAL			0x10000000
-#define ZEND_FETCH_STATIC			0x20000000
 #define ZEND_FETCH_GLOBAL_LOCK		0x40000000
 
 #define ZEND_FETCH_TYPE_MASK		0x70000000

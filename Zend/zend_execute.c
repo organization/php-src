@@ -2,7 +2,7 @@
    +----------------------------------------------------------------------+
    | Zend Engine                                                          |
    +----------------------------------------------------------------------+
-   | Copyright (c) 1998-2015 Zend Technologies Ltd. (http://www.zend.com) |
+   | Copyright (c) 1998-2016 Zend Technologies Ltd. (http://www.zend.com) |
    +----------------------------------------------------------------------+
    | This source file is subject to version 2.00 of the Zend license,     |
    | that is bundled with this package in the file LICENSE, and is        |
@@ -1537,15 +1537,6 @@ static zend_always_inline HashTable *zend_get_target_symbol_table(zend_execute_d
 	if (EXPECTED(fetch_type == ZEND_FETCH_GLOBAL_LOCK) ||
 	    EXPECTED(fetch_type == ZEND_FETCH_GLOBAL)) {
 		ht = &EG(symbol_table);
-	} else if (EXPECTED(fetch_type == ZEND_FETCH_STATIC)) {
-		ZEND_ASSERT(EX(func)->op_array.static_variables != NULL);
-		ht = EX(func)->op_array.static_variables;
-		if (GC_REFCOUNT(ht) > 1) {
-			if (!(GC_FLAGS(ht) & IS_ARRAY_IMMUTABLE)) {
-				GC_REFCOUNT(ht)--;
-			}
-			EX(func)->op_array.static_variables = ht = zend_array_dup(ht);
-		}
 	} else {
 		ZEND_ASSERT(fetch_type == ZEND_FETCH_LOCAL);
 		if (!EX(symbol_table)) {

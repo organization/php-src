@@ -2,7 +2,7 @@
    +----------------------------------------------------------------------+
    | Zend Engine, e-SSA based Type & Range Inference                      |
    +----------------------------------------------------------------------+
-   | Copyright (c) 1998-2015 The PHP Group                                |
+   | Copyright (c) 1998-2016 The PHP Group                                |
    +----------------------------------------------------------------------+
    | This source file is subject to version 3.01 of the PHP license,      |
    | that is bundled with this package in the file LICENSE, and is        |
@@ -1031,6 +1031,7 @@ int zend_inference_calc_range(const zend_op_array *op_array, zend_ssa *ssa, int 
 			}
 			break;
 		case ZEND_QM_ASSIGN:
+		case ZEND_JMP_SET:
 		case ZEND_COALESCE:
 			if (ssa->ops[line].result_def == var) {
 				if (OP1_HAS_RANGE()) {
@@ -2173,6 +2174,20 @@ uint32_t zend_array_element_type(uint32_t t1, int write, int insert)
 	return tmp;
 }
 
+static inline zend_class_entry *get_class_entry(const zend_script *script, zend_string *lcname) {
+	zend_class_entry *ce = zend_hash_find_ptr(&script->class_table, lcname);
+	if (ce) {
+		return ce;
+	}
+
+	ce = zend_hash_find_ptr(CG(class_table), lcname);
+	if (ce && ce->type == ZEND_INTERNAL_CLASS) {
+		return ce;
+	}
+
+	return NULL;
+}
+
 static void zend_update_type_info(const zend_op_array *op_array,
                                   zend_ssa            *ssa,
                                   const zend_script   *script,
@@ -2350,6 +2365,7 @@ static void zend_update_type_info(const zend_op_array *op_array,
 			UPDATE_SSA_TYPE(tmp, ssa_ops[i].result_def);
 			break;
 		case ZEND_QM_ASSIGN:
+		case ZEND_JMP_SET:
 		case ZEND_COALESCE:
 			tmp = t1 & ~(MAY_BE_UNDEF|MAY_BE_REF);
 			if (t1 & MAY_BE_UNDEF) {
@@ -3051,6 +3067,7 @@ static void zend_update_type_info(const zend_op_array *op_array,
 			}
 			break;
 		case ZEND_BIND_GLOBAL:
+		case ZEND_BIND_STATIC:
 			tmp = (MAY_BE_REF | MAY_BE_ANY );
 			UPDATE_SSA_TYPE(tmp, ssa_ops[i].op1_def);
 			break;
@@ -3112,13 +3129,7 @@ static void zend_update_type_info(const zend_op_array *op_array,
 					// class type hinting...
 					zend_string *lcname = zend_string_tolower(arg_info->class_name);
 					tmp |= MAY_BE_OBJECT;
-					ce = zend_hash_find_ptr(&script->class_table, lcname);
-					if (!ce) {
-						ce = zend_hash_find_ptr(CG(class_table), lcname);
-						if (ce && ce->type != ZEND_INTERNAL_CLASS) {
-							ce = NULL;
-						}
-					}
+					ce = get_class_entry(script, lcname);
 					zend_string_release(lcname);
 				} else if (arg_info->type_hint != IS_UNDEF) {
 					if (arg_info->type_hint == IS_CALLABLE) {
@@ -3219,14 +3230,8 @@ static void zend_update_type_info(const zend_op_array *op_array,
 			} else if (opline->op2_type == IS_CONST) {
 				zval *zv = CRT_CONSTANT_EX(op_array, opline->op2, ssa->rt_constants);
 				if (Z_TYPE_P(zv) == IS_STRING) {
-					if ((ce = zend_hash_find_ptr(&script->class_table, Z_STR_P(zv+1))) != NULL) {
-						UPDATE_SSA_OBJ_TYPE(ce, 0, ssa_ops[i].result_def);
-					} else if ((ce = zend_hash_find_ptr(CG(class_table), Z_STR_P(zv+1))) != NULL &&
-					           ce->type == ZEND_INTERNAL_CLASS) {
-						UPDATE_SSA_OBJ_TYPE(ce, 0, ssa_ops[i].result_def);
-					} else {
-						UPDATE_SSA_OBJ_TYPE(NULL, 0, ssa_ops[i].result_def);
-					}
+					ce = get_class_entry(script, Z_STR_P(zv+1));
+					UPDATE_SSA_OBJ_TYPE(ce, 0, ssa_ops[i].result_def);
 				} else {
 					UPDATE_SSA_OBJ_TYPE(NULL, 0, ssa_ops[i].result_def);
 				}
@@ -3241,7 +3246,7 @@ static void zend_update_type_info(const zend_op_array *op_array,
 		case ZEND_NEW:
 			tmp = MAY_BE_RC1|MAY_BE_RCN|MAY_BE_OBJECT;
 			if (opline->op1_type == IS_CONST &&
-			    (ce = zend_hash_find_ptr(CG(class_table), Z_STR_P(CRT_CONSTANT_EX(op_array, opline->op1, ssa->rt_constants)+1))) != NULL) {
+			    (ce = get_class_entry(script, Z_STR_P(CRT_CONSTANT_EX(op_array, opline->op1, ssa->rt_constants)+1))) != NULL) {
 				UPDATE_SSA_OBJ_TYPE(ce, 0, ssa_ops[i].result_def);
 			} else if ((t1 & MAY_BE_CLASS) && ssa_ops[i].op1_use >= 0 && ssa_var_info[ssa_ops[i].op1_use].ce) {
 				UPDATE_SSA_OBJ_TYPE(ssa_var_info[ssa_ops[i].op1_use].ce, ssa_var_info[ssa_ops[i].op1_use].is_instanceof, ssa_ops[i].result_def);
@@ -3420,10 +3425,6 @@ static void zend_update_type_info(const zend_op_array *op_array,
 			}
 			break;
 //		case ZEND_CATCH:
-// TODO: ???
-//			break;
-//		case ZEND_JMP_SET:
-//		case ZEND_COALESCE:
 // TODO: ???
 //			break;
 		case ZEND_FETCH_DIM_R:
