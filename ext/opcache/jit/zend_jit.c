@@ -110,8 +110,10 @@ static int zend_jit_op_array_analyze_ssa(zend_jit_context *ctx, zend_op_array *o
     zend_func_info *info = ZEND_FUNC_INFO(op_array);
     uint32_t build_flags;
 	
-	if (info && info->ssa.cfg.blocks) {
-		if (!(info->flags & ZEND_FUNC_TOO_DYNAMIC)) {
+	if (info && info->ssa.cfg.blocks &&
+	    op_array->last_try_catch == 0 &&
+	    !(op_array->fn_flags & ZEND_ACC_GENERATOR)) {
+		if (!(info->flags & ZEND_FUNC_INDIRECT_VAR_ASSESS)) {
 			if (zend_cfg_compute_dominators_tree(op_array, &info->ssa.cfg) != SUCCESS) {
 				return FAILURE;
 			}

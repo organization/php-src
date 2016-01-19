@@ -635,7 +635,9 @@ static void zend_jit_check_no_symtab(zend_op_array *op_array)
 	if (!info ||
 	    !op_array->function_name ||
 	    !info->ssa.var_info ||
-	    (info->flags & ZEND_FUNC_TOO_DYNAMIC)) {
+	    (op_array->last_try_catch != 0) ||
+	    (op_array->fn_flags & ZEND_ACC_GENERATOR) ||
+	    (info->flags & ZEND_FUNC_INDIRECT_VAR_ASSESS)) {
 		return;
 	}
 	for (b = 0; b < info->ssa.cfg.blocks_count; b++) {
@@ -1013,7 +1015,8 @@ static void zend_jit_check_inlining(zend_op_array *op_array)
 	zend_func_info *info = ZEND_FUNC_INFO(op_array);
 
 	if (info->caller_info &&
-	    (info->flags & (ZEND_FUNC_TOO_DYNAMIC|ZEND_FUNC_RECURSIVE)) == 0 &&
+	    op_array->last_try_catch == 0 &&
+	    (info->flags & (ZEND_FUNC_INDIRECT_VAR_ASSESS|ZEND_FUNC_RECURSIVE)) == 0 &&
 	    !(op_array->fn_flags & ZEND_ACC_GENERATOR) &&
 	    !(op_array->fn_flags & ZEND_ACC_RETURN_REFERENCE) &&
 	    !op_array->last_try_catch &&
