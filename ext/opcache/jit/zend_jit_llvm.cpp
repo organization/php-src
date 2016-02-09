@@ -1005,11 +1005,11 @@ static int zend_jit_call_handler(zend_llvm_ctx &llvm_ctx,
 				llvm_ctx.handler_type,
 				Function::ExternalLinkage,
 				Twine("ZEND_") + (name+5) + "_SPEC" +
-					((flags & ZEND_VM_OP1_SPEC) ? 
-						((flags & ZEND_VM_OP1_TMPVAR) ? 
+					((ZEND_VM_OP1_FLAGS(flags) & ZEND_VM_OP_SPEC) ?
+						((ZEND_VM_OP1_FLAGS(flags) & ZEND_VM_OP_TMPVAR) ?
 							op_type2[OP1_OP_TYPE()].name : op_type[OP1_OP_TYPE()].name) : "") +
-					((flags & ZEND_VM_OP2_SPEC) ?
-						((flags & ZEND_VM_OP2_TMPVAR) ? 
+					((ZEND_VM_OP2_FLAGS(flags) & ZEND_VM_OP_SPEC) ?
+						((ZEND_VM_OP2_FLAGS(flags) & ZEND_VM_OP_TMPVAR) ?
 							op_type2[OP2_OP_TYPE()].name : op_type[OP2_OP_TYPE()].name) : "") +
  					"_HANDLER",
 				llvm_ctx.module);
