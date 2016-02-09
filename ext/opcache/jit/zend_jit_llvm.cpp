@@ -3140,13 +3140,15 @@ static Value* zend_jit_load_res(zend_llvm_ctx &llvm_ctx,
 static Value* zend_jit_load_res_handle(zend_llvm_ctx &llvm_ctx,
                                        Value         *res_addr)
 {
-	return llvm_ctx.builder.CreateAlignedLoad(
+	return llvm_ctx.builder.CreateZExtOrBitCast(
+		llvm_ctx.builder.CreateAlignedLoad(
 			zend_jit_GEP(
 				llvm_ctx,
 				res_addr,
 				offsetof(zend_resource, handle),
 				PointerType::getUnqual(
-					Type::getInt32Ty(llvm_ctx.context))), 4);
+					Type::getInt32Ty(llvm_ctx.context))), 4),
+		LLVM_GET_LONG_TY(llvm_ctx.context));
 }
 /* }}} */
 
