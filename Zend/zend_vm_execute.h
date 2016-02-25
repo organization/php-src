@@ -489,13 +489,10 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL zend_leave_helper_SPEC(ZEND_OPCODE_
 			object = Z_OBJ(old_execute_data->This);
 #if 0
 			if (UNEXPECTED(EG(exception) != NULL) && (EX(opline)->op1.num & ZEND_CALL_CTOR)) {
-				if (!(EX(opline)->op1.num & ZEND_CALL_CTOR_RESULT_UNUSED)) {
 #else
 			if (UNEXPECTED(EG(exception) != NULL) && (call_info & ZEND_CALL_CTOR)) {
-				if (!(call_info & ZEND_CALL_CTOR_RESULT_UNUSED)) {
 #endif
-					GC_REFCOUNT(object)--;
-				}
+				GC_REFCOUNT(object)--;
 				if (GC_REFCOUNT(object) == 1) {
 					zend_object_store_ctor_failed(object);
 				}
@@ -580,6 +577,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_DO_ICALL_SPEC_RETVAL_UNUSED_HA
 	zend_execute_data *call = EX(call);
 	zend_function *fbc = call->func;
 	zval *ret;
+	zval retval;
 
 	SAVE_OPLINE();
 	EX(call) = call->prev_execute_data;
@@ -587,7 +585,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_DO_ICALL_SPEC_RETVAL_UNUSED_HA
 	call->prev_execute_data = execute_data;
 	EG(current_execute_data) = call;
 
-	ret = EX_VAR(opline->result.var);
+	ret = 0 ? EX_VAR(opline->result.var) : &retval;
 	ZVAL_NULL(ret);
 	Z_VAR_FLAGS_P(ret) = 0;
 
@@ -597,7 +595,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_DO_ICALL_SPEC_RETVAL_UNUSED_HA
 	ZEND_ASSERT(
 		EG(exception) || !call->func ||
 		!(call->func->common.fn_flags & ZEND_ACC_HAS_RETURN_TYPE) ||
-		zend_verify_internal_return_type(call->func, EX_VAR(opline->result.var)));
+		zend_verify_internal_return_type(call->func, ret));
 #endif
 
 	EG(current_execute_data) = call->prev_execute_data;
@@ -605,7 +603,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_DO_ICALL_SPEC_RETVAL_UNUSED_HA
 	zend_vm_stack_free_call_frame(call);
 
 	if (!0) {
-		zval_ptr_dtor(EX_VAR(opline->result.var));
+		zval_ptr_dtor(ret);
 	}
 
 	if (UNEXPECTED(EG(exception) != NULL)) {
@@ -626,6 +624,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_DO_ICALL_SPEC_RETVAL_USED_HAND
 	zend_execute_data *call = EX(call);
 	zend_function *fbc = call->func;
 	zval *ret;
+	zval retval;
 
 	SAVE_OPLINE();
 	EX(call) = call->prev_execute_data;
@@ -633,7 +632,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_DO_ICALL_SPEC_RETVAL_USED_HAND
 	call->prev_execute_data = execute_data;
 	EG(current_execute_data) = call;
 
-	ret = EX_VAR(opline->result.var);
+	ret = 1 ? EX_VAR(opline->result.var) : &retval;
 	ZVAL_NULL(ret);
 	Z_VAR_FLAGS_P(ret) = 0;
 
@@ -643,7 +642,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_DO_ICALL_SPEC_RETVAL_USED_HAND
 	ZEND_ASSERT(
 		EG(exception) || !call->func ||
 		!(call->func->common.fn_flags & ZEND_ACC_HAS_RETURN_TYPE) ||
-		zend_verify_internal_return_type(call->func, EX_VAR(opline->result.var)));
+		zend_verify_internal_return_type(call->func, ret));
 #endif
 
 	EG(current_execute_data) = call->prev_execute_data;
@@ -651,7 +650,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_DO_ICALL_SPEC_RETVAL_USED_HAND
 	zend_vm_stack_free_call_frame(call);
 
 	if (!1) {
-		zval_ptr_dtor(EX_VAR(opline->result.var));
+		zval_ptr_dtor(ret);
 	}
 
 	if (UNEXPECTED(EG(exception) != NULL)) {
@@ -754,6 +753,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_DO_FCALL_BY_NAME_SPEC_RETVAL_U
 		}
 		EG(scope) = EX(func)->op_array.scope;
 	} else {
+		zval retval;
 		ZEND_ASSERT(fbc->type == ZEND_INTERNAL_FUNCTION);
 
 		if (UNEXPECTED((fbc->common.fn_flags & ZEND_ACC_DEPRECATED) != 0)) {
@@ -786,7 +786,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_DO_FCALL_BY_NAME_SPEC_RETVAL_U
 			}
 		}
 
-		ret = EX_VAR(opline->result.var);
+		ret = 0 ? EX_VAR(opline->result.var) : &retval;
 		ZVAL_NULL(ret);
 		Z_VAR_FLAGS_P(ret) = (fbc->common.fn_flags & ZEND_ACC_RETURN_REFERENCE) != 0 ? IS_VAR_RET_REF : 0;
 
@@ -796,7 +796,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_DO_FCALL_BY_NAME_SPEC_RETVAL_U
 		ZEND_ASSERT(
 			EG(exception) || !call->func ||
 			!(call->func->common.fn_flags & ZEND_ACC_HAS_RETURN_TYPE) ||
-			zend_verify_internal_return_type(call->func, EX_VAR(opline->result.var)));
+			zend_verify_internal_return_type(call->func, ret));
 #endif
 
 		EG(current_execute_data) = call->prev_execute_data;
@@ -804,7 +804,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_DO_FCALL_BY_NAME_SPEC_RETVAL_U
 		zend_vm_stack_free_call_frame(call);
 
 		if (!0) {
-			zval_ptr_dtor(EX_VAR(opline->result.var));
+			zval_ptr_dtor(ret);
 		}
 	}
 
@@ -857,6 +857,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_DO_FCALL_BY_NAME_SPEC_RETVAL_U
 		}
 		EG(scope) = EX(func)->op_array.scope;
 	} else {
+		zval retval;
 		ZEND_ASSERT(fbc->type == ZEND_INTERNAL_FUNCTION);
 
 		if (UNEXPECTED((fbc->common.fn_flags & ZEND_ACC_DEPRECATED) != 0)) {
@@ -889,7 +890,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_DO_FCALL_BY_NAME_SPEC_RETVAL_U
 			}
 		}
 
-		ret = EX_VAR(opline->result.var);
+		ret = 1 ? EX_VAR(opline->result.var) : &retval;
 		ZVAL_NULL(ret);
 		Z_VAR_FLAGS_P(ret) = (fbc->common.fn_flags & ZEND_ACC_RETURN_REFERENCE) != 0 ? IS_VAR_RET_REF : 0;
 
@@ -899,7 +900,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_DO_FCALL_BY_NAME_SPEC_RETVAL_U
 		ZEND_ASSERT(
 			EG(exception) || !call->func ||
 			!(call->func->common.fn_flags & ZEND_ACC_HAS_RETURN_TYPE) ||
-			zend_verify_internal_return_type(call->func, EX_VAR(opline->result.var)));
+			zend_verify_internal_return_type(call->func, ret));
 #endif
 
 		EG(current_execute_data) = call->prev_execute_data;
@@ -907,7 +908,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_DO_FCALL_BY_NAME_SPEC_RETVAL_U
 		zend_vm_stack_free_call_frame(call);
 
 		if (!1) {
-			zval_ptr_dtor(EX_VAR(opline->result.var));
+			zval_ptr_dtor(ret);
 		}
 	}
 
@@ -984,6 +985,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_DO_FCALL_SPEC_RETVAL_UNUSED_HA
 		}
 	} else if (EXPECTED(fbc->type < ZEND_USER_FUNCTION)) {
 		int should_change_scope = 0;
+		zval retval;
 
 		if (fbc->common.scope) {
 			should_change_scope = 1;
@@ -1015,7 +1017,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_DO_FCALL_SPEC_RETVAL_UNUSED_HA
 			}
 		}
 
-		ret = EX_VAR(opline->result.var);
+		ret = 0 ? EX_VAR(opline->result.var) : &retval;
 		ZVAL_NULL(ret);
 		Z_VAR_FLAGS_P(ret) = (fbc->common.fn_flags & ZEND_ACC_RETURN_REFERENCE) != 0 ? IS_VAR_RET_REF : 0;
 
@@ -1030,14 +1032,14 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_DO_FCALL_SPEC_RETVAL_UNUSED_HA
 		ZEND_ASSERT(
 			EG(exception) || !call->func ||
 			!(call->func->common.fn_flags & ZEND_ACC_HAS_RETURN_TYPE) ||
-			zend_verify_internal_return_type(call->func, EX_VAR(opline->result.var)));
+			zend_verify_internal_return_type(call->func, ret));
 #endif
 
 		EG(current_execute_data) = call->prev_execute_data;
 		zend_vm_stack_free_args(call);
 
 		if (!0) {
-			zval_ptr_dtor(EX_VAR(opline->result.var));
+			zval_ptr_dtor(ret);
 		}
 
 		if (UNEXPECTED(should_change_scope)) {
@@ -1046,6 +1048,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_DO_FCALL_SPEC_RETVAL_UNUSED_HA
 			goto fcall_end;
 		}
 	} else { /* ZEND_OVERLOADED_FUNCTION */
+		zval retval;
 		/* Not sure what should be done here if it's a static method */
 		object = Z_OBJ(call->This);
 		if (UNEXPECTED(object == NULL)) {
@@ -1062,11 +1065,12 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_DO_FCALL_SPEC_RETVAL_UNUSED_HA
 
 		EG(scope) = fbc->common.scope;
 
-		ZVAL_NULL(EX_VAR(opline->result.var));
+		ret = 0 ? EX_VAR(opline->result.var) : &retval;
+		ZVAL_NULL(ret);
 
 		call->prev_execute_data = execute_data;
 		EG(current_execute_data) = call;
-		object->handlers->call_method(fbc->common.function_name, object, call, EX_VAR(opline->result.var));
+		object->handlers->call_method(fbc->common.function_name, object, call, ret);
 		EG(current_execute_data) = call->prev_execute_data;
 
 		zend_vm_stack_free_args(call);
@@ -1077,9 +1081,9 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_DO_FCALL_SPEC_RETVAL_UNUSED_HA
 		efree(fbc);
 
 		if (!0) {
-			zval_ptr_dtor(EX_VAR(opline->result.var));
+			zval_ptr_dtor(ret);
 		} else {
-			Z_VAR_FLAGS_P(EX_VAR(opline->result.var)) = 0;
+			Z_VAR_FLAGS_P(ret) = 0;
 		}
 	}
 
@@ -1088,13 +1092,10 @@ fcall_end_change_scope:
 		object = Z_OBJ(call->This);
 #if 0
 		if (UNEXPECTED(EG(exception) != NULL) && (opline->op1.num & ZEND_CALL_CTOR)) {
-			if (!(opline->op1.num & ZEND_CALL_CTOR_RESULT_UNUSED)) {
 #else
 		if (UNEXPECTED(EG(exception) != NULL) && (ZEND_CALL_INFO(call) & ZEND_CALL_CTOR)) {
-			if (!(ZEND_CALL_INFO(call) & ZEND_CALL_CTOR_RESULT_UNUSED)) {
 #endif
-				GC_REFCOUNT(object)--;
-			}
+			GC_REFCOUNT(object)--;
 			if (GC_REFCOUNT(object) == 1) {
 				zend_object_store_ctor_failed(object);
 			}
@@ -1179,6 +1180,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_DO_FCALL_SPEC_RETVAL_USED_HAND
 		}
 	} else if (EXPECTED(fbc->type < ZEND_USER_FUNCTION)) {
 		int should_change_scope = 0;
+		zval retval;
 
 		if (fbc->common.scope) {
 			should_change_scope = 1;
@@ -1210,7 +1212,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_DO_FCALL_SPEC_RETVAL_USED_HAND
 			}
 		}
 
-		ret = EX_VAR(opline->result.var);
+		ret = 1 ? EX_VAR(opline->result.var) : &retval;
 		ZVAL_NULL(ret);
 		Z_VAR_FLAGS_P(ret) = (fbc->common.fn_flags & ZEND_ACC_RETURN_REFERENCE) != 0 ? IS_VAR_RET_REF : 0;
 
@@ -1225,14 +1227,14 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_DO_FCALL_SPEC_RETVAL_USED_HAND
 		ZEND_ASSERT(
 			EG(exception) || !call->func ||
 			!(call->func->common.fn_flags & ZEND_ACC_HAS_RETURN_TYPE) ||
-			zend_verify_internal_return_type(call->func, EX_VAR(opline->result.var)));
+			zend_verify_internal_return_type(call->func, ret));
 #endif
 
 		EG(current_execute_data) = call->prev_execute_data;
 		zend_vm_stack_free_args(call);
 
 		if (!1) {
-			zval_ptr_dtor(EX_VAR(opline->result.var));
+			zval_ptr_dtor(ret);
 		}
 
 		if (UNEXPECTED(should_change_scope)) {
@@ -1241,6 +1243,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_DO_FCALL_SPEC_RETVAL_USED_HAND
 			goto fcall_end;
 		}
 	} else { /* ZEND_OVERLOADED_FUNCTION */
+		zval retval;
 		/* Not sure what should be done here if it's a static method */
 		object = Z_OBJ(call->This);
 		if (UNEXPECTED(object == NULL)) {
@@ -1257,11 +1260,12 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_DO_FCALL_SPEC_RETVAL_USED_HAND
 
 		EG(scope) = fbc->common.scope;
 
-		ZVAL_NULL(EX_VAR(opline->result.var));
+		ret = 1 ? EX_VAR(opline->result.var) : &retval;
+		ZVAL_NULL(ret);
 
 		call->prev_execute_data = execute_data;
 		EG(current_execute_data) = call;
-		object->handlers->call_method(fbc->common.function_name, object, call, EX_VAR(opline->result.var));
+		object->handlers->call_method(fbc->common.function_name, object, call, ret);
 		EG(current_execute_data) = call->prev_execute_data;
 
 		zend_vm_stack_free_args(call);
@@ -1272,9 +1276,9 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_DO_FCALL_SPEC_RETVAL_USED_HAND
 		efree(fbc);
 
 		if (!1) {
-			zval_ptr_dtor(EX_VAR(opline->result.var));
+			zval_ptr_dtor(ret);
 		} else {
-			Z_VAR_FLAGS_P(EX_VAR(opline->result.var)) = 0;
+			Z_VAR_FLAGS_P(ret) = 0;
 		}
 	}
 
@@ -1283,13 +1287,10 @@ fcall_end_change_scope:
 		object = Z_OBJ(call->This);
 #if 0
 		if (UNEXPECTED(EG(exception) != NULL) && (opline->op1.num & ZEND_CALL_CTOR)) {
-			if (!(opline->op1.num & ZEND_CALL_CTOR_RESULT_UNUSED)) {
 #else
 		if (UNEXPECTED(EG(exception) != NULL) && (ZEND_CALL_INFO(call) & ZEND_CALL_CTOR)) {
-			if (!(ZEND_CALL_INFO(call) & ZEND_CALL_CTOR_RESULT_UNUSED)) {
 #endif
-				GC_REFCOUNT(object)--;
-			}
+			GC_REFCOUNT(object)--;
 			if (GC_REFCOUNT(object) == 1) {
 				zend_object_store_ctor_failed(object);
 			}
@@ -2153,7 +2154,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_CALL_TRAMPOLINE_SPEC_HANDLER(Z
 		ZEND_ASSERT(
 			EG(exception) || !call->func ||
 			!(call->func->common.fn_flags & ZEND_ACC_HAS_RETURN_TYPE) ||
-			zend_verify_internal_return_type(call->func, EX_VAR(opline->result.var)));
+			zend_verify_internal_return_type(call->func, ret));
 #endif
 
 		EG(current_execute_data) = call->prev_execute_data;
@@ -3466,14 +3467,14 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_RETURN_SPEC_CONST_HANDLER(ZEND
 			ZVAL_NULL(EX(return_value));
 		}
 	} else if (!EX(return_value)) {
-		if (IS_CONST == IS_VAR || IS_CONST == IS_TMP_VAR ) {
+		if (IS_CONST & (IS_VAR|IS_TMP_VAR)) {
 			if (Z_REFCOUNTED_P(free_op1) && !Z_DELREF_P(free_op1)) {
 				SAVE_OPLINE();
 				zval_dtor_func_for_ptr(Z_COUNTED_P(free_op1));
 			}
 		}
 	} else {
-		if (IS_CONST == IS_CONST || IS_CONST == IS_TMP_VAR) {
+		if ((IS_CONST & (IS_CONST|IS_TMP_VAR))) {
 			ZVAL_COPY_VALUE(EX(return_value), retval_ptr);
 			if (IS_CONST == IS_CONST) {
 				if (UNEXPECTED(Z_OPT_COPYABLE_P(EX(return_value)))) {
@@ -3511,7 +3512,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_RETURN_BY_REF_SPEC_CONST_HANDL
 	SAVE_OPLINE();
 
 	do {
-		if (IS_CONST == IS_CONST || IS_CONST == IS_TMP_VAR ||
+		if ((IS_CONST & (IS_CONST|IS_TMP_VAR)) ||
 		    (IS_CONST == IS_VAR && opline->extended_value == ZEND_RETURNS_VALUE)) {
 			/* Not supposed to happen, but we'll allow it */
 			zend_error(E_NOTICE, "Only variable references should be returned by reference");
@@ -3570,7 +3571,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_GENERATOR_RETURN_SPEC_CONST_HA
 	retval = EX_CONSTANT(opline->op1);
 
 	/* Copy return value into generator->retval */
-	if (IS_CONST == IS_CONST || IS_CONST == IS_TMP_VAR) {
+	if ((IS_CONST & (IS_CONST|IS_TMP_VAR))) {
 		ZVAL_COPY_VALUE(&generator->retval, retval);
 		if (IS_CONST == IS_CONST) {
 			if (UNEXPECTED(Z_OPT_COPYABLE(generator->retval))) {
@@ -3750,7 +3751,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_BOOL_SPEC_CONST_HANDLER(ZEND_O
 static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_NEW_SPEC_CONST_HANDLER(ZEND_OPCODE_HANDLER_ARGS)
 {
 	USE_OPLINE
-	zval object_zval;
+	zval *result;
 	zend_function *constructor;
 	zend_class_entry *ce;
 
@@ -3773,33 +3774,26 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_NEW_SPEC_CONST_HANDLER(ZEND_OP
 	} else {
 		ce = Z_CE_P(EX_VAR(opline->op1.var));
 	}
-	if (UNEXPECTED(object_init_ex(&object_zval, ce) != SUCCESS)) {
+
+	result = EX_VAR(opline->result.var);
+	if (UNEXPECTED(object_init_ex(result, ce) != SUCCESS)) {
 		HANDLE_EXCEPTION();
 	}
-	constructor = Z_OBJ_HT(object_zval)->get_constructor(Z_OBJ(object_zval));
 
+	constructor = Z_OBJ_HT_P(result)->get_constructor(Z_OBJ_P(result));
 	if (constructor == NULL) {
-		if (EXPECTED(RETURN_VALUE_USED(opline))) {
-			ZVAL_COPY_VALUE(EX_VAR(opline->result.var), &object_zval);
-		} else {
-			OBJ_RELEASE(Z_OBJ(object_zval));
-		}
 		ZEND_VM_JMP(OP_JMP_ADDR(opline, opline->op2));
 	} else {
 		/* We are not handling overloaded classes right now */
 		zend_execute_data *call = zend_vm_stack_push_call_frame(
-				ZEND_CALL_FUNCTION | ZEND_CALL_RELEASE_THIS | ZEND_CALL_CTOR |
-				(EXPECTED(RETURN_VALUE_USED(opline)) ? 0 : ZEND_CALL_CTOR_RESULT_UNUSED),
+			ZEND_CALL_FUNCTION | ZEND_CALL_RELEASE_THIS | ZEND_CALL_CTOR,
 			constructor,
 			opline->extended_value,
 			ce,
-			Z_OBJ(object_zval));
+			Z_OBJ_P(result));
 		call->prev_execute_data = EX(call);
 		EX(call) = call;
-
-		if (EXPECTED(RETURN_VALUE_USED(opline))) {
-			ZVAL_COPY(EX_VAR(opline->result.var), &object_zval);
-		}
+		Z_ADDREF_P(result);
 
 		ZEND_VM_NEXT_OPCODE_CHECK_EXCEPTION();
 	}
@@ -4589,6 +4583,9 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_YIELD_FROM_SPEC_CONST_HANDLER(
 	if (RETURN_VALUE_USED(opline)) {
 		ZVAL_NULL(EX_VAR(opline->result.var));
 	}
+
+	/* This generator has no send target (though the generator we delegate to might have one) */
+	generator->send_target = NULL;
 
 	/* We increment to the next op, so we are at the correct position when the
 	 * generator is resumed. */
@@ -5512,7 +5509,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FETCH_DIM_FUNC_ARG_SPEC_CONST_
 	SAVE_OPLINE();
 
 	if (zend_is_by_ref_func_arg_fetch(opline, EX(call))) {
-        if (IS_CONST == IS_CONST || IS_CONST == IS_TMP_VAR) {
+        if ((IS_CONST & (IS_CONST|IS_TMP_VAR))) {
             zend_throw_error(NULL, "Cannot use temporary expression in write context");
 
 
@@ -5703,7 +5700,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FETCH_OBJ_FUNC_ARG_SPEC_CONST_
 
 			HANDLE_EXCEPTION();
 		}
-		if (IS_CONST == IS_CONST || IS_CONST == IS_TMP_VAR) {
+		if ((IS_CONST & (IS_CONST|IS_TMP_VAR))) {
 			zend_throw_error(NULL, "Cannot use temporary expression in write context");
 
 
@@ -5887,7 +5884,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_INIT_METHOD_CALL_SPEC_CONST_CO
 					}
 				}
 				if (IS_CONST == IS_CV && UNEXPECTED(Z_TYPE_P(object) == IS_UNDEF)) {
-					GET_OP1_UNDEF_CV(object, BP_VAR_R);
+					object = GET_OP1_UNDEF_CV(object, BP_VAR_R);
 					if (UNEXPECTED(EG(exception) != NULL)) {
 
 						HANDLE_EXCEPTION();
@@ -6001,15 +5998,22 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_INIT_STATIC_METHOD_CALL_SPEC_C
 		function_name = EX_CONSTANT(opline->op2);
 		if (IS_CONST != IS_CONST) {
 			if (UNEXPECTED(Z_TYPE_P(function_name) != IS_STRING)) {
-				if (IS_CONST == IS_CV && UNEXPECTED(Z_TYPE_P(function_name) == IS_UNDEF)) {
-					GET_OP2_UNDEF_CV(function_name, BP_VAR_R);
-					if (UNEXPECTED(EG(exception) != NULL)) {
-						HANDLE_EXCEPTION();
+				do {
+					if (IS_CONST & (IS_VAR|IS_CV) && Z_ISREF_P(function_name)) {
+						function_name = Z_REFVAL_P(function_name);
+						if (EXPECTED(Z_TYPE_P(function_name) == IS_STRING)) {
+							break;
+						}
+					} else if (IS_CONST == IS_CV && UNEXPECTED(Z_TYPE_P(function_name) == IS_UNDEF)) {
+						GET_OP2_UNDEF_CV(function_name, BP_VAR_R);
+						if (UNEXPECTED(EG(exception) != NULL)) {
+							HANDLE_EXCEPTION();
+						}
 					}
-				}
-				zend_throw_error(NULL, "Function name must be a string");
+					zend_throw_error(NULL, "Function name must be a string");
 
-				HANDLE_EXCEPTION();
+					HANDLE_EXCEPTION();
+				} while (0);
  			}
 		}
 
@@ -6810,14 +6814,14 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_YIELD_SPEC_CONST_CONST_HANDLER
 		if (UNEXPECTED(EX(func)->op_array.fn_flags & ZEND_ACC_RETURN_REFERENCE)) {
 			/* Constants and temporary variables aren't yieldable by reference,
 			 * but we still allow them with a notice. */
-			if (IS_CONST == IS_CONST || IS_CONST == IS_TMP_VAR) {
+			if (IS_CONST & (IS_CONST|IS_TMP_VAR)) {
 				zval *value;
 
 				zend_error(E_NOTICE, "Only variable references should be yielded by reference");
 
 				value = EX_CONSTANT(opline->op1);
 				ZVAL_COPY_VALUE(&generator->value, value);
-				if (IS_CONST != IS_CONST) {
+				if (IS_CONST == IS_CONST) {
 					if (UNEXPECTED(Z_OPT_COPYABLE(generator->value))) {
 						zval_copy_ctor_func(&generator->value);
 					}
@@ -6981,14 +6985,14 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_YIELD_SPEC_CONST_TMP_HANDLER(Z
 		if (UNEXPECTED(EX(func)->op_array.fn_flags & ZEND_ACC_RETURN_REFERENCE)) {
 			/* Constants and temporary variables aren't yieldable by reference,
 			 * but we still allow them with a notice. */
-			if (IS_CONST == IS_CONST || IS_CONST == IS_TMP_VAR) {
+			if (IS_CONST & (IS_CONST|IS_TMP_VAR)) {
 				zval *value;
 
 				zend_error(E_NOTICE, "Only variable references should be yielded by reference");
 
 				value = EX_CONSTANT(opline->op1);
 				ZVAL_COPY_VALUE(&generator->value, value);
-				if (IS_CONST != IS_CONST) {
+				if (IS_CONST == IS_CONST) {
 					if (UNEXPECTED(Z_OPT_COPYABLE(generator->value))) {
 						zval_copy_ctor_func(&generator->value);
 					}
@@ -7432,14 +7436,14 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_YIELD_SPEC_CONST_VAR_HANDLER(Z
 		if (UNEXPECTED(EX(func)->op_array.fn_flags & ZEND_ACC_RETURN_REFERENCE)) {
 			/* Constants and temporary variables aren't yieldable by reference,
 			 * but we still allow them with a notice. */
-			if (IS_CONST == IS_CONST || IS_CONST == IS_TMP_VAR) {
+			if (IS_CONST & (IS_CONST|IS_TMP_VAR)) {
 				zval *value;
 
 				zend_error(E_NOTICE, "Only variable references should be yielded by reference");
 
 				value = EX_CONSTANT(opline->op1);
 				ZVAL_COPY_VALUE(&generator->value, value);
-				if (IS_CONST != IS_CONST) {
+				if (IS_CONST == IS_CONST) {
 					if (UNEXPECTED(Z_OPT_COPYABLE(generator->value))) {
 						zval_copy_ctor_func(&generator->value);
 					}
@@ -7811,7 +7815,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FETCH_DIM_FUNC_ARG_SPEC_CONST_
 	SAVE_OPLINE();
 
 	if (zend_is_by_ref_func_arg_fetch(opline, EX(call))) {
-        if (IS_CONST == IS_CONST || IS_CONST == IS_TMP_VAR) {
+        if ((IS_CONST & (IS_CONST|IS_TMP_VAR))) {
             zend_throw_error(NULL, "Cannot use temporary expression in write context");
 
 
@@ -7889,15 +7893,22 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_INIT_STATIC_METHOD_CALL_SPEC_C
 		function_name = NULL;
 		if (IS_UNUSED != IS_CONST) {
 			if (UNEXPECTED(Z_TYPE_P(function_name) != IS_STRING)) {
-				if (IS_UNUSED == IS_CV && UNEXPECTED(Z_TYPE_P(function_name) == IS_UNDEF)) {
-					GET_OP2_UNDEF_CV(function_name, BP_VAR_R);
-					if (UNEXPECTED(EG(exception) != NULL)) {
-						HANDLE_EXCEPTION();
+				do {
+					if (IS_UNUSED & (IS_VAR|IS_CV) && Z_ISREF_P(function_name)) {
+						function_name = Z_REFVAL_P(function_name);
+						if (EXPECTED(Z_TYPE_P(function_name) == IS_STRING)) {
+							break;
+						}
+					} else if (IS_UNUSED == IS_CV && UNEXPECTED(Z_TYPE_P(function_name) == IS_UNDEF)) {
+						GET_OP2_UNDEF_CV(function_name, BP_VAR_R);
+						if (UNEXPECTED(EG(exception) != NULL)) {
+							HANDLE_EXCEPTION();
+						}
 					}
-				}
-				zend_throw_error(NULL, "Function name must be a string");
+					zend_throw_error(NULL, "Function name must be a string");
 
-				HANDLE_EXCEPTION();
+					HANDLE_EXCEPTION();
+				} while (0);
  			}
 		}
 
@@ -8462,14 +8473,14 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_YIELD_SPEC_CONST_UNUSED_HANDLE
 		if (UNEXPECTED(EX(func)->op_array.fn_flags & ZEND_ACC_RETURN_REFERENCE)) {
 			/* Constants and temporary variables aren't yieldable by reference,
 			 * but we still allow them with a notice. */
-			if (IS_CONST == IS_CONST || IS_CONST == IS_TMP_VAR) {
+			if (IS_CONST & (IS_CONST|IS_TMP_VAR)) {
 				zval *value;
 
 				zend_error(E_NOTICE, "Only variable references should be yielded by reference");
 
 				value = EX_CONSTANT(opline->op1);
 				ZVAL_COPY_VALUE(&generator->value, value);
-				if (IS_CONST != IS_CONST) {
+				if (IS_CONST == IS_CONST) {
 					if (UNEXPECTED(Z_OPT_COPYABLE(generator->value))) {
 						zval_copy_ctor_func(&generator->value);
 					}
@@ -9244,7 +9255,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FETCH_DIM_FUNC_ARG_SPEC_CONST_
 	SAVE_OPLINE();
 
 	if (zend_is_by_ref_func_arg_fetch(opline, EX(call))) {
-        if (IS_CONST == IS_CONST || IS_CONST == IS_TMP_VAR) {
+        if ((IS_CONST & (IS_CONST|IS_TMP_VAR))) {
             zend_throw_error(NULL, "Cannot use temporary expression in write context");
 
 
@@ -9435,7 +9446,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FETCH_OBJ_FUNC_ARG_SPEC_CONST_
 
 			HANDLE_EXCEPTION();
 		}
-		if (IS_CONST == IS_CONST || IS_CONST == IS_TMP_VAR) {
+		if ((IS_CONST & (IS_CONST|IS_TMP_VAR))) {
 			zend_throw_error(NULL, "Cannot use temporary expression in write context");
 
 
@@ -9575,7 +9586,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_INIT_METHOD_CALL_SPEC_CONST_CV
 					}
 				}
 				if (IS_CONST == IS_CV && UNEXPECTED(Z_TYPE_P(object) == IS_UNDEF)) {
-					GET_OP1_UNDEF_CV(object, BP_VAR_R);
+					object = GET_OP1_UNDEF_CV(object, BP_VAR_R);
 					if (UNEXPECTED(EG(exception) != NULL)) {
 
 						HANDLE_EXCEPTION();
@@ -9689,15 +9700,22 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_INIT_STATIC_METHOD_CALL_SPEC_C
 		function_name = _get_zval_ptr_cv_undef(execute_data, opline->op2.var);
 		if (IS_CV != IS_CONST) {
 			if (UNEXPECTED(Z_TYPE_P(function_name) != IS_STRING)) {
-				if (IS_CV == IS_CV && UNEXPECTED(Z_TYPE_P(function_name) == IS_UNDEF)) {
-					GET_OP2_UNDEF_CV(function_name, BP_VAR_R);
-					if (UNEXPECTED(EG(exception) != NULL)) {
-						HANDLE_EXCEPTION();
+				do {
+					if (IS_CV & (IS_VAR|IS_CV) && Z_ISREF_P(function_name)) {
+						function_name = Z_REFVAL_P(function_name);
+						if (EXPECTED(Z_TYPE_P(function_name) == IS_STRING)) {
+							break;
+						}
+					} else if (IS_CV == IS_CV && UNEXPECTED(Z_TYPE_P(function_name) == IS_UNDEF)) {
+						GET_OP2_UNDEF_CV(function_name, BP_VAR_R);
+						if (UNEXPECTED(EG(exception) != NULL)) {
+							HANDLE_EXCEPTION();
+						}
 					}
-				}
-				zend_throw_error(NULL, "Function name must be a string");
+					zend_throw_error(NULL, "Function name must be a string");
 
-				HANDLE_EXCEPTION();
+					HANDLE_EXCEPTION();
+				} while (0);
  			}
 		}
 
@@ -10289,14 +10307,14 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_YIELD_SPEC_CONST_CV_HANDLER(ZE
 		if (UNEXPECTED(EX(func)->op_array.fn_flags & ZEND_ACC_RETURN_REFERENCE)) {
 			/* Constants and temporary variables aren't yieldable by reference,
 			 * but we still allow them with a notice. */
-			if (IS_CONST == IS_CONST || IS_CONST == IS_TMP_VAR) {
+			if (IS_CONST & (IS_CONST|IS_TMP_VAR)) {
 				zval *value;
 
 				zend_error(E_NOTICE, "Only variable references should be yielded by reference");
 
 				value = EX_CONSTANT(opline->op1);
 				ZVAL_COPY_VALUE(&generator->value, value);
-				if (IS_CONST != IS_CONST) {
+				if (IS_CONST == IS_CONST) {
 					if (UNEXPECTED(Z_OPT_COPYABLE(generator->value))) {
 						zval_copy_ctor_func(&generator->value);
 					}
@@ -11035,7 +11053,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FETCH_DIM_FUNC_ARG_SPEC_CONST_
 	SAVE_OPLINE();
 
 	if (zend_is_by_ref_func_arg_fetch(opline, EX(call))) {
-        if (IS_CONST == IS_CONST || IS_CONST == IS_TMP_VAR) {
+        if ((IS_CONST & (IS_CONST|IS_TMP_VAR))) {
             zend_throw_error(NULL, "Cannot use temporary expression in write context");
 			zval_ptr_dtor_nogc(EX_VAR(opline->op2.var));
 
@@ -11228,7 +11246,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FETCH_OBJ_FUNC_ARG_SPEC_CONST_
 			zval_ptr_dtor_nogc(free_op2);
 			HANDLE_EXCEPTION();
 		}
-		if (IS_CONST == IS_CONST || IS_CONST == IS_TMP_VAR) {
+		if ((IS_CONST & (IS_CONST|IS_TMP_VAR))) {
 			zend_throw_error(NULL, "Cannot use temporary expression in write context");
 			zval_ptr_dtor_nogc(free_op2);
 
@@ -11368,7 +11386,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_INIT_METHOD_CALL_SPEC_CONST_TM
 					}
 				}
 				if (IS_CONST == IS_CV && UNEXPECTED(Z_TYPE_P(object) == IS_UNDEF)) {
-					GET_OP1_UNDEF_CV(object, BP_VAR_R);
+					object = GET_OP1_UNDEF_CV(object, BP_VAR_R);
 					if (UNEXPECTED(EG(exception) != NULL)) {
 						zval_ptr_dtor_nogc(free_op2);
 						HANDLE_EXCEPTION();
@@ -11483,15 +11501,22 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_INIT_STATIC_METHOD_CALL_SPEC_C
 		function_name = _get_zval_ptr_var(opline->op2.var, execute_data, &free_op2);
 		if ((IS_TMP_VAR|IS_VAR) != IS_CONST) {
 			if (UNEXPECTED(Z_TYPE_P(function_name) != IS_STRING)) {
-				if ((IS_TMP_VAR|IS_VAR) == IS_CV && UNEXPECTED(Z_TYPE_P(function_name) == IS_UNDEF)) {
-					GET_OP2_UNDEF_CV(function_name, BP_VAR_R);
-					if (UNEXPECTED(EG(exception) != NULL)) {
-						HANDLE_EXCEPTION();
+				do {
+					if ((IS_TMP_VAR|IS_VAR) & (IS_VAR|IS_CV) && Z_ISREF_P(function_name)) {
+						function_name = Z_REFVAL_P(function_name);
+						if (EXPECTED(Z_TYPE_P(function_name) == IS_STRING)) {
+							break;
+						}
+					} else if ((IS_TMP_VAR|IS_VAR) == IS_CV && UNEXPECTED(Z_TYPE_P(function_name) == IS_UNDEF)) {
+						GET_OP2_UNDEF_CV(function_name, BP_VAR_R);
+						if (UNEXPECTED(EG(exception) != NULL)) {
+							HANDLE_EXCEPTION();
+						}
 					}
-				}
-				zend_throw_error(NULL, "Function name must be a string");
-				zval_ptr_dtor_nogc(free_op2);
-				HANDLE_EXCEPTION();
+					zend_throw_error(NULL, "Function name must be a string");
+					zval_ptr_dtor_nogc(free_op2);
+					HANDLE_EXCEPTION();
+				} while (0);
  			}
 		}
 
@@ -12022,14 +12047,14 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_RETURN_SPEC_TMP_HANDLER(ZEND_O
 			ZVAL_NULL(EX(return_value));
 		}
 	} else if (!EX(return_value)) {
-		if (IS_TMP_VAR == IS_VAR || IS_TMP_VAR == IS_TMP_VAR ) {
+		if (IS_TMP_VAR & (IS_VAR|IS_TMP_VAR)) {
 			if (Z_REFCOUNTED_P(free_op1) && !Z_DELREF_P(free_op1)) {
 				SAVE_OPLINE();
 				zval_dtor_func_for_ptr(Z_COUNTED_P(free_op1));
 			}
 		}
 	} else {
-		if (IS_TMP_VAR == IS_CONST || IS_TMP_VAR == IS_TMP_VAR) {
+		if ((IS_TMP_VAR & (IS_CONST|IS_TMP_VAR))) {
 			ZVAL_COPY_VALUE(EX(return_value), retval_ptr);
 			if (IS_TMP_VAR == IS_CONST) {
 				if (UNEXPECTED(Z_OPT_COPYABLE_P(EX(return_value)))) {
@@ -12067,7 +12092,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_RETURN_BY_REF_SPEC_TMP_HANDLER
 	SAVE_OPLINE();
 
 	do {
-		if (IS_TMP_VAR == IS_CONST || IS_TMP_VAR == IS_TMP_VAR ||
+		if ((IS_TMP_VAR & (IS_CONST|IS_TMP_VAR)) ||
 		    (IS_TMP_VAR == IS_VAR && opline->extended_value == ZEND_RETURNS_VALUE)) {
 			/* Not supposed to happen, but we'll allow it */
 			zend_error(E_NOTICE, "Only variable references should be returned by reference");
@@ -12126,7 +12151,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_GENERATOR_RETURN_SPEC_TMP_HAND
 	retval = _get_zval_ptr_tmp(opline->op1.var, execute_data, &free_op1);
 
 	/* Copy return value into generator->retval */
-	if (IS_TMP_VAR == IS_CONST || IS_TMP_VAR == IS_TMP_VAR) {
+	if ((IS_TMP_VAR & (IS_CONST|IS_TMP_VAR))) {
 		ZVAL_COPY_VALUE(&generator->retval, retval);
 		if (IS_TMP_VAR == IS_CONST) {
 			if (UNEXPECTED(Z_OPT_COPYABLE(generator->retval))) {
@@ -12845,6 +12870,9 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_YIELD_FROM_SPEC_TMP_HANDLER(ZE
 		ZVAL_NULL(EX_VAR(opline->result.var));
 	}
 
+	/* This generator has no send target (though the generator we delegate to might have one) */
+	generator->send_target = NULL;
+
 	/* We increment to the next op, so we are at the correct position when the
 	 * generator is resumed. */
 	ZEND_VM_INC_OPCODE();
@@ -12937,7 +12965,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FETCH_DIM_FUNC_ARG_SPEC_TMP_CO
 	SAVE_OPLINE();
 
 	if (zend_is_by_ref_func_arg_fetch(opline, EX(call))) {
-        if (IS_TMP_VAR == IS_CONST || IS_TMP_VAR == IS_TMP_VAR) {
+        if ((IS_TMP_VAR & (IS_CONST|IS_TMP_VAR))) {
             zend_throw_error(NULL, "Cannot use temporary expression in write context");
 
 			zval_ptr_dtor_nogc(EX_VAR(opline->op1.var));
@@ -13056,7 +13084,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FETCH_OBJ_FUNC_ARG_SPEC_TMP_CO
 
 			HANDLE_EXCEPTION();
 		}
-		if (IS_TMP_VAR == IS_CONST || IS_TMP_VAR == IS_TMP_VAR) {
+		if ((IS_TMP_VAR & (IS_CONST|IS_TMP_VAR))) {
 			zend_throw_error(NULL, "Cannot use temporary expression in write context");
 
 
@@ -13312,14 +13340,14 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_YIELD_SPEC_TMP_CONST_HANDLER(Z
 		if (UNEXPECTED(EX(func)->op_array.fn_flags & ZEND_ACC_RETURN_REFERENCE)) {
 			/* Constants and temporary variables aren't yieldable by reference,
 			 * but we still allow them with a notice. */
-			if (IS_TMP_VAR == IS_CONST || IS_TMP_VAR == IS_TMP_VAR) {
+			if (IS_TMP_VAR & (IS_CONST|IS_TMP_VAR)) {
 				zval *value;
 
 				zend_error(E_NOTICE, "Only variable references should be yielded by reference");
 
 				value = _get_zval_ptr_tmp(opline->op1.var, execute_data, &free_op1);
 				ZVAL_COPY_VALUE(&generator->value, value);
-				if (IS_TMP_VAR != IS_CONST) {
+				if (IS_TMP_VAR == IS_CONST) {
 					if (UNEXPECTED(Z_OPT_COPYABLE(generator->value))) {
 						zval_copy_ctor_func(&generator->value);
 					}
@@ -13483,14 +13511,14 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_YIELD_SPEC_TMP_TMP_HANDLER(ZEN
 		if (UNEXPECTED(EX(func)->op_array.fn_flags & ZEND_ACC_RETURN_REFERENCE)) {
 			/* Constants and temporary variables aren't yieldable by reference,
 			 * but we still allow them with a notice. */
-			if (IS_TMP_VAR == IS_CONST || IS_TMP_VAR == IS_TMP_VAR) {
+			if (IS_TMP_VAR & (IS_CONST|IS_TMP_VAR)) {
 				zval *value;
 
 				zend_error(E_NOTICE, "Only variable references should be yielded by reference");
 
 				value = _get_zval_ptr_tmp(opline->op1.var, execute_data, &free_op1);
 				ZVAL_COPY_VALUE(&generator->value, value);
-				if (IS_TMP_VAR != IS_CONST) {
+				if (IS_TMP_VAR == IS_CONST) {
 					if (UNEXPECTED(Z_OPT_COPYABLE(generator->value))) {
 						zval_copy_ctor_func(&generator->value);
 					}
@@ -13654,14 +13682,14 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_YIELD_SPEC_TMP_VAR_HANDLER(ZEN
 		if (UNEXPECTED(EX(func)->op_array.fn_flags & ZEND_ACC_RETURN_REFERENCE)) {
 			/* Constants and temporary variables aren't yieldable by reference,
 			 * but we still allow them with a notice. */
-			if (IS_TMP_VAR == IS_CONST || IS_TMP_VAR == IS_TMP_VAR) {
+			if (IS_TMP_VAR & (IS_CONST|IS_TMP_VAR)) {
 				zval *value;
 
 				zend_error(E_NOTICE, "Only variable references should be yielded by reference");
 
 				value = _get_zval_ptr_tmp(opline->op1.var, execute_data, &free_op1);
 				ZVAL_COPY_VALUE(&generator->value, value);
-				if (IS_TMP_VAR != IS_CONST) {
+				if (IS_TMP_VAR == IS_CONST) {
 					if (UNEXPECTED(Z_OPT_COPYABLE(generator->value))) {
 						zval_copy_ctor_func(&generator->value);
 					}
@@ -13771,7 +13799,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FETCH_DIM_FUNC_ARG_SPEC_TMP_UN
 	SAVE_OPLINE();
 
 	if (zend_is_by_ref_func_arg_fetch(opline, EX(call))) {
-        if (IS_TMP_VAR == IS_CONST || IS_TMP_VAR == IS_TMP_VAR) {
+        if ((IS_TMP_VAR & (IS_CONST|IS_TMP_VAR))) {
             zend_throw_error(NULL, "Cannot use temporary expression in write context");
 
 			zval_ptr_dtor_nogc(EX_VAR(opline->op1.var));
@@ -14006,14 +14034,14 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_YIELD_SPEC_TMP_UNUSED_HANDLER(
 		if (UNEXPECTED(EX(func)->op_array.fn_flags & ZEND_ACC_RETURN_REFERENCE)) {
 			/* Constants and temporary variables aren't yieldable by reference,
 			 * but we still allow them with a notice. */
-			if (IS_TMP_VAR == IS_CONST || IS_TMP_VAR == IS_TMP_VAR) {
+			if (IS_TMP_VAR & (IS_CONST|IS_TMP_VAR)) {
 				zval *value;
 
 				zend_error(E_NOTICE, "Only variable references should be yielded by reference");
 
 				value = _get_zval_ptr_tmp(opline->op1.var, execute_data, &free_op1);
 				ZVAL_COPY_VALUE(&generator->value, value);
-				if (IS_TMP_VAR != IS_CONST) {
+				if (IS_TMP_VAR == IS_CONST) {
 					if (UNEXPECTED(Z_OPT_COPYABLE(generator->value))) {
 						zval_copy_ctor_func(&generator->value);
 					}
@@ -14159,7 +14187,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FETCH_DIM_FUNC_ARG_SPEC_TMP_CV
 	SAVE_OPLINE();
 
 	if (zend_is_by_ref_func_arg_fetch(opline, EX(call))) {
-        if (IS_TMP_VAR == IS_CONST || IS_TMP_VAR == IS_TMP_VAR) {
+        if ((IS_TMP_VAR & (IS_CONST|IS_TMP_VAR))) {
             zend_throw_error(NULL, "Cannot use temporary expression in write context");
 
 			zval_ptr_dtor_nogc(EX_VAR(opline->op1.var));
@@ -14278,7 +14306,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FETCH_OBJ_FUNC_ARG_SPEC_TMP_CV
 
 			HANDLE_EXCEPTION();
 		}
-		if (IS_TMP_VAR == IS_CONST || IS_TMP_VAR == IS_TMP_VAR) {
+		if ((IS_TMP_VAR & (IS_CONST|IS_TMP_VAR))) {
 			zend_throw_error(NULL, "Cannot use temporary expression in write context");
 
 
@@ -14534,14 +14562,14 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_YIELD_SPEC_TMP_CV_HANDLER(ZEND
 		if (UNEXPECTED(EX(func)->op_array.fn_flags & ZEND_ACC_RETURN_REFERENCE)) {
 			/* Constants and temporary variables aren't yieldable by reference,
 			 * but we still allow them with a notice. */
-			if (IS_TMP_VAR == IS_CONST || IS_TMP_VAR == IS_TMP_VAR) {
+			if (IS_TMP_VAR & (IS_CONST|IS_TMP_VAR)) {
 				zval *value;
 
 				zend_error(E_NOTICE, "Only variable references should be yielded by reference");
 
 				value = _get_zval_ptr_tmp(opline->op1.var, execute_data, &free_op1);
 				ZVAL_COPY_VALUE(&generator->value, value);
-				if (IS_TMP_VAR != IS_CONST) {
+				if (IS_TMP_VAR == IS_CONST) {
 					if (UNEXPECTED(Z_OPT_COPYABLE(generator->value))) {
 						zval_copy_ctor_func(&generator->value);
 					}
@@ -14682,7 +14710,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FETCH_DIM_FUNC_ARG_SPEC_TMP_TM
 	SAVE_OPLINE();
 
 	if (zend_is_by_ref_func_arg_fetch(opline, EX(call))) {
-        if (IS_TMP_VAR == IS_CONST || IS_TMP_VAR == IS_TMP_VAR) {
+        if ((IS_TMP_VAR & (IS_CONST|IS_TMP_VAR))) {
             zend_throw_error(NULL, "Cannot use temporary expression in write context");
 			zval_ptr_dtor_nogc(EX_VAR(opline->op2.var));
 			zval_ptr_dtor_nogc(EX_VAR(opline->op1.var));
@@ -14802,7 +14830,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FETCH_OBJ_FUNC_ARG_SPEC_TMP_TM
 			zval_ptr_dtor_nogc(free_op2);
 			HANDLE_EXCEPTION();
 		}
-		if (IS_TMP_VAR == IS_CONST || IS_TMP_VAR == IS_TMP_VAR) {
+		if ((IS_TMP_VAR & (IS_CONST|IS_TMP_VAR))) {
 			zend_throw_error(NULL, "Cannot use temporary expression in write context");
 			zval_ptr_dtor_nogc(free_op2);
 
@@ -15271,14 +15299,14 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_RETURN_SPEC_VAR_HANDLER(ZEND_O
 			ZVAL_NULL(EX(return_value));
 		}
 	} else if (!EX(return_value)) {
-		if (IS_VAR == IS_VAR || IS_VAR == IS_TMP_VAR ) {
+		if (IS_VAR & (IS_VAR|IS_TMP_VAR)) {
 			if (Z_REFCOUNTED_P(free_op1) && !Z_DELREF_P(free_op1)) {
 				SAVE_OPLINE();
 				zval_dtor_func_for_ptr(Z_COUNTED_P(free_op1));
 			}
 		}
 	} else {
-		if (IS_VAR == IS_CONST || IS_VAR == IS_TMP_VAR) {
+		if ((IS_VAR & (IS_CONST|IS_TMP_VAR))) {
 			ZVAL_COPY_VALUE(EX(return_value), retval_ptr);
 			if (IS_VAR == IS_CONST) {
 				if (UNEXPECTED(Z_OPT_COPYABLE_P(EX(return_value)))) {
@@ -15316,7 +15344,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_RETURN_BY_REF_SPEC_VAR_HANDLER
 	SAVE_OPLINE();
 
 	do {
-		if (IS_VAR == IS_CONST || IS_VAR == IS_TMP_VAR ||
+		if ((IS_VAR & (IS_CONST|IS_TMP_VAR)) ||
 		    (IS_VAR == IS_VAR && opline->extended_value == ZEND_RETURNS_VALUE)) {
 			/* Not supposed to happen, but we'll allow it */
 			zend_error(E_NOTICE, "Only variable references should be returned by reference");
@@ -15376,7 +15404,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_GENERATOR_RETURN_SPEC_VAR_HAND
 	retval = _get_zval_ptr_var(opline->op1.var, execute_data, &free_op1);
 
 	/* Copy return value into generator->retval */
-	if (IS_VAR == IS_CONST || IS_VAR == IS_TMP_VAR) {
+	if ((IS_VAR & (IS_CONST|IS_TMP_VAR))) {
 		ZVAL_COPY_VALUE(&generator->retval, retval);
 		if (IS_VAR == IS_CONST) {
 			if (UNEXPECTED(Z_OPT_COPYABLE(generator->retval))) {
@@ -15709,7 +15737,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_SEND_USER_SPEC_VAR_HANDLER(ZEN
 static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_NEW_SPEC_VAR_HANDLER(ZEND_OPCODE_HANDLER_ARGS)
 {
 	USE_OPLINE
-	zval object_zval;
+	zval *result;
 	zend_function *constructor;
 	zend_class_entry *ce;
 
@@ -15732,33 +15760,26 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_NEW_SPEC_VAR_HANDLER(ZEND_OPCO
 	} else {
 		ce = Z_CE_P(EX_VAR(opline->op1.var));
 	}
-	if (UNEXPECTED(object_init_ex(&object_zval, ce) != SUCCESS)) {
+
+	result = EX_VAR(opline->result.var);
+	if (UNEXPECTED(object_init_ex(result, ce) != SUCCESS)) {
 		HANDLE_EXCEPTION();
 	}
-	constructor = Z_OBJ_HT(object_zval)->get_constructor(Z_OBJ(object_zval));
 
+	constructor = Z_OBJ_HT_P(result)->get_constructor(Z_OBJ_P(result));
 	if (constructor == NULL) {
-		if (EXPECTED(RETURN_VALUE_USED(opline))) {
-			ZVAL_COPY_VALUE(EX_VAR(opline->result.var), &object_zval);
-		} else {
-			OBJ_RELEASE(Z_OBJ(object_zval));
-		}
 		ZEND_VM_JMP(OP_JMP_ADDR(opline, opline->op2));
 	} else {
 		/* We are not handling overloaded classes right now */
 		zend_execute_data *call = zend_vm_stack_push_call_frame(
-				ZEND_CALL_FUNCTION | ZEND_CALL_RELEASE_THIS | ZEND_CALL_CTOR |
-				(EXPECTED(RETURN_VALUE_USED(opline)) ? 0 : ZEND_CALL_CTOR_RESULT_UNUSED),
+			ZEND_CALL_FUNCTION | ZEND_CALL_RELEASE_THIS | ZEND_CALL_CTOR,
 			constructor,
 			opline->extended_value,
 			ce,
-			Z_OBJ(object_zval));
+			Z_OBJ_P(result));
 		call->prev_execute_data = EX(call);
 		EX(call) = call;
-
-		if (EXPECTED(RETURN_VALUE_USED(opline))) {
-			ZVAL_COPY(EX_VAR(opline->result.var), &object_zval);
-		}
+		Z_ADDREF_P(result);
 
 		ZEND_VM_NEXT_OPCODE_CHECK_EXCEPTION();
 	}
@@ -16698,6 +16719,9 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_YIELD_FROM_SPEC_VAR_HANDLER(ZE
 		ZVAL_NULL(EX_VAR(opline->result.var));
 	}
 
+	/* This generator has no send target (though the generator we delegate to might have one) */
+	generator->send_target = NULL;
+
 	/* We increment to the next op, so we are at the correct position when the
 	 * generator is resumed. */
 	ZEND_VM_INC_OPCODE();
@@ -17354,7 +17378,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FETCH_DIM_FUNC_ARG_SPEC_VAR_CO
 	SAVE_OPLINE();
 
 	if (zend_is_by_ref_func_arg_fetch(opline, EX(call))) {
-        if (IS_VAR == IS_CONST || IS_VAR == IS_TMP_VAR) {
+        if ((IS_VAR & (IS_CONST|IS_TMP_VAR))) {
             zend_throw_error(NULL, "Cannot use temporary expression in write context");
 
 			zval_ptr_dtor_nogc(EX_VAR(opline->op1.var));
@@ -17542,7 +17566,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FETCH_OBJ_FUNC_ARG_SPEC_VAR_CO
 
 			HANDLE_EXCEPTION();
 		}
-		if (IS_VAR == IS_CONST || IS_VAR == IS_TMP_VAR) {
+		if ((IS_VAR & (IS_CONST|IS_TMP_VAR))) {
 			zend_throw_error(NULL, "Cannot use temporary expression in write context");
 
 			if (UNEXPECTED(free_op1)) {zval_ptr_dtor_nogc(free_op1);};
@@ -18776,15 +18800,22 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_INIT_STATIC_METHOD_CALL_SPEC_V
 		function_name = EX_CONSTANT(opline->op2);
 		if (IS_CONST != IS_CONST) {
 			if (UNEXPECTED(Z_TYPE_P(function_name) != IS_STRING)) {
-				if (IS_CONST == IS_CV && UNEXPECTED(Z_TYPE_P(function_name) == IS_UNDEF)) {
-					GET_OP2_UNDEF_CV(function_name, BP_VAR_R);
-					if (UNEXPECTED(EG(exception) != NULL)) {
-						HANDLE_EXCEPTION();
+				do {
+					if (IS_CONST & (IS_VAR|IS_CV) && Z_ISREF_P(function_name)) {
+						function_name = Z_REFVAL_P(function_name);
+						if (EXPECTED(Z_TYPE_P(function_name) == IS_STRING)) {
+							break;
+						}
+					} else if (IS_CONST == IS_CV && UNEXPECTED(Z_TYPE_P(function_name) == IS_UNDEF)) {
+						GET_OP2_UNDEF_CV(function_name, BP_VAR_R);
+						if (UNEXPECTED(EG(exception) != NULL)) {
+							HANDLE_EXCEPTION();
+						}
 					}
-				}
-				zend_throw_error(NULL, "Function name must be a string");
+					zend_throw_error(NULL, "Function name must be a string");
 
-				HANDLE_EXCEPTION();
+					HANDLE_EXCEPTION();
+				} while (0);
  			}
 		}
 
@@ -19232,14 +19263,14 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_YIELD_SPEC_VAR_CONST_HANDLER(Z
 		if (UNEXPECTED(EX(func)->op_array.fn_flags & ZEND_ACC_RETURN_REFERENCE)) {
 			/* Constants and temporary variables aren't yieldable by reference,
 			 * but we still allow them with a notice. */
-			if (IS_VAR == IS_CONST || IS_VAR == IS_TMP_VAR) {
+			if (IS_VAR & (IS_CONST|IS_TMP_VAR)) {
 				zval *value;
 
 				zend_error(E_NOTICE, "Only variable references should be yielded by reference");
 
 				value = _get_zval_ptr_var(opline->op1.var, execute_data, &free_op1);
 				ZVAL_COPY_VALUE(&generator->value, value);
-				if (IS_VAR != IS_CONST) {
+				if (IS_VAR == IS_CONST) {
 					if (UNEXPECTED(Z_OPT_COPYABLE(generator->value))) {
 						zval_copy_ctor_func(&generator->value);
 					}
@@ -19460,14 +19491,14 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_YIELD_SPEC_VAR_TMP_HANDLER(ZEN
 		if (UNEXPECTED(EX(func)->op_array.fn_flags & ZEND_ACC_RETURN_REFERENCE)) {
 			/* Constants and temporary variables aren't yieldable by reference,
 			 * but we still allow them with a notice. */
-			if (IS_VAR == IS_CONST || IS_VAR == IS_TMP_VAR) {
+			if (IS_VAR & (IS_CONST|IS_TMP_VAR)) {
 				zval *value;
 
 				zend_error(E_NOTICE, "Only variable references should be yielded by reference");
 
 				value = _get_zval_ptr_var(opline->op1.var, execute_data, &free_op1);
 				ZVAL_COPY_VALUE(&generator->value, value);
-				if (IS_VAR != IS_CONST) {
+				if (IS_VAR == IS_CONST) {
 					if (UNEXPECTED(Z_OPT_COPYABLE(generator->value))) {
 						zval_copy_ctor_func(&generator->value);
 					}
@@ -19744,14 +19775,14 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_YIELD_SPEC_VAR_VAR_HANDLER(ZEN
 		if (UNEXPECTED(EX(func)->op_array.fn_flags & ZEND_ACC_RETURN_REFERENCE)) {
 			/* Constants and temporary variables aren't yieldable by reference,
 			 * but we still allow them with a notice. */
-			if (IS_VAR == IS_CONST || IS_VAR == IS_TMP_VAR) {
+			if (IS_VAR & (IS_CONST|IS_TMP_VAR)) {
 				zval *value;
 
 				zend_error(E_NOTICE, "Only variable references should be yielded by reference");
 
 				value = _get_zval_ptr_var(opline->op1.var, execute_data, &free_op1);
 				ZVAL_COPY_VALUE(&generator->value, value);
-				if (IS_VAR != IS_CONST) {
+				if (IS_VAR == IS_CONST) {
 					if (UNEXPECTED(Z_OPT_COPYABLE(generator->value))) {
 						zval_copy_ctor_func(&generator->value);
 					}
@@ -20194,7 +20225,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FETCH_DIM_FUNC_ARG_SPEC_VAR_UN
 	SAVE_OPLINE();
 
 	if (zend_is_by_ref_func_arg_fetch(opline, EX(call))) {
-        if (IS_VAR == IS_CONST || IS_VAR == IS_TMP_VAR) {
+        if ((IS_VAR & (IS_CONST|IS_TMP_VAR))) {
             zend_throw_error(NULL, "Cannot use temporary expression in write context");
 
 			zval_ptr_dtor_nogc(EX_VAR(opline->op1.var));
@@ -20656,15 +20687,22 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_INIT_STATIC_METHOD_CALL_SPEC_V
 		function_name = NULL;
 		if (IS_UNUSED != IS_CONST) {
 			if (UNEXPECTED(Z_TYPE_P(function_name) != IS_STRING)) {
-				if (IS_UNUSED == IS_CV && UNEXPECTED(Z_TYPE_P(function_name) == IS_UNDEF)) {
-					GET_OP2_UNDEF_CV(function_name, BP_VAR_R);
-					if (UNEXPECTED(EG(exception) != NULL)) {
-						HANDLE_EXCEPTION();
+				do {
+					if (IS_UNUSED & (IS_VAR|IS_CV) && Z_ISREF_P(function_name)) {
+						function_name = Z_REFVAL_P(function_name);
+						if (EXPECTED(Z_TYPE_P(function_name) == IS_STRING)) {
+							break;
+						}
+					} else if (IS_UNUSED == IS_CV && UNEXPECTED(Z_TYPE_P(function_name) == IS_UNDEF)) {
+						GET_OP2_UNDEF_CV(function_name, BP_VAR_R);
+						if (UNEXPECTED(EG(exception) != NULL)) {
+							HANDLE_EXCEPTION();
+						}
 					}
-				}
-				zend_throw_error(NULL, "Function name must be a string");
+					zend_throw_error(NULL, "Function name must be a string");
 
-				HANDLE_EXCEPTION();
+					HANDLE_EXCEPTION();
+				} while (0);
  			}
 		}
 
@@ -20971,14 +21009,14 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_YIELD_SPEC_VAR_UNUSED_HANDLER(
 		if (UNEXPECTED(EX(func)->op_array.fn_flags & ZEND_ACC_RETURN_REFERENCE)) {
 			/* Constants and temporary variables aren't yieldable by reference,
 			 * but we still allow them with a notice. */
-			if (IS_VAR == IS_CONST || IS_VAR == IS_TMP_VAR) {
+			if (IS_VAR & (IS_CONST|IS_TMP_VAR)) {
 				zval *value;
 
 				zend_error(E_NOTICE, "Only variable references should be yielded by reference");
 
 				value = _get_zval_ptr_var(opline->op1.var, execute_data, &free_op1);
 				ZVAL_COPY_VALUE(&generator->value, value);
-				if (IS_VAR != IS_CONST) {
+				if (IS_VAR == IS_CONST) {
 					if (UNEXPECTED(Z_OPT_COPYABLE(generator->value))) {
 						zval_copy_ctor_func(&generator->value);
 					}
@@ -21689,7 +21727,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FETCH_DIM_FUNC_ARG_SPEC_VAR_CV
 	SAVE_OPLINE();
 
 	if (zend_is_by_ref_func_arg_fetch(opline, EX(call))) {
-        if (IS_VAR == IS_CONST || IS_VAR == IS_TMP_VAR) {
+        if ((IS_VAR & (IS_CONST|IS_TMP_VAR))) {
             zend_throw_error(NULL, "Cannot use temporary expression in write context");
 
 			zval_ptr_dtor_nogc(EX_VAR(opline->op1.var));
@@ -21877,7 +21915,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FETCH_OBJ_FUNC_ARG_SPEC_VAR_CV
 
 			HANDLE_EXCEPTION();
 		}
-		if (IS_VAR == IS_CONST || IS_VAR == IS_TMP_VAR) {
+		if ((IS_VAR & (IS_CONST|IS_TMP_VAR))) {
 			zend_throw_error(NULL, "Cannot use temporary expression in write context");
 
 			if (UNEXPECTED(free_op1)) {zval_ptr_dtor_nogc(free_op1);};
@@ -23166,15 +23204,22 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_INIT_STATIC_METHOD_CALL_SPEC_V
 		function_name = _get_zval_ptr_cv_undef(execute_data, opline->op2.var);
 		if (IS_CV != IS_CONST) {
 			if (UNEXPECTED(Z_TYPE_P(function_name) != IS_STRING)) {
-				if (IS_CV == IS_CV && UNEXPECTED(Z_TYPE_P(function_name) == IS_UNDEF)) {
-					GET_OP2_UNDEF_CV(function_name, BP_VAR_R);
-					if (UNEXPECTED(EG(exception) != NULL)) {
-						HANDLE_EXCEPTION();
+				do {
+					if (IS_CV & (IS_VAR|IS_CV) && Z_ISREF_P(function_name)) {
+						function_name = Z_REFVAL_P(function_name);
+						if (EXPECTED(Z_TYPE_P(function_name) == IS_STRING)) {
+							break;
+						}
+					} else if (IS_CV == IS_CV && UNEXPECTED(Z_TYPE_P(function_name) == IS_UNDEF)) {
+						GET_OP2_UNDEF_CV(function_name, BP_VAR_R);
+						if (UNEXPECTED(EG(exception) != NULL)) {
+							HANDLE_EXCEPTION();
+						}
 					}
-				}
-				zend_throw_error(NULL, "Function name must be a string");
+					zend_throw_error(NULL, "Function name must be a string");
 
-				HANDLE_EXCEPTION();
+					HANDLE_EXCEPTION();
+				} while (0);
  			}
 		}
 
@@ -23540,14 +23585,14 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_YIELD_SPEC_VAR_CV_HANDLER(ZEND
 		if (UNEXPECTED(EX(func)->op_array.fn_flags & ZEND_ACC_RETURN_REFERENCE)) {
 			/* Constants and temporary variables aren't yieldable by reference,
 			 * but we still allow them with a notice. */
-			if (IS_VAR == IS_CONST || IS_VAR == IS_TMP_VAR) {
+			if (IS_VAR & (IS_CONST|IS_TMP_VAR)) {
 				zval *value;
 
 				zend_error(E_NOTICE, "Only variable references should be yielded by reference");
 
 				value = _get_zval_ptr_var(opline->op1.var, execute_data, &free_op1);
 				ZVAL_COPY_VALUE(&generator->value, value);
-				if (IS_VAR != IS_CONST) {
+				if (IS_VAR == IS_CONST) {
 					if (UNEXPECTED(Z_OPT_COPYABLE(generator->value))) {
 						zval_copy_ctor_func(&generator->value);
 					}
@@ -24226,7 +24271,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FETCH_DIM_FUNC_ARG_SPEC_VAR_TM
 	SAVE_OPLINE();
 
 	if (zend_is_by_ref_func_arg_fetch(opline, EX(call))) {
-        if (IS_VAR == IS_CONST || IS_VAR == IS_TMP_VAR) {
+        if ((IS_VAR & (IS_CONST|IS_TMP_VAR))) {
             zend_throw_error(NULL, "Cannot use temporary expression in write context");
 			zval_ptr_dtor_nogc(EX_VAR(opline->op2.var));
 			zval_ptr_dtor_nogc(EX_VAR(opline->op1.var));
@@ -24415,7 +24460,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FETCH_OBJ_FUNC_ARG_SPEC_VAR_TM
 			zval_ptr_dtor_nogc(free_op2);
 			HANDLE_EXCEPTION();
 		}
-		if (IS_VAR == IS_CONST || IS_VAR == IS_TMP_VAR) {
+		if ((IS_VAR & (IS_CONST|IS_TMP_VAR))) {
 			zend_throw_error(NULL, "Cannot use temporary expression in write context");
 			zval_ptr_dtor_nogc(free_op2);
 			if (UNEXPECTED(free_op1)) {zval_ptr_dtor_nogc(free_op1);};
@@ -25593,15 +25638,22 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_INIT_STATIC_METHOD_CALL_SPEC_V
 		function_name = _get_zval_ptr_var(opline->op2.var, execute_data, &free_op2);
 		if ((IS_TMP_VAR|IS_VAR) != IS_CONST) {
 			if (UNEXPECTED(Z_TYPE_P(function_name) != IS_STRING)) {
-				if ((IS_TMP_VAR|IS_VAR) == IS_CV && UNEXPECTED(Z_TYPE_P(function_name) == IS_UNDEF)) {
-					GET_OP2_UNDEF_CV(function_name, BP_VAR_R);
-					if (UNEXPECTED(EG(exception) != NULL)) {
-						HANDLE_EXCEPTION();
+				do {
+					if ((IS_TMP_VAR|IS_VAR) & (IS_VAR|IS_CV) && Z_ISREF_P(function_name)) {
+						function_name = Z_REFVAL_P(function_name);
+						if (EXPECTED(Z_TYPE_P(function_name) == IS_STRING)) {
+							break;
+						}
+					} else if ((IS_TMP_VAR|IS_VAR) == IS_CV && UNEXPECTED(Z_TYPE_P(function_name) == IS_UNDEF)) {
+						GET_OP2_UNDEF_CV(function_name, BP_VAR_R);
+						if (UNEXPECTED(EG(exception) != NULL)) {
+							HANDLE_EXCEPTION();
+						}
 					}
-				}
-				zend_throw_error(NULL, "Function name must be a string");
-				zval_ptr_dtor_nogc(free_op2);
-				HANDLE_EXCEPTION();
+					zend_throw_error(NULL, "Function name must be a string");
+					zval_ptr_dtor_nogc(free_op2);
+					HANDLE_EXCEPTION();
+				} while (0);
  			}
 		}
 
@@ -25945,7 +25997,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_UNSET_OBJ_SPEC_VAR_TMPVAR_HAND
 static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_NEW_SPEC_UNUSED_HANDLER(ZEND_OPCODE_HANDLER_ARGS)
 {
 	USE_OPLINE
-	zval object_zval;
+	zval *result;
 	zend_function *constructor;
 	zend_class_entry *ce;
 
@@ -25968,33 +26020,26 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_NEW_SPEC_UNUSED_HANDLER(ZEND_O
 	} else {
 		ce = Z_CE_P(EX_VAR(opline->op1.var));
 	}
-	if (UNEXPECTED(object_init_ex(&object_zval, ce) != SUCCESS)) {
+
+	result = EX_VAR(opline->result.var);
+	if (UNEXPECTED(object_init_ex(result, ce) != SUCCESS)) {
 		HANDLE_EXCEPTION();
 	}
-	constructor = Z_OBJ_HT(object_zval)->get_constructor(Z_OBJ(object_zval));
 
+	constructor = Z_OBJ_HT_P(result)->get_constructor(Z_OBJ_P(result));
 	if (constructor == NULL) {
-		if (EXPECTED(RETURN_VALUE_USED(opline))) {
-			ZVAL_COPY_VALUE(EX_VAR(opline->result.var), &object_zval);
-		} else {
-			OBJ_RELEASE(Z_OBJ(object_zval));
-		}
 		ZEND_VM_JMP(OP_JMP_ADDR(opline, opline->op2));
 	} else {
 		/* We are not handling overloaded classes right now */
 		zend_execute_data *call = zend_vm_stack_push_call_frame(
-				ZEND_CALL_FUNCTION | ZEND_CALL_RELEASE_THIS | ZEND_CALL_CTOR |
-				(EXPECTED(RETURN_VALUE_USED(opline)) ? 0 : ZEND_CALL_CTOR_RESULT_UNUSED),
+			ZEND_CALL_FUNCTION | ZEND_CALL_RELEASE_THIS | ZEND_CALL_CTOR,
 			constructor,
 			opline->extended_value,
 			ce,
-			Z_OBJ(object_zval));
+			Z_OBJ_P(result));
 		call->prev_execute_data = EX(call);
 		EX(call) = call;
-
-		if (EXPECTED(RETURN_VALUE_USED(opline))) {
-			ZVAL_COPY(EX_VAR(opline->result.var), &object_zval);
-		}
+		Z_ADDREF_P(result);
 
 		ZEND_VM_NEXT_OPCODE_CHECK_EXCEPTION();
 	}
@@ -26816,7 +26861,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FETCH_OBJ_FUNC_ARG_SPEC_UNUSED
 
 			HANDLE_EXCEPTION();
 		}
-		if (IS_UNUSED == IS_CONST || IS_UNUSED == IS_TMP_VAR) {
+		if ((IS_UNUSED & (IS_CONST|IS_TMP_VAR))) {
 			zend_throw_error(NULL, "Cannot use temporary expression in write context");
 
 
@@ -27648,7 +27693,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_INIT_METHOD_CALL_SPEC_UNUSED_C
 					}
 				}
 				if (IS_UNUSED == IS_CV && UNEXPECTED(Z_TYPE_P(object) == IS_UNDEF)) {
-					GET_OP1_UNDEF_CV(object, BP_VAR_R);
+					object = GET_OP1_UNDEF_CV(object, BP_VAR_R);
 					if (UNEXPECTED(EG(exception) != NULL)) {
 
 						HANDLE_EXCEPTION();
@@ -27762,15 +27807,22 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_INIT_STATIC_METHOD_CALL_SPEC_U
 		function_name = EX_CONSTANT(opline->op2);
 		if (IS_CONST != IS_CONST) {
 			if (UNEXPECTED(Z_TYPE_P(function_name) != IS_STRING)) {
-				if (IS_CONST == IS_CV && UNEXPECTED(Z_TYPE_P(function_name) == IS_UNDEF)) {
-					GET_OP2_UNDEF_CV(function_name, BP_VAR_R);
-					if (UNEXPECTED(EG(exception) != NULL)) {
-						HANDLE_EXCEPTION();
+				do {
+					if (IS_CONST & (IS_VAR|IS_CV) && Z_ISREF_P(function_name)) {
+						function_name = Z_REFVAL_P(function_name);
+						if (EXPECTED(Z_TYPE_P(function_name) == IS_STRING)) {
+							break;
+						}
+					} else if (IS_CONST == IS_CV && UNEXPECTED(Z_TYPE_P(function_name) == IS_UNDEF)) {
+						GET_OP2_UNDEF_CV(function_name, BP_VAR_R);
+						if (UNEXPECTED(EG(exception) != NULL)) {
+							HANDLE_EXCEPTION();
+						}
 					}
-				}
-				zend_throw_error(NULL, "Function name must be a string");
+					zend_throw_error(NULL, "Function name must be a string");
 
-				HANDLE_EXCEPTION();
+					HANDLE_EXCEPTION();
+				} while (0);
  			}
 		}
 
@@ -28351,14 +28403,14 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_YIELD_SPEC_UNUSED_CONST_HANDLE
 		if (UNEXPECTED(EX(func)->op_array.fn_flags & ZEND_ACC_RETURN_REFERENCE)) {
 			/* Constants and temporary variables aren't yieldable by reference,
 			 * but we still allow them with a notice. */
-			if (IS_UNUSED == IS_CONST || IS_UNUSED == IS_TMP_VAR) {
+			if (IS_UNUSED & (IS_CONST|IS_TMP_VAR)) {
 				zval *value;
 
 				zend_error(E_NOTICE, "Only variable references should be yielded by reference");
 
 				value = NULL;
 				ZVAL_COPY_VALUE(&generator->value, value);
-				if (IS_UNUSED != IS_CONST) {
+				if (IS_UNUSED == IS_CONST) {
 					if (UNEXPECTED(Z_OPT_COPYABLE(generator->value))) {
 						zval_copy_ctor_func(&generator->value);
 					}
@@ -28486,14 +28538,14 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_YIELD_SPEC_UNUSED_TMP_HANDLER(
 		if (UNEXPECTED(EX(func)->op_array.fn_flags & ZEND_ACC_RETURN_REFERENCE)) {
 			/* Constants and temporary variables aren't yieldable by reference,
 			 * but we still allow them with a notice. */
-			if (IS_UNUSED == IS_CONST || IS_UNUSED == IS_TMP_VAR) {
+			if (IS_UNUSED & (IS_CONST|IS_TMP_VAR)) {
 				zval *value;
 
 				zend_error(E_NOTICE, "Only variable references should be yielded by reference");
 
 				value = NULL;
 				ZVAL_COPY_VALUE(&generator->value, value);
-				if (IS_UNUSED != IS_CONST) {
+				if (IS_UNUSED == IS_CONST) {
 					if (UNEXPECTED(Z_OPT_COPYABLE(generator->value))) {
 						zval_copy_ctor_func(&generator->value);
 					}
@@ -28621,14 +28673,14 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_YIELD_SPEC_UNUSED_VAR_HANDLER(
 		if (UNEXPECTED(EX(func)->op_array.fn_flags & ZEND_ACC_RETURN_REFERENCE)) {
 			/* Constants and temporary variables aren't yieldable by reference,
 			 * but we still allow them with a notice. */
-			if (IS_UNUSED == IS_CONST || IS_UNUSED == IS_TMP_VAR) {
+			if (IS_UNUSED & (IS_CONST|IS_TMP_VAR)) {
 				zval *value;
 
 				zend_error(E_NOTICE, "Only variable references should be yielded by reference");
 
 				value = NULL;
 				ZVAL_COPY_VALUE(&generator->value, value);
-				if (IS_UNUSED != IS_CONST) {
+				if (IS_UNUSED == IS_CONST) {
 					if (UNEXPECTED(Z_OPT_COPYABLE(generator->value))) {
 						zval_copy_ctor_func(&generator->value);
 					}
@@ -29075,15 +29127,22 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_INIT_STATIC_METHOD_CALL_SPEC_U
 		function_name = NULL;
 		if (IS_UNUSED != IS_CONST) {
 			if (UNEXPECTED(Z_TYPE_P(function_name) != IS_STRING)) {
-				if (IS_UNUSED == IS_CV && UNEXPECTED(Z_TYPE_P(function_name) == IS_UNDEF)) {
-					GET_OP2_UNDEF_CV(function_name, BP_VAR_R);
-					if (UNEXPECTED(EG(exception) != NULL)) {
-						HANDLE_EXCEPTION();
+				do {
+					if (IS_UNUSED & (IS_VAR|IS_CV) && Z_ISREF_P(function_name)) {
+						function_name = Z_REFVAL_P(function_name);
+						if (EXPECTED(Z_TYPE_P(function_name) == IS_STRING)) {
+							break;
+						}
+					} else if (IS_UNUSED == IS_CV && UNEXPECTED(Z_TYPE_P(function_name) == IS_UNDEF)) {
+						GET_OP2_UNDEF_CV(function_name, BP_VAR_R);
+						if (UNEXPECTED(EG(exception) != NULL)) {
+							HANDLE_EXCEPTION();
+						}
 					}
-				}
-				zend_throw_error(NULL, "Function name must be a string");
+					zend_throw_error(NULL, "Function name must be a string");
 
-				HANDLE_EXCEPTION();
+					HANDLE_EXCEPTION();
+				} while (0);
  			}
 		}
 
@@ -29279,14 +29338,14 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_YIELD_SPEC_UNUSED_UNUSED_HANDL
 		if (UNEXPECTED(EX(func)->op_array.fn_flags & ZEND_ACC_RETURN_REFERENCE)) {
 			/* Constants and temporary variables aren't yieldable by reference,
 			 * but we still allow them with a notice. */
-			if (IS_UNUSED == IS_CONST || IS_UNUSED == IS_TMP_VAR) {
+			if (IS_UNUSED & (IS_CONST|IS_TMP_VAR)) {
 				zval *value;
 
 				zend_error(E_NOTICE, "Only variable references should be yielded by reference");
 
 				value = NULL;
 				ZVAL_COPY_VALUE(&generator->value, value);
-				if (IS_UNUSED != IS_CONST) {
+				if (IS_UNUSED == IS_CONST) {
 					if (UNEXPECTED(Z_OPT_COPYABLE(generator->value))) {
 						zval_copy_ctor_func(&generator->value);
 					}
@@ -30099,7 +30158,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FETCH_OBJ_FUNC_ARG_SPEC_UNUSED
 
 			HANDLE_EXCEPTION();
 		}
-		if (IS_UNUSED == IS_CONST || IS_UNUSED == IS_TMP_VAR) {
+		if ((IS_UNUSED & (IS_CONST|IS_TMP_VAR))) {
 			zend_throw_error(NULL, "Cannot use temporary expression in write context");
 
 
@@ -30931,7 +30990,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_INIT_METHOD_CALL_SPEC_UNUSED_C
 					}
 				}
 				if (IS_UNUSED == IS_CV && UNEXPECTED(Z_TYPE_P(object) == IS_UNDEF)) {
-					GET_OP1_UNDEF_CV(object, BP_VAR_R);
+					object = GET_OP1_UNDEF_CV(object, BP_VAR_R);
 					if (UNEXPECTED(EG(exception) != NULL)) {
 
 						HANDLE_EXCEPTION();
@@ -31045,15 +31104,22 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_INIT_STATIC_METHOD_CALL_SPEC_U
 		function_name = _get_zval_ptr_cv_undef(execute_data, opline->op2.var);
 		if (IS_CV != IS_CONST) {
 			if (UNEXPECTED(Z_TYPE_P(function_name) != IS_STRING)) {
-				if (IS_CV == IS_CV && UNEXPECTED(Z_TYPE_P(function_name) == IS_UNDEF)) {
-					GET_OP2_UNDEF_CV(function_name, BP_VAR_R);
-					if (UNEXPECTED(EG(exception) != NULL)) {
-						HANDLE_EXCEPTION();
+				do {
+					if (IS_CV & (IS_VAR|IS_CV) && Z_ISREF_P(function_name)) {
+						function_name = Z_REFVAL_P(function_name);
+						if (EXPECTED(Z_TYPE_P(function_name) == IS_STRING)) {
+							break;
+						}
+					} else if (IS_CV == IS_CV && UNEXPECTED(Z_TYPE_P(function_name) == IS_UNDEF)) {
+						GET_OP2_UNDEF_CV(function_name, BP_VAR_R);
+						if (UNEXPECTED(EG(exception) != NULL)) {
+							HANDLE_EXCEPTION();
+						}
 					}
-				}
-				zend_throw_error(NULL, "Function name must be a string");
+					zend_throw_error(NULL, "Function name must be a string");
 
-				HANDLE_EXCEPTION();
+					HANDLE_EXCEPTION();
+				} while (0);
  			}
 		}
 
@@ -31508,14 +31574,14 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_YIELD_SPEC_UNUSED_CV_HANDLER(Z
 		if (UNEXPECTED(EX(func)->op_array.fn_flags & ZEND_ACC_RETURN_REFERENCE)) {
 			/* Constants and temporary variables aren't yieldable by reference,
 			 * but we still allow them with a notice. */
-			if (IS_UNUSED == IS_CONST || IS_UNUSED == IS_TMP_VAR) {
+			if (IS_UNUSED & (IS_CONST|IS_TMP_VAR)) {
 				zval *value;
 
 				zend_error(E_NOTICE, "Only variable references should be yielded by reference");
 
 				value = NULL;
 				ZVAL_COPY_VALUE(&generator->value, value);
-				if (IS_UNUSED != IS_CONST) {
+				if (IS_UNUSED == IS_CONST) {
 					if (UNEXPECTED(Z_OPT_COPYABLE(generator->value))) {
 						zval_copy_ctor_func(&generator->value);
 					}
@@ -32333,7 +32399,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FETCH_OBJ_FUNC_ARG_SPEC_UNUSED
 			zval_ptr_dtor_nogc(free_op2);
 			HANDLE_EXCEPTION();
 		}
-		if (IS_UNUSED == IS_CONST || IS_UNUSED == IS_TMP_VAR) {
+		if ((IS_UNUSED & (IS_CONST|IS_TMP_VAR))) {
 			zend_throw_error(NULL, "Cannot use temporary expression in write context");
 			zval_ptr_dtor_nogc(free_op2);
 
@@ -33165,7 +33231,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_INIT_METHOD_CALL_SPEC_UNUSED_T
 					}
 				}
 				if (IS_UNUSED == IS_CV && UNEXPECTED(Z_TYPE_P(object) == IS_UNDEF)) {
-					GET_OP1_UNDEF_CV(object, BP_VAR_R);
+					object = GET_OP1_UNDEF_CV(object, BP_VAR_R);
 					if (UNEXPECTED(EG(exception) != NULL)) {
 						zval_ptr_dtor_nogc(free_op2);
 						HANDLE_EXCEPTION();
@@ -33280,15 +33346,22 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_INIT_STATIC_METHOD_CALL_SPEC_U
 		function_name = _get_zval_ptr_var(opline->op2.var, execute_data, &free_op2);
 		if ((IS_TMP_VAR|IS_VAR) != IS_CONST) {
 			if (UNEXPECTED(Z_TYPE_P(function_name) != IS_STRING)) {
-				if ((IS_TMP_VAR|IS_VAR) == IS_CV && UNEXPECTED(Z_TYPE_P(function_name) == IS_UNDEF)) {
-					GET_OP2_UNDEF_CV(function_name, BP_VAR_R);
-					if (UNEXPECTED(EG(exception) != NULL)) {
-						HANDLE_EXCEPTION();
+				do {
+					if ((IS_TMP_VAR|IS_VAR) & (IS_VAR|IS_CV) && Z_ISREF_P(function_name)) {
+						function_name = Z_REFVAL_P(function_name);
+						if (EXPECTED(Z_TYPE_P(function_name) == IS_STRING)) {
+							break;
+						}
+					} else if ((IS_TMP_VAR|IS_VAR) == IS_CV && UNEXPECTED(Z_TYPE_P(function_name) == IS_UNDEF)) {
+						GET_OP2_UNDEF_CV(function_name, BP_VAR_R);
+						if (UNEXPECTED(EG(exception) != NULL)) {
+							HANDLE_EXCEPTION();
+						}
 					}
-				}
-				zend_throw_error(NULL, "Function name must be a string");
-				zval_ptr_dtor_nogc(free_op2);
-				HANDLE_EXCEPTION();
+					zend_throw_error(NULL, "Function name must be a string");
+					zval_ptr_dtor_nogc(free_op2);
+					HANDLE_EXCEPTION();
+				} while (0);
  			}
 		}
 
@@ -34208,14 +34281,14 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_RETURN_SPEC_CV_HANDLER(ZEND_OP
 			ZVAL_NULL(EX(return_value));
 		}
 	} else if (!EX(return_value)) {
-		if (IS_CV == IS_VAR || IS_CV == IS_TMP_VAR ) {
+		if (IS_CV & (IS_VAR|IS_TMP_VAR)) {
 			if (Z_REFCOUNTED_P(free_op1) && !Z_DELREF_P(free_op1)) {
 				SAVE_OPLINE();
 				zval_dtor_func_for_ptr(Z_COUNTED_P(free_op1));
 			}
 		}
 	} else {
-		if (IS_CV == IS_CONST || IS_CV == IS_TMP_VAR) {
+		if ((IS_CV & (IS_CONST|IS_TMP_VAR))) {
 			ZVAL_COPY_VALUE(EX(return_value), retval_ptr);
 			if (IS_CV == IS_CONST) {
 				if (UNEXPECTED(Z_OPT_COPYABLE_P(EX(return_value)))) {
@@ -34253,7 +34326,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_RETURN_BY_REF_SPEC_CV_HANDLER(
 	SAVE_OPLINE();
 
 	do {
-		if (IS_CV == IS_CONST || IS_CV == IS_TMP_VAR ||
+		if ((IS_CV & (IS_CONST|IS_TMP_VAR)) ||
 		    (IS_CV == IS_VAR && opline->extended_value == ZEND_RETURNS_VALUE)) {
 			/* Not supposed to happen, but we'll allow it */
 			zend_error(E_NOTICE, "Only variable references should be returned by reference");
@@ -34312,7 +34385,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_GENERATOR_RETURN_SPEC_CV_HANDL
 	retval = _get_zval_ptr_cv_BP_VAR_R(execute_data, opline->op1.var);
 
 	/* Copy return value into generator->retval */
-	if (IS_CV == IS_CONST || IS_CV == IS_TMP_VAR) {
+	if ((IS_CV & (IS_CONST|IS_TMP_VAR))) {
 		ZVAL_COPY_VALUE(&generator->retval, retval);
 		if (IS_CV == IS_CONST) {
 			if (UNEXPECTED(Z_OPT_COPYABLE(generator->retval))) {
@@ -35411,6 +35484,9 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_YIELD_FROM_SPEC_CV_HANDLER(ZEN
 	if (RETURN_VALUE_USED(opline)) {
 		ZVAL_NULL(EX_VAR(opline->result.var));
 	}
+
+	/* This generator has no send target (though the generator we delegate to might have one) */
+	generator->send_target = NULL;
 
 	/* We increment to the next op, so we are at the correct position when the
 	 * generator is resumed. */
@@ -36879,7 +36955,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FETCH_DIM_FUNC_ARG_SPEC_CV_CON
 	SAVE_OPLINE();
 
 	if (zend_is_by_ref_func_arg_fetch(opline, EX(call))) {
-        if (IS_CV == IS_CONST || IS_CV == IS_TMP_VAR) {
+        if ((IS_CV & (IS_CONST|IS_TMP_VAR))) {
             zend_throw_error(NULL, "Cannot use temporary expression in write context");
 
 
@@ -37139,7 +37215,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FETCH_OBJ_FUNC_ARG_SPEC_CV_CON
 
 			HANDLE_EXCEPTION();
 		}
-		if (IS_CV == IS_CONST || IS_CV == IS_TMP_VAR) {
+		if ((IS_CV & (IS_CONST|IS_TMP_VAR))) {
 			zend_throw_error(NULL, "Cannot use temporary expression in write context");
 
 
@@ -38489,7 +38565,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_INIT_METHOD_CALL_SPEC_CV_CONST
 					}
 				}
 				if (IS_CV == IS_CV && UNEXPECTED(Z_TYPE_P(object) == IS_UNDEF)) {
-					GET_OP1_UNDEF_CV(object, BP_VAR_R);
+					object = GET_OP1_UNDEF_CV(object, BP_VAR_R);
 					if (UNEXPECTED(EG(exception) != NULL)) {
 
 						HANDLE_EXCEPTION();
@@ -39277,14 +39353,14 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_YIELD_SPEC_CV_CONST_HANDLER(ZE
 		if (UNEXPECTED(EX(func)->op_array.fn_flags & ZEND_ACC_RETURN_REFERENCE)) {
 			/* Constants and temporary variables aren't yieldable by reference,
 			 * but we still allow them with a notice. */
-			if (IS_CV == IS_CONST || IS_CV == IS_TMP_VAR) {
+			if (IS_CV & (IS_CONST|IS_TMP_VAR)) {
 				zval *value;
 
 				zend_error(E_NOTICE, "Only variable references should be yielded by reference");
 
 				value = _get_zval_ptr_cv_BP_VAR_R(execute_data, opline->op1.var);
 				ZVAL_COPY_VALUE(&generator->value, value);
-				if (IS_CV != IS_CONST) {
+				if (IS_CV == IS_CONST) {
 					if (UNEXPECTED(Z_OPT_COPYABLE(generator->value))) {
 						zval_copy_ctor_func(&generator->value);
 					}
@@ -39646,14 +39722,14 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_YIELD_SPEC_CV_TMP_HANDLER(ZEND
 		if (UNEXPECTED(EX(func)->op_array.fn_flags & ZEND_ACC_RETURN_REFERENCE)) {
 			/* Constants and temporary variables aren't yieldable by reference,
 			 * but we still allow them with a notice. */
-			if (IS_CV == IS_CONST || IS_CV == IS_TMP_VAR) {
+			if (IS_CV & (IS_CONST|IS_TMP_VAR)) {
 				zval *value;
 
 				zend_error(E_NOTICE, "Only variable references should be yielded by reference");
 
 				value = _get_zval_ptr_cv_BP_VAR_R(execute_data, opline->op1.var);
 				ZVAL_COPY_VALUE(&generator->value, value);
-				if (IS_CV != IS_CONST) {
+				if (IS_CV == IS_CONST) {
 					if (UNEXPECTED(Z_OPT_COPYABLE(generator->value))) {
 						zval_copy_ctor_func(&generator->value);
 					}
@@ -40259,14 +40335,14 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_YIELD_SPEC_CV_VAR_HANDLER(ZEND
 		if (UNEXPECTED(EX(func)->op_array.fn_flags & ZEND_ACC_RETURN_REFERENCE)) {
 			/* Constants and temporary variables aren't yieldable by reference,
 			 * but we still allow them with a notice. */
-			if (IS_CV == IS_CONST || IS_CV == IS_TMP_VAR) {
+			if (IS_CV & (IS_CONST|IS_TMP_VAR)) {
 				zval *value;
 
 				zend_error(E_NOTICE, "Only variable references should be yielded by reference");
 
 				value = _get_zval_ptr_cv_BP_VAR_R(execute_data, opline->op1.var);
 				ZVAL_COPY_VALUE(&generator->value, value);
-				if (IS_CV != IS_CONST) {
+				if (IS_CV == IS_CONST) {
 					if (UNEXPECTED(Z_OPT_COPYABLE(generator->value))) {
 						zval_copy_ctor_func(&generator->value);
 					}
@@ -40970,7 +41046,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FETCH_DIM_FUNC_ARG_SPEC_CV_UNU
 	SAVE_OPLINE();
 
 	if (zend_is_by_ref_func_arg_fetch(opline, EX(call))) {
-        if (IS_CV == IS_CONST || IS_CV == IS_TMP_VAR) {
+        if ((IS_CV & (IS_CONST|IS_TMP_VAR))) {
             zend_throw_error(NULL, "Cannot use temporary expression in write context");
 
 
@@ -41893,14 +41969,14 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_YIELD_SPEC_CV_UNUSED_HANDLER(Z
 		if (UNEXPECTED(EX(func)->op_array.fn_flags & ZEND_ACC_RETURN_REFERENCE)) {
 			/* Constants and temporary variables aren't yieldable by reference,
 			 * but we still allow them with a notice. */
-			if (IS_CV == IS_CONST || IS_CV == IS_TMP_VAR) {
+			if (IS_CV & (IS_CONST|IS_TMP_VAR)) {
 				zval *value;
 
 				zend_error(E_NOTICE, "Only variable references should be yielded by reference");
 
 				value = _get_zval_ptr_cv_BP_VAR_R(execute_data, opline->op1.var);
 				ZVAL_COPY_VALUE(&generator->value, value);
-				if (IS_CV != IS_CONST) {
+				if (IS_CV == IS_CONST) {
 					if (UNEXPECTED(Z_OPT_COPYABLE(generator->value))) {
 						zval_copy_ctor_func(&generator->value);
 					}
@@ -43239,7 +43315,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FETCH_DIM_FUNC_ARG_SPEC_CV_CV_
 	SAVE_OPLINE();
 
 	if (zend_is_by_ref_func_arg_fetch(opline, EX(call))) {
-        if (IS_CV == IS_CONST || IS_CV == IS_TMP_VAR) {
+        if ((IS_CV & (IS_CONST|IS_TMP_VAR))) {
             zend_throw_error(NULL, "Cannot use temporary expression in write context");
 
 
@@ -43499,7 +43575,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FETCH_OBJ_FUNC_ARG_SPEC_CV_CV_
 
 			HANDLE_EXCEPTION();
 		}
-		if (IS_CV == IS_CONST || IS_CV == IS_TMP_VAR) {
+		if ((IS_CV & (IS_CONST|IS_TMP_VAR))) {
 			zend_throw_error(NULL, "Cannot use temporary expression in write context");
 
 
@@ -44859,7 +44935,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_INIT_METHOD_CALL_SPEC_CV_CV_HA
 					}
 				}
 				if (IS_CV == IS_CV && UNEXPECTED(Z_TYPE_P(object) == IS_UNDEF)) {
-					GET_OP1_UNDEF_CV(object, BP_VAR_R);
+					object = GET_OP1_UNDEF_CV(object, BP_VAR_R);
 					if (UNEXPECTED(EG(exception) != NULL)) {
 
 						HANDLE_EXCEPTION();
@@ -45455,14 +45531,14 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_YIELD_SPEC_CV_CV_HANDLER(ZEND_
 		if (UNEXPECTED(EX(func)->op_array.fn_flags & ZEND_ACC_RETURN_REFERENCE)) {
 			/* Constants and temporary variables aren't yieldable by reference,
 			 * but we still allow them with a notice. */
-			if (IS_CV == IS_CONST || IS_CV == IS_TMP_VAR) {
+			if (IS_CV & (IS_CONST|IS_TMP_VAR)) {
 				zval *value;
 
 				zend_error(E_NOTICE, "Only variable references should be yielded by reference");
 
 				value = _get_zval_ptr_cv_BP_VAR_R(execute_data, opline->op1.var);
 				ZVAL_COPY_VALUE(&generator->value, value);
-				if (IS_CV != IS_CONST) {
+				if (IS_CV == IS_CONST) {
 					if (UNEXPECTED(Z_OPT_COPYABLE(generator->value))) {
 						zval_copy_ctor_func(&generator->value);
 					}
@@ -46769,7 +46845,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FETCH_DIM_FUNC_ARG_SPEC_CV_TMP
 	SAVE_OPLINE();
 
 	if (zend_is_by_ref_func_arg_fetch(opline, EX(call))) {
-        if (IS_CV == IS_CONST || IS_CV == IS_TMP_VAR) {
+        if ((IS_CV & (IS_CONST|IS_TMP_VAR))) {
             zend_throw_error(NULL, "Cannot use temporary expression in write context");
 			zval_ptr_dtor_nogc(EX_VAR(opline->op2.var));
 
@@ -47031,7 +47107,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FETCH_OBJ_FUNC_ARG_SPEC_CV_TMP
 			zval_ptr_dtor_nogc(free_op2);
 			HANDLE_EXCEPTION();
 		}
-		if (IS_CV == IS_CONST || IS_CV == IS_TMP_VAR) {
+		if ((IS_CV & (IS_CONST|IS_TMP_VAR))) {
 			zend_throw_error(NULL, "Cannot use temporary expression in write context");
 			zval_ptr_dtor_nogc(free_op2);
 
@@ -48281,7 +48357,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_INIT_METHOD_CALL_SPEC_CV_TMPVA
 					}
 				}
 				if (IS_CV == IS_CV && UNEXPECTED(Z_TYPE_P(object) == IS_UNDEF)) {
-					GET_OP1_UNDEF_CV(object, BP_VAR_R);
+					object = GET_OP1_UNDEF_CV(object, BP_VAR_R);
 					if (UNEXPECTED(EG(exception) != NULL)) {
 						zval_ptr_dtor_nogc(free_op2);
 						HANDLE_EXCEPTION();
@@ -50443,7 +50519,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_INIT_METHOD_CALL_SPEC_TMPVAR_C
 					}
 				}
 				if ((IS_TMP_VAR|IS_VAR) == IS_CV && UNEXPECTED(Z_TYPE_P(object) == IS_UNDEF)) {
-					GET_OP1_UNDEF_CV(object, BP_VAR_R);
+					object = GET_OP1_UNDEF_CV(object, BP_VAR_R);
 					if (UNEXPECTED(EG(exception) != NULL)) {
 
 						HANDLE_EXCEPTION();
@@ -52677,7 +52753,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_INIT_METHOD_CALL_SPEC_TMPVAR_C
 					}
 				}
 				if ((IS_TMP_VAR|IS_VAR) == IS_CV && UNEXPECTED(Z_TYPE_P(object) == IS_UNDEF)) {
-					GET_OP1_UNDEF_CV(object, BP_VAR_R);
+					object = GET_OP1_UNDEF_CV(object, BP_VAR_R);
 					if (UNEXPECTED(EG(exception) != NULL)) {
 
 						HANDLE_EXCEPTION();
@@ -53815,7 +53891,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_INIT_METHOD_CALL_SPEC_TMPVAR_T
 					}
 				}
 				if ((IS_TMP_VAR|IS_VAR) == IS_CV && UNEXPECTED(Z_TYPE_P(object) == IS_UNDEF)) {
-					GET_OP1_UNDEF_CV(object, BP_VAR_R);
+					object = GET_OP1_UNDEF_CV(object, BP_VAR_R);
 					if (UNEXPECTED(EG(exception) != NULL)) {
 						zval_ptr_dtor_nogc(free_op2);
 						HANDLE_EXCEPTION();
@@ -57281,7 +57357,7 @@ static const void *zend_vm_get_opcode_handler(zend_uchar opcode, const zend_op* 
 	if (spec & SPEC_RULE_OP1) offset = offset * 5 + zend_vm_decode[op->op1_type];
 	if (spec & SPEC_RULE_OP2) offset = offset * 5 + zend_vm_decode[op->op2_type];
 	if (spec & SPEC_RULE_OP_DATA) offset = offset * 5 + zend_vm_decode[(op + 1)->op1_type];
-	if (spec & SPEC_RULE_RETVAL) offset = offset * 2 + ((op->result_type & EXT_TYPE_UNUSED) == 0);
+	if (spec & SPEC_RULE_RETVAL) offset = offset * 2 + (op->result_type != IS_UNUSED);
 	if (spec & SPEC_RULE_QUICK_ARG) offset = offset * 2 + (op->op2.num < MAX_ARG_FLAG_NUM);
 	return zend_opcode_handlers[(spec & SPEC_START_MASK) + offset];
 }
