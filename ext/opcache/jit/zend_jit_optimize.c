@@ -917,13 +917,13 @@ int zend_jit_is_return_value_used(zend_op_array *op_array)
 
 		while (call_info) {
 			if (used == -1) {
-				used = !(call_info->caller_call_opline->result_type & EXT_TYPE_UNUSED);
+				used = !(call_info->caller_call_opline->result_type == IS_UNUSED);
 			} else if (used == 0) {
-				if (!(call_info->caller_call_opline->result_type & EXT_TYPE_UNUSED)) {
+				if (!(call_info->caller_call_opline->result_type == IS_UNUSED)) {
 					return -1;
 				}
 			} else if (used > 0) {
-				if (call_info->caller_call_opline->result_type & EXT_TYPE_UNUSED) {
+				if (call_info->caller_call_opline->result_type == IS_UNUSED) {
 					return -1;
 				}
 			}

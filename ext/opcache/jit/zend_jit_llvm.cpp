@@ -16320,14 +16320,18 @@ static int zend_jit_do_fcall(zend_llvm_ctx    &llvm_ctx,
 		}
 
 		//JIT: ret = EX_VAR(RES_OP()->var);
-		Value *ret = zend_jit_load_var(llvm_ctx, RES_OP()->var);
-		//JIT: ZVAL_NULL(ret);
-		zend_jit_save_zval_type_info(llvm_ctx, ret, RES_SSA_VAR(), RES_INFO(), llvm_ctx.builder.getInt32(IS_NULL));
+		Value *ret;
 		if (RETURN_VALUE_USED(opline)) {
+			ret = zend_jit_load_var(llvm_ctx, RES_OP()->var);
+			//JIT: ZVAL_NULL(ret);
+			zend_jit_save_zval_type_info(llvm_ctx, ret, RES_SSA_VAR(), RES_INFO(), llvm_ctx.builder.getInt32(IS_NULL));
 			if (zend_jit_may_be_used_as_returned_reference(op_array, RES_SSA_VAR())) {
 				//JIT: Z_VAR_FLAGS_P(ret) = (fbc->common.fn_flags & ZEND_ACC_RETURN_REFERENCE) != 0 ? IS_VAR_RET_REF : 0;
 				zend_jit_set_retref_flag(llvm_ctx, ret, func, func_addr);
 			}
+		} else {
+			ret = zend_jit_get_stack_slot(llvm_ctx, 0);
+			zend_jit_save_zval_type_info(llvm_ctx, ret, -1, MAY_BE_ANY, llvm_ctx.builder.getInt32(IS_NULL));
 		}
 
 		//JIT: fbc->internal_function.handler(call, ret TSRMLS_CC);
@@ -16374,7 +16378,8 @@ static int zend_jit_do_fcall(zend_llvm_ctx    &llvm_ctx,
 
 		if (!RETURN_VALUE_USED(opline)) {
 			//JIT: zval_ptr_dtor(ret);
-			Value *ret = zend_jit_load_var(llvm_ctx, RES_OP()->var);
+//???			Value *ret = zend_jit_load_var(llvm_ctx, RES_OP()->var);
+			Value *ret = zend_jit_get_stack_slot(llvm_ctx, 0);
 			zend_jit_zval_ptr_dtor_ex(llvm_ctx, ret, NULL, RES_SSA_VAR(), RES_INFO(), opline->lineno, 1); 
 		}
 
@@ -16634,10 +16639,9 @@ static int zend_jit_do_fcall(zend_llvm_ctx    &llvm_ctx,
 					bb_skip);
 				llvm_ctx.builder.SetInsertPoint(bb_exception);
 
-				if (!(OP1_OP()->num & ZEND_CALL_CTOR_RESULT_UNUSED)) {
-					//JIT: GC_REFCOUNT(object)--;
-					zend_jit_delref(llvm_ctx, object);
-				}
+				//JIT: GC_REFCOUNT(object)--;
+				zend_jit_delref(llvm_ctx, object);
+
 				//JIT: if (GC_REFCOUNT(object) == 1) {
 				zend_jit_unexpected_br(llvm_ctx,				
 					llvm_ctx.builder.CreateICmpEQ(

@@ -134,7 +134,7 @@ static int zend_jit_op_array_analyze_ssa(zend_jit_context *ctx, zend_op_array *o
 				return FAILURE;
 			}
 			if (ZCG(accel_directives).jit_debug & JIT_DEBUG_DUMP_SSA) {
-				zend_dump_op_array(op_array, ZEND_DUMP_SSA | ZEND_DUMP_HIDE_UNUSED_VARS | ZEND_DUMP_RT_CONSTANTS, NULL, &info->ssa);
+				zend_dump_op_array(op_array, ZEND_DUMP_SSA | ZEND_DUMP_RT_CONSTANTS, NULL, &info->ssa);
 			}
 			if (zend_jit_optimize_ssa(ctx, op_array) != SUCCESS) {
 				return FAILURE;
@@ -217,7 +217,7 @@ int zend_jit(zend_script *script)
 				}
 
 				if (ZCG(accel_directives).jit_debug & JIT_DEBUG_DUMP_TYPED_SSA) {
-					zend_dump_op_array(op_array, ZEND_DUMP_SSA | ZEND_DUMP_HIDE_UNUSED_VARS | ZEND_DUMP_RT_CONSTANTS, NULL, &info->ssa);
+					zend_dump_op_array(op_array, ZEND_DUMP_SSA | ZEND_DUMP_RT_CONSTANTS, NULL, &info->ssa);
 				}
 				clone = clone->clone;
 			}
