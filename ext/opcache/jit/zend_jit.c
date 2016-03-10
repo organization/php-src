@@ -213,7 +213,7 @@ int zend_jit(zend_script *script)
 				}
 
 				if (ZCG(accel_directives).jit_debug & JIT_DEBUG_DUMP_TYPES) {
-					zend_dump_ssa_variables(op_array, &info->ssa);
+					zend_dump_ssa_variables(op_array, &info->ssa, ZEND_DUMP_RC_INFERENCE);
 				}
 
 				if (ZCG(accel_directives).jit_debug & JIT_DEBUG_DUMP_TYPED_SSA) {
