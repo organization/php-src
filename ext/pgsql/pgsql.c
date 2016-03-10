@@ -780,7 +780,7 @@ zend_module_entry pgsql_module_entry = {
 
 #ifdef COMPILE_DL_PGSQL
 #ifdef ZTS
-ZEND_TSRMLS_CACHE_DEFINE();
+ZEND_TSRMLS_CACHE_DEFINE()
 #endif
 ZEND_GET_MODULE(pgsql)
 #endif
@@ -1258,7 +1258,7 @@ PHP_MINFO_FUNCTION(pgsql)
 #else
 	php_info_print_table_row(2, "Multibyte character support", "disabled");
 #endif
-#ifdef USE_SSL
+#if defined(USE_SSL) || defined(USE_OPENSSL)
 	php_info_print_table_row(2, "SSL support", "enabled");
 #else
 	php_info_print_table_row(2, "SSL support", "disabled");
@@ -2826,7 +2826,6 @@ static void php_pgsql_fetch_hash(INTERNAL_FUNCTION_PARAMETERS, zend_long result_
 			fci.size = sizeof(fci);
 			fci.function_table = &ce->function_table;
 			ZVAL_UNDEF(&fci.function_name);
-			fci.symbol_table = NULL;
 			fci.object = Z_OBJ_P(return_value);
 			fci.retval = &retval;
 			fci.params = NULL;
