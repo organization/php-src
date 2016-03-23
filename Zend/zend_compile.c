@@ -737,11 +737,7 @@ void zend_do_free(znode *op1) /* {{{ */
 			}
 		}
 
-		opline = get_next_op(CG(active_op_array));
-
-		opline->opcode = ZEND_FREE;
-		SET_NODE(opline->op1, op1);
-		SET_UNUSED(opline->op2);
+		zend_emit_op(NULL, ZEND_FREE, op1, NULL);
 	} else if (op1->op_type == IS_VAR) {
 		zend_op *opline = &CG(active_op_array)->opcodes[CG(active_op_array)->last-1];
 		while (opline->opcode == ZEND_END_SILENCE ||
@@ -3802,6 +3798,10 @@ void zend_compile_global_var(zend_ast *ast) /* {{{ */
 		zend_op *opline = zend_emit_op(&result, ZEND_FETCH_W, &name_node, NULL);
 		opline->extended_value = ZEND_FETCH_GLOBAL_LOCK;
 
+		if (name_node.op_type == IS_CONST) {
+			zend_string_addref(Z_STR(name_node.u.constant));
+		}
+
 		zend_emit_assign_ref_znode(
 			zend_ast_create(ZEND_AST_VAR, zend_ast_create_znode(&name_node)),
 			&result
@@ -5053,7 +5053,7 @@ void zend_begin_method_decl(zend_op_array *op_array, zend_string *name, zend_boo
 	zend_string *lcname;
 
 	if (in_interface) {
-		if ((op_array->fn_flags & ZEND_ACC_PPP_MASK) != ZEND_ACC_PUBLIC) {
+		if (!is_public || (op_array->fn_flags & (ZEND_ACC_FINAL|ZEND_ACC_ABSTRACT))) {
 			zend_error_noreturn(E_COMPILE_ERROR, "Access type for interface method "
 				"%s::%s() must be omitted", ZSTR_VAL(ce->name), ZSTR_VAL(name));
 		}
