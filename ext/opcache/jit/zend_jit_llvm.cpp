@@ -9993,6 +9993,9 @@ static int zend_jit_assign_to_variable(zend_llvm_ctx    &llvm_ctx,
 	op2_type_info = zend_jit_load_type_info_c(llvm_ctx, op2_addr, op2_type, op2, op2_ssa_var, op2_info);
 
 	/* op1 may by IS_UNDEFINED */
+	if (op1_info & MAY_BE_UNDEF) {
+		op1_info |= MAY_BE_NULL;
+	}
 //???	if ((op1_info & MAY_BE_UNDEF) && ((op1_info & MAY_BE_ANY) == MAY_BE_NULL)) {
 //???		op1_info &= ~MAY_BE_NULL;
 //???	}
