@@ -319,7 +319,6 @@ static int zend_jit_sort_blocks(zend_jit_context *ctx, zend_op_array *op_array)
 			case ZEND_CATCH:
 			case ZEND_FE_RESET_R:
 			case ZEND_FE_RESET_RW:
-			case ZEND_NEW:
 			case ZEND_ASSERT_CHECK:
 				blocks[bb->successors[0]].flags |= ZEND_BB_TARGET;
 				blocks[bb->successors[1]].flags |= ZEND_BB_FOLLOW;

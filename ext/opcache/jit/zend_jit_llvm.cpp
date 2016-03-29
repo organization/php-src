@@ -18114,7 +18114,21 @@ static int zend_jit_codegen_ex(zend_jit_context *ctx,
 //					break;
 				case ZEND_NEW:
 					llvm_ctx.call_level++;
-					/* break missing intentionally */
+					if (!zend_jit_handler(llvm_ctx, opline)) return 0;
+					if (EXPECTED(opline->extended_value == 0 && (opline+1)->opcode == ZEND_DO_FCALL)) {
+					  	BasicBlock *bb_ctor = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
+						BasicBlock *bb_skip = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
+
+						if (!zend_jit_cond_jmp(llvm_ctx, opline, opline+1, bb_ctor, bb_skip)) return 0;
+						i++;
+						llvm_ctx.builder.SetInsertPoint(bb_ctor);
+						opline++;
+						if (!zend_jit_do_fcall(llvm_ctx, ctx, op_array, opline)) return 0;
+						llvm_ctx.call_level--;
+						llvm_ctx.builder.CreateBr(bb_skip);
+						llvm_ctx.builder.SetInsertPoint(bb_skip);
+					}
+					break;
 				case ZEND_JMPZ_EX:
 				case ZEND_JMPNZ_EX:
 				case ZEND_JMP_SET:
