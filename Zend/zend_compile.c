@@ -2709,9 +2709,8 @@ void zend_compile_static_prop(znode *result, zend_ast *ast, uint32_t type, int d
 }
 /* }}} */
 
-static void zend_compile_list_assign(znode *result, zend_ast *ast, znode *expr_node) /* {{{ */
+static void zend_compile_unkeyed_list_assign(zend_ast_list *list, znode *expr_node) /* {{{ */
 {
-	zend_ast_list *list = zend_ast_get_list(ast);
 	uint32_t i;
 	zend_bool has_elems = 0;
 
@@ -2737,6 +2736,40 @@ static void zend_compile_list_assign(znode *result, zend_ast *ast, znode *expr_n
 
 	if (!has_elems) {
 		zend_error_noreturn(E_COMPILE_ERROR, "Cannot use empty list");
+	}
+}
+/* }}} */
+
+static void zend_compile_keyed_list_assign(zend_ast_list *list, znode *expr_node) /* {{{ */
+{
+	uint32_t i;
+
+	for (i = 0; i < list->children; ++i) {
+		zend_ast *pair_ast = list->child[i];
+		zend_ast *var_ast = pair_ast->child[0];
+		zend_ast *key_ast = pair_ast->child[1];
+		znode fetch_result, dim_node;
+
+		zend_compile_expr(&dim_node, key_ast);
+
+		if (expr_node->op_type == IS_CONST) {
+			Z_TRY_ADDREF(expr_node->u.constant);
+		}
+
+		zend_emit_op(&fetch_result, ZEND_FETCH_LIST, expr_node, &dim_node);
+		zend_emit_assign_znode(var_ast, &fetch_result);
+	}
+}
+/* }}} */
+
+static void zend_compile_list_assign(znode *result, zend_ast *ast, znode *expr_node) /* {{{ */
+{
+	zend_ast_list *list = zend_ast_get_list(ast);
+
+	if (list->children > 0 && list->child[0] != NULL && list->child[0]->kind == ZEND_AST_ARRAY_ELEM) {
+		zend_compile_keyed_list_assign(list, expr_node);
+	} else {
+		zend_compile_unkeyed_list_assign(list, expr_node);
 	}
 
 	*result = *expr_node;
@@ -3705,7 +3738,8 @@ void zend_compile_static_call(znode *result, zend_ast *ast, uint32_t type) /* {{
 					&& zend_string_equals_ci(CG(active_class_entry)->name, lcname)) {
 				ce = CG(active_class_entry);
 			}
-		} else if (opline->op1_type == IS_UNUSED && (opline->op1.num & ZEND_FETCH_CLASS_SELF)
+		} else if (opline->op1_type == IS_UNUSED
+				&& (opline->op1.num & ZEND_FETCH_CLASS_MASK) == ZEND_FETCH_CLASS_SELF
 				&& zend_is_scope_known()) {
 			ce = CG(active_class_entry);
 		}
@@ -3759,7 +3793,8 @@ void zend_compile_new(znode *result, zend_ast *ast) /* {{{ */
 	zend_compile_call_common(&ctor_result, args_ast, NULL);
 	zend_do_free(&ctor_result);
 
-	/* New jumps over ctor call if ctor does not exist */
+	/* We save the position of DO_FCALL for convenience in find_live_range().
+	 * This info is not preserved for runtime. */
 	opline = &CG(active_op_array)->opcodes[opnum];
 	opline->op2.opline_num = get_next_op_number(CG(active_op_array));
 }
@@ -5712,10 +5747,6 @@ void zend_compile_class_decl(zend_ast *ast) /* {{{ */
 
 	CG(active_class_entry) = ce;
 
-	if (implements_ast) {
-		zend_compile_implements(&declare_node, implements_ast);
-	}
-
 	zend_compile_stmt(stmt_ast);
 
 	/* Reset lineno for final opcodes and errors */
@@ -5772,11 +5803,15 @@ void zend_compile_class_decl(zend_ast *ast) /* {{{ */
 		zend_emit_op(NULL, ZEND_BIND_TRAITS, &declare_node, NULL);
 	}
 
+	if (implements_ast) {
+		zend_compile_implements(&declare_node, implements_ast);
+	}
+
 	if (!(ce->ce_flags & (ZEND_ACC_INTERFACE|ZEND_ACC_EXPLICIT_ABSTRACT_CLASS))
-		&& (extends_ast || ce->num_interfaces > 0)
+		&& (extends_ast || implements_ast)
 	) {
 		zend_verify_abstract_class(ce);
-		if (ce->num_interfaces && !(ce->ce_flags & ZEND_ACC_IMPLEMENT_TRAITS)) {
+		if (implements_ast) {
 			zend_emit_op(NULL, ZEND_VERIFY_ABSTRACT_CLASS, &declare_node, NULL);
 		}
 	}
