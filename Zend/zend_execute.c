@@ -1090,7 +1090,6 @@ static zend_never_inline void zend_assign_to_object_dim(zval *retval, zval *obje
 {
 	zend_free_op free_value;
  	zval *value = get_zval_ptr_deref(value_type, value_op, execute_data, &free_value, BP_VAR_R);
- 	zval tmp;
 
 	/* Note:  property_name in this case is really the array index! */
 	if (!Z_OBJ_HT_P(object)->write_dimension) {
@@ -1101,10 +1100,8 @@ static zend_never_inline void zend_assign_to_object_dim(zval *retval, zval *obje
 
 	/* separate our value if necessary */
 	if (value_type == IS_CONST) {
-		if (UNEXPECTED(Z_OPT_COPYABLE_P(value))) {
-			ZVAL_COPY_VALUE(&tmp, value);
-			zval_copy_ctor_func(&tmp);
-			value = &tmp;
+		if (UNEXPECTED(Z_REFCOUNTED_P(value))) {
+			Z_ADDREF_P(value);
 		}
 	}
 
@@ -2154,15 +2151,19 @@ static zend_always_inline void i_init_func_execute_data(zend_execute_data *execu
 		GC_REFCOUNT(Z_OBJ(EX(This)))++;
 	}
 
-	if (UNEXPECTED(!op_array->run_time_cache)) {
-		op_array->run_time_cache = zend_arena_alloc(&CG(arena), op_array->cache_size);
-		memset(op_array->run_time_cache, 0, op_array->cache_size);
-	}
 	EX_LOAD_RUN_TIME_CACHE(op_array);
 	EX_LOAD_LITERALS(op_array);
 
 	EG(current_execute_data) = execute_data;
 	ZEND_VM_INTERRUPT_CHECK();
+}
+/* }}} */
+
+static zend_never_inline void ZEND_FASTCALL init_func_run_time_cache(zend_op_array *op_array) /* {{{ */
+{
+	ZEND_ASSERT(op_array->run_time_cache == NULL);
+	op_array->run_time_cache = zend_arena_alloc(&CG(arena), op_array->cache_size);
+	memset(op_array->run_time_cache, 0, op_array->cache_size);
 }
 /* }}} */
 
@@ -2334,6 +2335,10 @@ ZEND_API zend_execute_data *zend_create_generator_execute_data(zend_execute_data
 	}
 
 	EX(symbol_table) = NULL;
+
+	if (UNEXPECTED(!op_array->run_time_cache)) {
+		init_func_run_time_cache(op_array);
+	}
 
 	i_init_func_execute_data(execute_data, op_array, return_value, 1);
 
