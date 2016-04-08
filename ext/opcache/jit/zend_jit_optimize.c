@@ -1209,7 +1209,7 @@ static void zend_jit_infer_return_types(zend_jit_context *ctx)
 		zend_infer_types_ex(ctx->call_graph.op_arrays[i], ctx->main_script, &info->ssa, varlist[i]);
 
 		/* calculate return type */		
-		zend_func_return_info(ctx->call_graph.op_arrays[i], 1, 0, &tmp);
+		zend_func_return_info(ctx->call_graph.op_arrays[i], ctx->main_script, 1, 0, &tmp);
 		if (info->return_info.type != tmp.type ||
 		    info->return_info.ce != tmp.ce ||
 		    info->return_info.is_instanceof != tmp.is_instanceof ||
@@ -1711,7 +1711,7 @@ static void zend_jit_ip_infer_ranges_warmup(zend_jit_context *ctx, zend_jit_ip_v
 			} else if (ip_var[j].kind == IP_RET) {
 				zend_ssa_var_info tmp;
 
-				zend_func_return_info(op_array, 1, 1, &tmp);
+				zend_func_return_info(op_array, ctx->main_script, 1, 1, &tmp);
 				if (tmp.has_range) {
 					if (zend_inference_widening_meet(&info->return_info, &tmp.range)) {
 						int i;
@@ -1913,7 +1913,7 @@ static void zend_jit_ip_infer_ranges(zend_jit_context *ctx, int with_args)
 			} else if (ip_var[j].kind == IP_RET) {
 				zend_ssa_var_info tmp;
 
-				zend_func_return_info(op_array, 1, 0, &tmp);
+				zend_func_return_info(op_array, ctx->main_script, 1, 0, &tmp);
 				if (tmp.has_range) {
 					info->return_info.has_range = 1;
 					info->return_info.range = tmp.range;
@@ -1988,7 +1988,7 @@ static void zend_jit_ip_infer_ranges(zend_jit_context *ctx, int with_args)
 			} else if (ip_var[j].kind == IP_RET) {
 				zend_ssa_var_info tmp;
 
-				zend_func_return_info(op_array, 1, 1, &tmp);
+				zend_func_return_info(op_array, ctx->main_script, 1, 1, &tmp);
 				if (tmp.has_range) {
 					if (zend_inference_widening_meet(&info->return_info, &tmp.range)) {
 						int i;
@@ -2068,7 +2068,7 @@ static void zend_jit_ip_infer_ranges(zend_jit_context *ctx, int with_args)
 			} else if (ip_var[j].kind == IP_RET) {
 				zend_ssa_var_info tmp;
 
-				zend_func_return_info(op_array, 1, 0, &tmp);
+				zend_func_return_info(op_array, ctx->main_script, 1, 0, &tmp);
 				if (tmp.has_range) {
 					if (zend_inference_narrowing_meet(&info->return_info, &tmp.range)) {
 						int i;
@@ -2203,11 +2203,11 @@ static void zend_jit_infer_arg_and_return_types(zend_jit_context *ctx, int recur
 		}
 		
 		if (zend_bitset_empty(varlist[i], zend_bitset_len(info->ssa.vars_count))) {
-			zend_func_return_info(ctx->call_graph.op_arrays[i], recursive, 0, &tmp);
+			zend_func_return_info(ctx->call_graph.op_arrays[i], ctx->main_script, recursive, 0, &tmp);
 		} else {		
 			/* perform incremental type inference */
 			zend_infer_types_ex(ctx->call_graph.op_arrays[i], ctx->main_script, &info->ssa, varlist[i]);
-			zend_func_return_info(ctx->call_graph.op_arrays[i], recursive, 0, &tmp);
+			zend_func_return_info(ctx->call_graph.op_arrays[i], ctx->main_script, recursive, 0, &tmp);
 
 			/* check if this function calls others */
 			if (info->callee_info) {
