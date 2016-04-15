@@ -769,6 +769,23 @@ static int zend_verify_internal_arg_type(zend_function *zf, uint32_t arg_num, zv
 	return 1;
 }
 
+static zend_never_inline int zend_verify_internal_arg_types(zend_function *fbc, zend_execute_data *call)
+{
+	uint32_t i;
+	uint32_t num_args = ZEND_CALL_NUM_ARGS(call);
+	zval *p = ZEND_CALL_ARG(call, 1);
+
+	for (i = 0; i < num_args; ++i) {
+		if (UNEXPECTED(!zend_verify_internal_arg_type(fbc, i + 1, p))) {
+			EG(current_execute_data) = call->prev_execute_data;
+			zend_vm_stack_free_args(call);
+			return 0;
+		}
+		p++;
+	}
+	return 1;
+}
+
 static zend_always_inline int zend_verify_arg_type(zend_function *zf, uint32_t arg_num, zval *arg, zval *default_value, void **cache_slot)
 {
 	zend_arg_info *cur_arg_info;
@@ -1650,6 +1667,16 @@ static zend_never_inline zval* ZEND_FASTCALL zend_fetch_dimension_address_inner_
 static zend_never_inline zval* ZEND_FASTCALL zend_fetch_dimension_address_inner_W_CONST(HashTable *ht, const zval *dim)
 {
 	return zend_fetch_dimension_address_inner(ht, dim, IS_CONST, BP_VAR_W);
+}
+
+static zend_never_inline zval* ZEND_FASTCALL zend_fetch_dimension_address_inner_RW(HashTable *ht, const zval *dim)
+{
+	return zend_fetch_dimension_address_inner(ht, dim, IS_TMP_VAR, BP_VAR_RW);
+}
+
+static zend_never_inline zval* ZEND_FASTCALL zend_fetch_dimension_address_inner_RW_CONST(HashTable *ht, const zval *dim)
+{
+	return zend_fetch_dimension_address_inner(ht, dim, IS_CONST, BP_VAR_RW);
 }
 
 static zend_always_inline void zend_fetch_dimension_address(zval *result, zval *container, zval *dim, int dim_type, int type)
@@ -2843,6 +2870,127 @@ static zend_never_inline zend_execute_data *zend_init_dynamic_call_array(zend_ar
 
 	return zend_vm_stack_push_call_frame(call_info,
 		fbc, num_args, called_scope, object);
+}
+/* }}} */
+
+#define ZEND_FAKE_OP_ARRAY ((zend_op_array*)(zend_intptr_t)-1)
+
+static zend_never_inline zend_op_array* ZEND_FASTCALL zend_include_or_eval(zval *inc_filename, int type) /* {{{ */
+{
+	zend_op_array *new_op_array = NULL;
+	zval tmp_inc_filename;
+
+	ZVAL_UNDEF(&tmp_inc_filename);
+	if (Z_TYPE_P(inc_filename) != IS_STRING) {
+		ZVAL_STR(&tmp_inc_filename, zval_get_string(inc_filename));
+		inc_filename = &tmp_inc_filename;
+	}
+
+	if (type != ZEND_EVAL && strlen(Z_STRVAL_P(inc_filename)) != Z_STRLEN_P(inc_filename)) {
+		if (type == ZEND_INCLUDE_ONCE || type == ZEND_INCLUDE) {
+			zend_message_dispatcher(ZMSG_FAILED_INCLUDE_FOPEN, Z_STRVAL_P(inc_filename));
+		} else {
+			zend_message_dispatcher(ZMSG_FAILED_REQUIRE_FOPEN, Z_STRVAL_P(inc_filename));
+		}
+	} else {
+		switch (type) {
+			case ZEND_INCLUDE_ONCE:
+			case ZEND_REQUIRE_ONCE: {
+					zend_file_handle file_handle;
+					zend_string *resolved_path;
+
+					resolved_path = zend_resolve_path(Z_STRVAL_P(inc_filename), (int)Z_STRLEN_P(inc_filename));
+					if (resolved_path) {
+						if (zend_hash_exists(&EG(included_files), resolved_path)) {
+							goto already_compiled;
+						}
+					} else {
+						resolved_path = zend_string_copy(Z_STR_P(inc_filename));
+					}
+
+					if (SUCCESS == zend_stream_open(ZSTR_VAL(resolved_path), &file_handle)) {
+
+						if (!file_handle.opened_path) {
+							file_handle.opened_path = zend_string_copy(resolved_path);
+						}
+
+						if (zend_hash_add_empty_element(&EG(included_files), file_handle.opened_path)) {
+							zend_op_array *op_array = zend_compile_file(&file_handle, (type==ZEND_INCLUDE_ONCE?ZEND_INCLUDE:ZEND_REQUIRE));
+							zend_destroy_file_handle(&file_handle);
+							zend_string_release(resolved_path);
+							if (Z_TYPE(tmp_inc_filename) != IS_UNDEF) {
+								zend_string_release(Z_STR(tmp_inc_filename));
+							}
+							return op_array;
+						} else {
+							zend_file_handle_dtor(&file_handle);
+already_compiled:
+							new_op_array = ZEND_FAKE_OP_ARRAY;
+						}
+					} else {
+						if (type == ZEND_INCLUDE_ONCE) {
+							zend_message_dispatcher(ZMSG_FAILED_INCLUDE_FOPEN, Z_STRVAL_P(inc_filename));
+						} else {
+							zend_message_dispatcher(ZMSG_FAILED_REQUIRE_FOPEN, Z_STRVAL_P(inc_filename));
+						}
+					}
+					zend_string_release(resolved_path);
+				}
+				break;
+			case ZEND_INCLUDE:
+			case ZEND_REQUIRE:
+				new_op_array = compile_filename(type, inc_filename);
+				break;
+			case ZEND_EVAL: {
+					char *eval_desc = zend_make_compiled_string_description("eval()'d code");
+					new_op_array = zend_compile_string(inc_filename, eval_desc);
+					efree(eval_desc);
+				}
+				break;
+			EMPTY_SWITCH_DEFAULT_CASE()
+		}
+	}
+	if (Z_TYPE(tmp_inc_filename) != IS_UNDEF) {
+		zend_string_release(Z_STR(tmp_inc_filename));
+	}
+	return new_op_array;
+}
+/* }}} */
+
+static zend_never_inline int zend_do_fcall_overloaded(zend_function *fbc, zend_execute_data *call, zval *ret) /* {{{ */
+{
+	zend_object *object;
+
+	/* Not sure what should be done here if it's a static method */
+	if (UNEXPECTED(Z_TYPE(call->This) != IS_OBJECT)) {
+		zend_vm_stack_free_args(call);
+		if (fbc->type == ZEND_OVERLOADED_FUNCTION_TEMPORARY) {
+			zend_string_release(fbc->common.function_name);
+		}
+		efree(fbc);
+		zend_vm_stack_free_call_frame(call);
+
+		zend_throw_error(NULL, "Cannot call overloaded function for non-object");
+		return 0;
+	}
+
+	object = Z_OBJ(call->This);
+	EG(scope) = fbc->common.scope;
+
+	ZVAL_NULL(ret);
+
+	EG(current_execute_data) = call;
+	object->handlers->call_method(fbc->common.function_name, object, call, ret);
+	EG(current_execute_data) = call->prev_execute_data;
+
+	zend_vm_stack_free_args(call);
+
+	if (fbc->type == ZEND_OVERLOADED_FUNCTION_TEMPORARY) {
+		zend_string_release(fbc->common.function_name);
+	}
+	efree(fbc);
+
+	return 1;
 }
 /* }}} */
 
