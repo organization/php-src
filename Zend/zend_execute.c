@@ -645,19 +645,19 @@ static ZEND_COLD void zend_verify_arg_error(const zend_function *zf, uint32_t ar
 	}
 }
 
-static int is_null_constant(zval *default_value)
+static int is_null_constant(zend_class_entry *scope, zval *default_value)
 {
 	if (Z_CONSTANT_P(default_value)) {
 		zval constant;
 
-		ZVAL_COPY_VALUE(&constant, default_value);
-		if (UNEXPECTED(zval_update_constant_ex(&constant, 0, NULL) != SUCCESS)) {
+		ZVAL_COPY(&constant, default_value);
+		if (UNEXPECTED(zval_update_constant_ex(&constant, scope) != SUCCESS)) {
 			return 0;
 		}
 		if (Z_TYPE(constant) == IS_NULL) {
 			return 1;
 		}
-		zval_dtor(&constant);
+		zval_ptr_dtor(&constant);
 	}
 	return 0;
 }
@@ -822,7 +822,7 @@ static zend_always_inline int zend_verify_arg_type(zend_function *zf, uint32_t a
 					return 0;
 				}
 			}
-		} else if (Z_TYPE_P(arg) != IS_NULL || !(cur_arg_info->allow_null || (default_value && is_null_constant(default_value)))) {
+		} else if (Z_TYPE_P(arg) != IS_NULL || !(cur_arg_info->allow_null || (default_value && is_null_constant(zf->common.scope, default_value)))) {
 			if (cur_arg_info->class_name) {
 				if (EXPECTED(*cache_slot)) {
 					ce = (zend_class_entry*)*cache_slot;
@@ -1938,6 +1938,12 @@ ZEND_API void zend_fetch_dimension_by_zval(zval *result, zval *container, zval *
 	zend_fetch_dimension_address_read_R(result, container, dim, IS_TMP_VAR);
 }
 
+ZEND_API void zend_fetch_dimension_by_zval_is(zval *result, zval *container, zval *dim, int dim_type)
+{
+	zend_fetch_dimension_address_read(result, container, dim, dim_type, BP_VAR_IS, 1);
+}
+
+
 static zend_always_inline void zend_fetch_property_address(zval *result, zval *container, uint32_t container_op_type, zval *prop_ptr, uint32_t prop_op_type, void **cache_slot, int type)
 {
     if (container_op_type != IS_UNUSED && UNEXPECTED(Z_TYPE_P(container) != IS_OBJECT)) {
@@ -2100,16 +2106,17 @@ void zend_free_compiled_variables(zend_execute_data *execute_data) /* {{{ */
 }
 /* }}} */
 
-#ifdef ZEND_WIN32
-# define ZEND_VM_INTERRUPT_CHECK() do { \
-		if (EG(timed_out)) { \
-			zend_timeout(0); \
+static zend_never_inline ZEND_COLD ZEND_NORETURN void ZEND_FASTCALL zend_interrupt(void) /* {{{ */
+{
+	zend_timeout(0);
+}
+/* }}} */
+
+#define ZEND_VM_INTERRUPT_CHECK() do { \
+		if (UNEXPECTED(EG(timed_out))) { \
+			zend_interrupt(); \
 		} \
 	} while (0)
-#else
-# define ZEND_VM_INTERRUPT_CHECK() do { \
-	} while (0)
-#endif
 
 /*
  * Stack Frame Layout (the whole stack frame is allocated at once)
@@ -2198,7 +2205,6 @@ static zend_always_inline void i_init_func_execute_data(zend_execute_data *execu
 	EX_LOAD_LITERALS(op_array);
 
 	EG(current_execute_data) = execute_data;
-	ZEND_VM_INTERRUPT_CHECK();
 }
 /* }}} */
 
@@ -2235,7 +2241,6 @@ static zend_always_inline void i_init_code_execute_data(zend_execute_data *execu
 	EX_LOAD_LITERALS(op_array);
 
 	EG(current_execute_data) = execute_data;
-	ZEND_VM_INTERRUPT_CHECK();
 }
 /* }}} */
 
@@ -2326,7 +2331,6 @@ static zend_always_inline void i_init_execute_data(zend_execute_data *execute_da
 	EX_LOAD_LITERALS(op_array);
 
 	EG(current_execute_data) = execute_data;
-	ZEND_VM_INTERRUPT_CHECK();
 }
 /* }}} */
 
@@ -2975,7 +2979,6 @@ static zend_never_inline int zend_do_fcall_overloaded(zend_function *fbc, zend_e
 	}
 
 	object = Z_OBJ(call->This);
-	EG(scope) = fbc->common.scope;
 
 	ZVAL_NULL(ret);
 

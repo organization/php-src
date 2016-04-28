@@ -719,6 +719,9 @@ PHP_MINIT_FUNCTION(curl)
 	REGISTER_CURL_CONSTANT(CURLOPT_SSL_CIPHER_LIST);
 	REGISTER_CURL_CONSTANT(CURLOPT_SSL_VERIFYHOST);
 	REGISTER_CURL_CONSTANT(CURLOPT_SSL_VERIFYPEER);
+#if LIBCURL_VERSION_NUM >= 0x072900 /* 7.41.0 */
+	REGISTER_CURL_CONSTANT(CURLOPT_SSL_VERIFYSTATUS);
+#endif	
 	REGISTER_CURL_CONSTANT(CURLOPT_STDERR);
 	REGISTER_CURL_CONSTANT(CURLOPT_TELNETOPTIONS);
 	REGISTER_CURL_CONSTANT(CURLOPT_TIMECONDITION);
@@ -999,6 +1002,7 @@ PHP_MINIT_FUNCTION(curl)
 #endif
 
 #if LIBCURL_VERSION_NUM >= 0x071000 /* Available since 7.16.0 */
+	REGISTER_CURL_CONSTANT(CURLE_SSL_CACERT_BADFILE);
 	REGISTER_CURL_CONSTANT(CURLOPT_SSL_SESSIONID_CACHE);
 	REGISTER_CURL_CONSTANT(CURLMOPT_PIPELINING);
 #endif
@@ -1338,7 +1342,6 @@ static size_t curl_write(char *data, size_t size, size_t nmemb, void *ctx)
 			ZVAL_STRINGL(&argv[1], data, length);
 
 			fci.size = sizeof(fci);
-			fci.function_table = EG(function_table);
 			fci.object = NULL;
 			ZVAL_COPY_VALUE(&fci.function_name, &t->func_name);
 			fci.retval = &retval;
@@ -1388,7 +1391,6 @@ static int curl_fnmatch(void *ctx, const char *pattern, const char *string)
 			ZVAL_STRING(&argv[2], string);
 
 			fci.size = sizeof(fci);
-			fci.function_table = EG(function_table);
 			ZVAL_COPY_VALUE(&fci.function_name, &t->func_name);
 			fci.object = NULL;
 			fci.retval = &retval;
@@ -1444,7 +1446,6 @@ static size_t curl_progress(void *clientp, double dltotal, double dlnow, double 
 			ZVAL_LONG(&argv[4], (zend_long)ulnow);
 
 			fci.size = sizeof(fci);
-			fci.function_table = EG(function_table);
 			ZVAL_COPY_VALUE(&fci.function_name, &t->func_name);
 			fci.object = NULL;
 			fci.retval = &retval;
@@ -1506,7 +1507,6 @@ static size_t curl_read(char *data, size_t size, size_t nmemb, void *ctx)
 			ZVAL_LONG(&argv[2], (int)size * nmemb);
 
 			fci.size = sizeof(fci);
-			fci.function_table = EG(function_table);
 			ZVAL_COPY_VALUE(&fci.function_name, &t->func_name);
 			fci.object = NULL;
 			fci.retval = &retval;
@@ -1573,7 +1573,6 @@ static size_t curl_write_header(char *data, size_t size, size_t nmemb, void *ctx
 			ZVAL_STRINGL(&argv[1], data, length);
 
 			fci.size = sizeof(fci);
-			fci.function_table = EG(function_table);
 			ZVAL_COPY_VALUE(&fci.function_name, &t->func_name);
 			fci.object = NULL;
 			fci.retval = &retval;
@@ -2066,6 +2065,9 @@ static int _php_curl_setopt(php_curl *ch, zend_long option, zval *zvalue) /* {{{
 		case CURLOPT_RESUME_FROM:
 		case CURLOPT_SSLVERSION:
 		case CURLOPT_SSL_VERIFYPEER:
+#if LIBCURL_VERSION_NUM >= 0x072900 /* 7.41.0 */
+		case CURLOPT_SSL_VERIFYSTATUS:
+#endif	
 		case CURLOPT_TIMECONDITION:
 		case CURLOPT_TIMEOUT:
 		case CURLOPT_TIMEVALUE:

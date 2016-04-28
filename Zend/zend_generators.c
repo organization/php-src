@@ -220,10 +220,10 @@ static uint32_t calc_gc_buffer_size(zend_generator *generator) /* {{{ */
 
 		/* Yield from root references */
 		if (generator->node.children == 0) {
-			zend_generator *root = generator->node.ptr.root;
-			while (root != generator) {
+			zend_generator *child = generator, *root = generator->node.ptr.root;
+			while (root != child) {
+				child = child->node.parent;
 				size++;
-				root = zend_generator_get_child(&root->node, generator);
 			}
 		}
 	}
@@ -287,8 +287,8 @@ static HashTable *zend_generator_get_gc(zval *object, zval **table, int *n) /* {
 	if (generator->node.children == 0) {
 		zend_generator *child = generator, *root = generator->node.ptr.root;
 		while (root != child) {
-			ZVAL_OBJ(gc_buffer++, &child->std);
 			child = child->node.parent;
+			ZVAL_OBJ(gc_buffer++, &child->std);
 		}
 	}
 
@@ -321,7 +321,7 @@ static zend_object *zend_generator_create(zend_class_entry *class_type) /* {{{ *
 }
 /* }}} */
 
-/* Requires globals EG(scope), EG(This) and EG(current_execute_data). */
+/* Requires globals EG(current_execute_data). */
 ZEND_API void zend_generator_create_zval(zend_execute_data *call, zend_op_array *op_array, zval *return_value) /* {{{ */
 {
 	zend_generator *generator;
@@ -761,13 +761,11 @@ try_again:
 	{
 		/* Backup executor globals */
 		zend_execute_data *original_execute_data = EG(current_execute_data);
-		zend_class_entry *original_scope = EG(scope);
 		zend_vm_stack original_stack = EG(vm_stack);
 		original_stack->top = EG(vm_stack_top);
 
 		/* Set executor globals */
 		EG(current_execute_data) = generator->execute_data;
-		EG(scope) = generator->execute_data->func->common.scope;
 		EG(vm_stack_top) = generator->stack->top;
 		EG(vm_stack_end) = generator->stack->end;
 		EG(vm_stack) = generator->stack;
@@ -797,7 +795,6 @@ try_again:
 
 		/* Restore executor globals */
 		EG(current_execute_data) = original_execute_data;
-		EG(scope) = original_scope;
 		EG(vm_stack_top) = original_stack->top;
 		EG(vm_stack_end) = original_stack->end;
 		EG(vm_stack) = original_stack;
