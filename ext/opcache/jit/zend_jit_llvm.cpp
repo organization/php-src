@@ -16282,17 +16282,6 @@ static int zend_jit_do_fcall(zend_llvm_ctx    &llvm_ctx,
 			llvm_ctx.builder.SetInsertPoint(bb_user);
 		}
 
-		//JIT: call->symbol_table = NULL;
-		llvm_ctx.builder.CreateAlignedStore(
-			llvm_ctx.builder.CreateIntToPtr(
-				LLVM_GET_LONG(0),
-				PointerType::getUnqual(llvm_ctx.HashTable_type)),
-			zend_jit_GEP(
-				llvm_ctx,
-				call,
-				offsetof(zend_execute_data, symbol_table),
-				PointerType::getUnqual(PointerType::getUnqual(llvm_ctx.HashTable_type))), 4);
-
 		Value *return_value = NULL;
 		if (RETURN_VALUE_USED(opline)) {
 			//JIT: return_value = EX_VAR(RES_OP()->var);
@@ -16702,21 +16691,21 @@ static int zend_jit_leave(zend_llvm_ctx    &llvm_ctx,
 		llvm_ctx.builder.CreateICmpNE(
 			llvm_ctx.builder.CreateAnd(
 				call_info,
-				llvm_ctx.builder.getInt8(ZEND_CALL_FREE_SYMBOL_TABLE|ZEND_CALL_FREE_EXTRA_ARGS|ZEND_CALL_ALLOCATED)),
+				llvm_ctx.builder.getInt8(ZEND_CALL_HAS_SYMBOL_TABLE|ZEND_CALL_FREE_EXTRA_ARGS|ZEND_CALL_ALLOCATED)),
 			llvm_ctx.builder.getInt8(0)),
 		bb_slow,
 		bb_fast);
 	llvm_ctx.builder.SetInsertPoint(bb_slow);	
 	
 	if ((info->flags & ZEND_JIT_FUNC_NO_SYMTAB) == 0) {
-		//JIT: if (UNEXPECTED(call_info & ZEND_CALL_FREE_SYMBOL_TABLE)) {
+		//JIT: if (UNEXPECTED(call_info & ZEND_CALL_HAS_SYMBOL_TABLE)) {
 	   	BasicBlock *bb_follow = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
 		BasicBlock *bb_skip = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
 		zend_jit_unexpected_br(llvm_ctx,
 			llvm_ctx.builder.CreateICmpNE(
 				llvm_ctx.builder.CreateAnd(
 					call_info,
-					llvm_ctx.builder.getInt8(ZEND_CALL_FREE_SYMBOL_TABLE)),
+					llvm_ctx.builder.getInt8(ZEND_CALL_HAS_SYMBOL_TABLE)),
 				llvm_ctx.builder.getInt8(0)),
 			bb_follow,
 			bb_skip);
