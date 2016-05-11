@@ -608,21 +608,8 @@ ZEND_API int zval_update_constant_ex(zval *p, zend_class_entry *scope) /* {{{ */
 						Z_TYPE_FLAGS_P(p) = IS_TYPE_REFCOUNTED | IS_TYPE_COPYABLE;
 					}
 				}
-				if (actual[0] == '\\') {
-					if (inline_change) {
-						memmove(Z_STRVAL_P(p), Z_STRVAL_P(p)+1, Z_STRLEN_P(p));
-						--Z_STRLEN_P(p);
-					} else {
-						++actual;
-					}
-					--actual_len;
-				}
 				if ((Z_CONST_FLAGS_P(p) & IS_CONSTANT_UNQUALIFIED) == 0) {
-					if (ZSTR_VAL(save)[0] == '\\') {
-						zend_throw_error(NULL, "Undefined constant '%s'", ZSTR_VAL(save) + 1);
-					} else {
-						zend_throw_error(NULL, "Undefined constant '%s'", ZSTR_VAL(save));
-					}
+					zend_throw_error(NULL, "Undefined constant '%s'", ZSTR_VAL(save));
 					if (inline_change) {
 						zend_string_release(save);
 					}
@@ -646,12 +633,6 @@ ZEND_API int zval_update_constant_ex(zval *p, zend_class_entry *scope) /* {{{ */
 				zend_string_release(Z_STR_P(p));
 			}
 			ZVAL_COPY_VALUE(p, const_value);
-			if (Z_OPT_CONSTANT_P(p)) {
-				if (UNEXPECTED(zval_update_constant_ex(p, scope) != SUCCESS)) {
-					RESET_CONSTANT_VISITED(p);
-					return FAILURE;
-				}
-			}
 			zval_opt_copy_ctor(p);
 		}
 	} else if (Z_TYPE_P(p) == IS_CONSTANT_AST) {
@@ -988,7 +969,7 @@ ZEND_API zend_class_entry *zend_lookup_class_ex(zend_string *name, const zval *k
 	}
 
 	/* Verify class name before passing it to __autoload() */
-	if (strspn(ZSTR_VAL(name), "0123456789_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ\177\200\201\202\203\204\205\206\207\210\211\212\213\214\215\216\217\220\221\222\223\224\225\226\227\230\231\232\233\234\235\236\237\240\241\242\243\244\245\246\247\250\251\252\253\254\255\256\257\260\261\262\263\264\265\266\267\270\271\272\273\274\275\276\277\300\301\302\303\304\305\306\307\310\311\312\313\314\315\316\317\320\321\322\323\324\325\326\327\330\331\332\333\334\335\336\337\340\341\342\343\344\345\346\347\350\351\352\353\354\355\356\357\360\361\362\363\364\365\366\367\370\371\372\373\374\375\376\377\\") != ZSTR_LEN(name)) {
+	if (strspn(ZSTR_VAL(name), "0123456789_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ\200\201\202\203\204\205\206\207\210\211\212\213\214\215\216\217\220\221\222\223\224\225\226\227\230\231\232\233\234\235\236\237\240\241\242\243\244\245\246\247\250\251\252\253\254\255\256\257\260\261\262\263\264\265\266\267\270\271\272\273\274\275\276\277\300\301\302\303\304\305\306\307\310\311\312\313\314\315\316\317\320\321\322\323\324\325\326\327\330\331\332\333\334\335\336\337\340\341\342\343\344\345\346\347\350\351\352\353\354\355\356\357\360\361\362\363\364\365\366\367\370\371\372\373\374\375\376\377\\") != ZSTR_LEN(name)) {
 		if (!key) {
 			zend_string_release(lc_name);
 		}

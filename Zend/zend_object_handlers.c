@@ -519,7 +519,7 @@ static void zend_property_guard_dtor(zval *el) /* {{{ */ {
 }
 /* }}} */
 
-static uint32_t *zend_get_property_guard(zend_object *zobj, zend_string *member) /* {{{ */
+ZEND_API uint32_t *zend_get_property_guard(zend_object *zobj, zend_string *member) /* {{{ */
 {
 	HashTable *guards;
 	zval *zv;
@@ -543,7 +543,9 @@ static uint32_t *zend_get_property_guard(zend_object *zobj, zend_string *member)
 			ALLOC_HASHTABLE(guards);
 			zend_hash_init(guards, 8, NULL, zend_property_guard_dtor, 0);
 			/* mark pointer as "special" using low bit */
-			zend_hash_add_new_ptr(guards, member, (void*)(((zend_uintptr_t)&zv->u2.property_guard) | 1));
+			zend_hash_add_new_ptr(guards, member,
+				(void*)(((zend_uintptr_t)&zv->u2.property_guard) | 1));
+			zend_string_release(Z_STR_P(zv));
 			ZVAL_ARR(zv, guards);
 		}
 	} else if (EXPECTED(Z_TYPE_P(zv) == IS_ARRAY)) {
@@ -1123,6 +1125,7 @@ ZEND_API int zend_check_protected(zend_class_entry *ce, zend_class_entry *scope)
 
 ZEND_API zend_function *zend_get_call_trampoline_func(zend_class_entry *ce, zend_string *method_name, int is_static) /* {{{ */
 {
+	size_t mname_len;
 	zend_op_array *func;
 	zend_function *fbc = is_static ? ce->__callstatic : ce->__call;
 
@@ -1155,8 +1158,8 @@ ZEND_API zend_function *zend_get_call_trampoline_func(zend_class_entry *ce, zend
 
 	//??? keep compatibility for "\0" characters
 	//??? see: Zend/tests/bug46238.phpt
-	if (UNEXPECTED(strlen(ZSTR_VAL(method_name)) != ZSTR_LEN(method_name))) {
-		func->function_name = zend_string_init(ZSTR_VAL(method_name), strlen(ZSTR_VAL(method_name)), 0);
+	if (UNEXPECTED((mname_len = strlen(ZSTR_VAL(method_name))) != ZSTR_LEN(method_name))) {
+		func->function_name = zend_string_init(ZSTR_VAL(method_name), mname_len, 0);
 	} else {
 		func->function_name = zend_string_copy(method_name);
 	}
