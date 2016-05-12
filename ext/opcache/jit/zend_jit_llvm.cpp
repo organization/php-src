@@ -16158,57 +16158,7 @@ static int zend_jit_do_fcall(zend_llvm_ctx    &llvm_ctx,
 				llvm_ctx.zval_ptr_type);
 		}
 
-		if (!func || (func->common.fn_flags & ZEND_ACC_GENERATOR) != 0) {
-		    BasicBlock *bb_follow = NULL;
-			if (!func) {
-				//JIT: if (UNEXPECTED((fbc->common.fn_flags & ZEND_ACC_GENERATOR) != 0)) {
-				BasicBlock *bb_generator = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
-				bb_follow = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
-				zend_jit_unexpected_br(llvm_ctx,
-					llvm_ctx.builder.CreateICmpNE(
-						llvm_ctx.builder.CreateAnd(
-							llvm_ctx.builder.CreateAlignedLoad(
-								zend_jit_GEP(
-									llvm_ctx,
-									func_addr,
-									offsetof(zend_function, common.fn_flags),
-									PointerType::getUnqual(Type::getInt32Ty(llvm_ctx.context))), 4),
-							llvm_ctx.builder.getInt32(ZEND_ACC_GENERATOR)),
-						llvm_ctx.builder.getInt32(0)),					
-					bb_generator,
-					bb_follow);
-				llvm_ctx.builder.SetInsertPoint(bb_generator);
-			}
-			if (RETURN_VALUE_USED(opline)) {
-				//JIT: zend_generator_create_zval(call, &fbc->op_array, EX_VAR(RES_OP()->var) TSRMLS_CC);
-				Function *_helper = zend_jit_get_helper(
-					llvm_ctx,
-					(void*)zend_generator_create_zval,
-					ZEND_JIT_SYM("zend_generator_create_zval"),
-					0,
-					Type::getVoidTy(llvm_ctx.context),
-					PointerType::getUnqual(llvm_ctx.zend_execute_data_type),
-					PointerType::getUnqual(llvm_ctx.zend_function_type),
-					llvm_ctx.zval_ptr_type,
-					NULL,
-					NULL);
-				llvm_ctx.builder.CreateCall3(_helper, call, func_addr, return_value);
-			} else {
-				//JIT: zend_vm_stack_free_args(call TSRMLS_CC);
-				zend_jit_vm_stack_free_args(llvm_ctx, 
-					num_args,
-					call,
-					opline);
-			}
-			if (!bb_fcall_end) {
-				bb_fcall_end = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
-			}
-			llvm_ctx.builder.CreateBr(bb_fcall_end);
-			if (bb_follow) {
-				llvm_ctx.builder.SetInsertPoint(bb_follow);
-			}
-		}
-		if (!func || (func->common.fn_flags & ZEND_ACC_GENERATOR) == 0) {
+		if (1) {
 			//JIT: call->prev_execute_data = execute_data;
 			llvm_ctx.builder.CreateAlignedStore(
 				llvm_ctx._execute_data,
@@ -16233,6 +16183,22 @@ static int zend_jit_do_fcall(zend_llvm_ctx    &llvm_ctx,
 					inst->setCallingConv(CallingConv::X86_FastCall);
 //???				}
 			} else {
+				//JIT: ZEND_ADD_CALL_FLAG(call, ZEND_CALL_TOP);
+				llvm_ctx.builder.CreateAlignedStore(
+					llvm_ctx.builder.CreateOr(
+						llvm_ctx.builder.getInt32(ZEND_CALL_TOP << ZEND_CALL_INFO_SHIFT),
+						llvm_ctx.builder.CreateAlignedLoad(
+							zend_jit_GEP(
+								llvm_ctx,
+								call,
+								offsetof(zend_execute_data, This.u1.type_info),
+								PointerType::getUnqual(Type::getInt32Ty(llvm_ctx.context))), 4)),
+					zend_jit_GEP(
+						llvm_ctx,
+						call,
+						offsetof(zend_execute_data, This.u1.type_info),
+						PointerType::getUnqual(Type::getInt32Ty(llvm_ctx.context))), 4);
+
 				//JIT: zend_execute_ex(call TSRMLS_CC);
 				Function *_helper = zend_jit_get_helper(
 					llvm_ctx,
