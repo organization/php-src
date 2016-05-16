@@ -4028,7 +4028,7 @@ ZEND_VM_HANDLER(41, ZEND_GENERATOR_CREATE, ANY, ANY)
 			ZEND_ADD_CALL_FLAG_EX(call_info, ZEND_CALL_RELEASE_THIS);
 			Z_ADDREF(gen_execute_data->This);
 		}
-		ZEND_ADD_CALL_FLAG_EX(call_info, (ZEND_CALL_TOP_FUNCTION | ZEND_CALL_ALLOCATED));
+		ZEND_ADD_CALL_FLAG_EX(call_info, (ZEND_CALL_TOP_FUNCTION | ZEND_CALL_ALLOCATED | ZEND_CALL_GENERATOR));
 		Z_TYPE_INFO(gen_execute_data->This) = call_info;
 		gen_execute_data->prev_execute_data = NULL;
 
@@ -7159,7 +7159,7 @@ ZEND_VM_HANDLER(149, ZEND_HANDLE_EXCEPTION, ANY, ANY)
 		if (catch_op_num) {
 			ZEND_VM_SET_OPCODE(&EX(func)->op_array.opcodes[catch_op_num]);
 			ZEND_VM_CONTINUE();
-		} else if (UNEXPECTED((EX(func)->op_array.fn_flags & ZEND_ACC_GENERATOR) != 0)) {
+		} else if (UNEXPECTED((EX_CALL_INFO() & ZEND_CALL_GENERATOR) != 0)) {
 			zend_generator *generator = zend_get_running_generator(execute_data);
 			zend_generator_close(generator, 1);
 			ZEND_VM_RETURN();
@@ -7191,7 +7191,7 @@ ZEND_VM_HANDLER(150, ZEND_USER_OPCODE, ANY, ANY)
 		case ZEND_USER_OPCODE_CONTINUE:
 			ZEND_VM_CONTINUE();
 		case ZEND_USER_OPCODE_RETURN:
-			if (UNEXPECTED((EX(func)->op_array.fn_flags & ZEND_ACC_GENERATOR) != 0)) {
+			if (UNEXPECTED((EX_CALL_INFO() & ZEND_CALL_GENERATOR) != 0)) {
 				zend_generator *generator = zend_get_running_generator(execute_data);
 				zend_generator_close(generator, 1);
 				ZEND_VM_RETURN();
@@ -7531,7 +7531,7 @@ ZEND_VM_HANDLER(159, ZEND_DISCARD_EXCEPTION, ANY, ANY)
 	ZEND_VM_NEXT_OPCODE();
 }
 
-ZEND_VM_HANDLER(162, ZEND_FAST_CALL, JMP_ADDR, TRY_CATCH, FAST_CALL)
+ZEND_VM_HANDLER(162, ZEND_FAST_CALL, JMP_ADDR, ANY, FAST_CALL)
 {
 	USE_OPLINE
 	zval *fast_call = EX_VAR(opline->result.var);
@@ -7554,9 +7554,6 @@ ZEND_VM_HANDLER(163, ZEND_FAST_RET, ANY, TRY_CATCH, FAST_RET)
 
 	if (fast_call->u2.lineno != (uint32_t)-1) {
 		const zend_op *fast_ret = EX(func)->op_array.opcodes + fast_call->u2.lineno;
-		if (fast_ret->extended_value & ZEND_FAST_CALL_FROM_FINALLY) {
-			fast_call->u2.lineno = EX(func)->op_array.try_catch_array[fast_ret->op2.num].finally_op - 2;
-		}
 		ZEND_VM_SET_OPCODE(fast_ret + 1);
 		ZEND_VM_CONTINUE();
 	} else {
@@ -7565,7 +7562,11 @@ ZEND_VM_HANDLER(163, ZEND_FAST_RET, ANY, TRY_CATCH, FAST_RET)
 
 		if (opline->extended_value == ZEND_FAST_RET_TO_FINALLY) {
 			uint32_t finally_op = EX(func)->op_array.try_catch_array[opline->op2.num].finally_op;
+			uint32_t finally_end = EX(func)->op_array.try_catch_array[opline->op2.num].finally_end;
+			zval *next_fast_call = EX_VAR(EX(func)->op_array.opcodes[finally_end].op1.var);
 
+			Z_OBJ_P(next_fast_call) = Z_OBJ_P(fast_call);
+			next_fast_call->u2.lineno = (uint32_t)-1;
 			cleanup_live_vars(execute_data, opline - EX(func)->op_array.opcodes, finally_op);
 			ZEND_VM_SET_OPCODE(&EX(func)->op_array.opcodes[finally_op]);
 			ZEND_VM_CONTINUE();
@@ -7580,7 +7581,7 @@ ZEND_VM_HANDLER(163, ZEND_FAST_RET, ANY, TRY_CATCH, FAST_RET)
 				ZEND_VM_CONTINUE();
 			} else {
 				cleanup_live_vars(execute_data, opline - EX(func)->op_array.opcodes, 0);
-				if (UNEXPECTED((EX(func)->op_array.fn_flags & ZEND_ACC_GENERATOR) != 0)) {
+				if (UNEXPECTED((EX_CALL_INFO() & ZEND_CALL_GENERATOR) != 0)) {
 					zend_generator *generator = zend_get_running_generator(execute_data);
 					zend_generator_close(generator, 1);
 					ZEND_VM_RETURN();
