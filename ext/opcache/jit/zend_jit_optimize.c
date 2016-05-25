@@ -629,7 +629,7 @@ static void zend_jit_check_no_symtab(zend_op_array *op_array)
 {
 	zend_func_info *info = ZEND_FUNC_INFO(op_array);
 	zend_ssa *ssa = &info->ssa;
-	int b, i;
+	int b, i, end;
 
 	if (!info ||
 	    !op_array->function_name ||
@@ -643,7 +643,11 @@ static void zend_jit_check_no_symtab(zend_op_array *op_array)
 		if ((info->ssa.cfg.blocks[b].flags & ZEND_BB_REACHABLE) == 0) {
 			continue;
 		}
-		for (i = info->ssa.cfg.blocks[b].start; i <= info->ssa.cfg.blocks[b].end; i++) {
+		if (!info->ssa.cfg.blocks[b].len) {
+			continue;
+		}
+		end = info->ssa.cfg.blocks[b].start + info->ssa.cfg.blocks[b].len - 1;
+		for (i = info->ssa.cfg.blocks[b].start; i <= end; i++) {
 			zend_op *opline = op_array->opcodes + i;
 
 			switch (opline->opcode) {
@@ -935,7 +939,7 @@ int zend_jit_is_return_value_used(zend_op_array *op_array)
 static void zend_jit_check_no_frame(zend_jit_context *ctx, zend_op_array *op_array)
 {
 	zend_func_info *info = ZEND_FUNC_INFO(op_array);
-	int b, i;
+	int b, i, end;
 
 	if (!info ||
 	    !op_array->function_name ||
@@ -955,7 +959,11 @@ static void zend_jit_check_no_frame(zend_jit_context *ctx, zend_op_array *op_arr
 		if ((info->ssa.cfg.blocks[b].flags & ZEND_BB_REACHABLE) == 0) {
 			continue;
 		}
-		for (i = info->ssa.cfg.blocks[b].start; i <= info->ssa.cfg.blocks[b].end; i++) {
+		if (!info->ssa.cfg.blocks[b].len) {
+			continue;
+		}
+		end = info->ssa.cfg.blocks[b].start + info->ssa.cfg.blocks[b].len - 1;
+		for (i = info->ssa.cfg.blocks[b].start; i <= end; i++) {
 			zend_op *opline = op_array->opcodes + i;
 			if (!zend_opline_supports_jit(op_array, opline)) {
 				return;

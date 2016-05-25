@@ -17372,7 +17372,7 @@ static int zend_jit_codegen_ex(zend_jit_context *ctx,
                                zend_llvm_ctx    &llvm_ctx,
                                zend_op_array    *op_array)
 {
-	int i;
+	int i, end;
 	int b, from_b;
 	zend_func_info *info = ZEND_FUNC_INFO(op_array);
 	zend_basic_block *blocks = info->ssa.cfg.blocks;
@@ -17449,9 +17449,7 @@ static int zend_jit_codegen_ex(zend_jit_context *ctx,
 //???	}
 	zend_jit_assign_regs(llvm_ctx, op_array);
 
-	if (blocks[0].flags & ZEND_BB_TARGET) {
-		llvm_ctx.bb_labels[0] = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
-	}
+	ZEND_ASSERT(!(blocks[0].flags & ZEND_BB_TARGET));
 	for (b = 1; b < info->ssa.cfg.blocks_count; b++) {
 		if (blocks[b].flags & ZEND_BB_REACHABLE) {
 			llvm_ctx.bb_labels[b] = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
@@ -17467,21 +17465,28 @@ static int zend_jit_codegen_ex(zend_jit_context *ctx,
 		if ((blocks[b].flags & ZEND_BB_REACHABLE) == 0) {
 			continue;
 		}
-		if (b > 0 || (blocks[b].flags & ZEND_BB_TARGET)) {
+		if (b > 0) {
 			BasicBlock *bb = llvm_ctx.builder.GetInsertBlock();
-			if (bb && !bb->getTerminator()) {			
+			if (bb && !bb->getTerminator()) {
 				llvm_ctx.builder.CreateBr(TARGET_BB(b));
 			}
 			llvm_ctx.builder.SetInsertPoint(llvm_ctx.bb_labels[b]);
 		}
 		if (blocks[b].flags & ZEND_BB_TARGET) {
 			llvm_ctx.valid_opline = 0;
-		} else if (b > 0 && blocks[b - 1].end + 1 != blocks[b].start) {
+		} else if (b > 0 && blocks[b - 1].start + blocks[b - 1].len != blocks[b].start) {
 			llvm_ctx.valid_opline = 0;
 		}
 
 		from_b = b;
-		for (i = blocks[b].start; i <= blocks[b].end; i++) {
+		if (!blocks[b].len) {
+			if (blocks[b].successors[0] >= 0) {
+				llvm_ctx.builder.CreateBr(TARGET_BB(blocks[b].successors[0]));
+			}
+			continue;
+		}
+		end = blocks[b].start + blocks[b].len - 1;
+		for (i = blocks[b].start; i <= end; i++) {
 			opline = op_array->opcodes + i;
 
 //			if (supports_reg_alloc(opline)) {
@@ -17578,7 +17583,7 @@ static int zend_jit_codegen_ex(zend_jit_context *ctx,
 				case ZEND_IS_SMALLER:
 				case ZEND_IS_SMALLER_OR_EQUAL:
 				case ZEND_CASE:
-					if (i != blocks[b].end &&
+					if (i != end &&
 					    (opline+1)->opcode == ZEND_JMPZ &&
 					    (opline+1)->op1_type == IS_TMP_VAR &&
 					    (opline+1)->op1.var == RES_OP()->var) {
@@ -17587,7 +17592,7 @@ static int zend_jit_codegen_ex(zend_jit_context *ctx,
 							TARGET_BB(blocks[b].successors[1]),
 							1)) return 0;
 						i++;
-					} else if (i != blocks[b].end &&
+					} else if (i != end &&
 					    (opline+1)->opcode == ZEND_JMPNZ &&
 					    (opline+1)->op1_type == IS_TMP_VAR &&
 					    (opline+1)->op1.var == RES_OP()->var) {
@@ -17596,7 +17601,7 @@ static int zend_jit_codegen_ex(zend_jit_context *ctx,
 							TARGET_BB(blocks[b].successors[0]),
 							0)) return 0;
 						i++;
-					} else if (i != blocks[b].end &&
+					} else if (i != end &&
 					    (opline+1)->opcode == ZEND_JMPZNZ &&
 					    (opline+1)->op1_type == IS_TMP_VAR &&
 					    (opline+1)->op1.var == RES_OP()->var) {
@@ -17871,7 +17876,7 @@ static int zend_jit_codegen_ex(zend_jit_context *ctx,
 		    blocks[b].successors[1] < 0 &&
 //??? "i" or "b"?
 		    blocks[b].successors[0] != i + 1) {
-			switch (op_array->opcodes[blocks[b].end].opcode) {
+			switch (op_array->opcodes[end].opcode) {
 				case ZEND_JMP:
 					break;
 				default:

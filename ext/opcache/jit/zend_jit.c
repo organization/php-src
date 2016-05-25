@@ -79,7 +79,7 @@ static int zend_jit_op_array_analyze_cfg(zend_jit_context *ctx, zend_op_array *o
 		return FAILURE;
 	}
 
-	if (zend_build_cfg(&ctx->arena, op_array, ZEND_RT_CONSTANTS, &info->ssa.cfg, &info->flags) != SUCCESS) {
+	if (zend_build_cfg(&ctx->arena, op_array, ZEND_CFG_NO_ENTRY_PREDECESSORS | ZEND_RT_CONSTANTS, &info->ssa.cfg, &info->flags) != SUCCESS) {
 		return FAILURE;
 	}
 
