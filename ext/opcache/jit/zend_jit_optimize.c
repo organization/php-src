@@ -803,11 +803,6 @@ static void zend_jit_check_no_symtab(zend_op_array *op_array)
 					return;
 				case ZEND_SEND_VAR:
 					goto check_cv1;
-				case ZEND_SEND_VAR_NO_REF:
-					if ((opline->extended_value & (ZEND_ARG_COMPILE_TIME_BOUND|ZEND_ARG_SEND_BY_REF)) != ZEND_ARG_COMPILE_TIME_BOUND) {
-						return;
-					}
-					goto check_cv1;
 //???				case ZEND_SEND_REF:
 //???					if (opline->extended_value == ZEND_DO_FCALL_BY_NAME) {
 //???						return;

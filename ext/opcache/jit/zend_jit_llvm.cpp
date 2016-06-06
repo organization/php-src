@@ -6272,7 +6272,7 @@ static Value* zend_jit_fetch_dimension_address(zend_llvm_ctx     &llvm_ctx,
 			llvm_ctx.builder.SetInsertPoint(bb_string);
 		}
 
-		if (fetch_type != BP_VAR_UNSET) {
+		if (0 && fetch_type != BP_VAR_UNSET) {
 			// JIT: Z_STRLEN_P(container)==0
 			if (!bb_convert_to_array) {
 				bb_convert_to_array = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
@@ -6289,12 +6289,13 @@ static Value* zend_jit_fetch_dimension_address(zend_llvm_ctx     &llvm_ctx,
 		}
 
 		if (dim_op_type == IS_UNUSED) {
-			// JIT: zend_error_noreturn(E_ERROR, "[] operator not supported for strings");
-			zend_jit_error_noreturn(llvm_ctx, 
-					opline,
-					E_ERROR,
-					"%s",
-					LLVM_GET_CONST_STRING("[] operator not supported for strings"));
+			// JIT: zend_throw_error(NULL, "[] operator not supported for strings");
+			zend_jit_throw_error(llvm_ctx, opline,
+					NULL, "[] operator not supported for strings");
+			if (!*bb_error) {
+				*bb_error = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
+			}
+			llvm_ctx.builder.CreateBr(*bb_error);
 		} else {
 			Value *index = zend_jit_str_offset_index(
 					llvm_ctx,
@@ -11441,7 +11442,7 @@ static int zend_jit_send_var_no_ref(zend_llvm_ctx    &llvm_ctx,
 						offsetof(zend_execute_data, call),
 						PointerType::getUnqual(PointerType::getUnqual(LLVM_GET_LONG_TY(llvm_ctx.context)))), 4);
 
-	if (!(opline->extended_value & ZEND_ARG_COMPILE_TIME_BOUND)) {
+	if (opline->opcode == ZEND_SEND_VAR_NO_REF_EX) {
 		//JIT: if (ARG_SHOULD_BE_SENT_BY_REF(EX(call)->func, OP2_OP()->num)) {
 		BasicBlock *bb_no_ref = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
 		BasicBlock *bb_ref = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
@@ -11465,81 +11466,7 @@ static int zend_jit_send_var_no_ref(zend_llvm_ctx    &llvm_ctx,
 	//JIT: varptr = GET_OP1_ZVAL_PTR(BP_VAR_R);
 	Value *op1_addr = zend_jit_load_operand(llvm_ctx,
 				OP1_OP_TYPE(), OP1_OP(), OP1_SSA_VAR(), OP1_INFO(), 0, opline);
-	Value *op1_type_info = NULL;
-
-	BasicBlock *bb_common = NULL;
-
-	if (OP1_MAY_BE(MAY_BE_REF|MAY_BE_OBJECT)) {
-		BasicBlock *bb_error = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
-		BasicBlock *bb_follow = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
-		BasicBlock *bb_next;
-
-		bb_common = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);;
-		op1_type_info = zend_jit_load_type_info_c(llvm_ctx, op1_addr, OP1_OP_TYPE(), OP1_OP(), OP1_SSA_VAR(), OP1_INFO());
-		if (opline->extended_value & ZEND_ARG_SEND_FUNCTION) {
-			BasicBlock *bb_next = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
-			//JIT: Z_ISREF_P(varptr)) &&
-			zend_jit_expected_br(llvm_ctx,
-				llvm_ctx.builder.CreateICmpEQ(
-					op1_type_info,
-					llvm_ctx.builder.getInt32(IS_REFERENCE_EX)),
-				bb_next,
-				bb_error);
-			llvm_ctx.builder.SetInsertPoint(bb_next);
-		}
-		//JIT: (Z_ISREF_P(varptr) || Z_TYPE_P(varptr) == IS_OBJECT)) {
-		bb_next = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
-		zend_jit_expected_br(llvm_ctx,
-			llvm_ctx.builder.CreateICmpEQ(
-				op1_type_info,
-				llvm_ctx.builder.getInt32(IS_REFERENCE_EX)),
-				bb_follow,
-				bb_next);
-		llvm_ctx.builder.SetInsertPoint(bb_next);
-		zend_jit_expected_br(llvm_ctx,
-			llvm_ctx.builder.CreateICmpEQ(
-				op1_type_info,
-				llvm_ctx.builder.getInt32(IS_OBJECT_EX)),
-				bb_follow,
-				bb_error);
-		llvm_ctx.builder.SetInsertPoint(bb_follow);
-
-		//JIT: ZVAL_MAKE_REF(varptr);
-		zend_jit_make_ref(llvm_ctx, op1_addr, op1_type_info, OP1_SSA_VAR(), OP1_INFO());
-
-		llvm_ctx.builder.CreateBr(bb_common);
-		llvm_ctx.builder.SetInsertPoint(bb_error);
-	}
-
-	if (opline->extended_value & ZEND_ARG_COMPILE_TIME_BOUND) {
-		if (!(opline->extended_value & ZEND_ARG_SEND_SILENT)) {
-			//JIT: zend_error(E_NOTICE, "Only variables should be passed by reference");
-			zend_jit_error(llvm_ctx, opline, E_NOTICE, "Only variables should be passed by reference");
-		}
-	} else {
-		//JIT: !ARG_MAY_BE_SENT_BY_REF(EX(call)->func, opline->op2.num)) {
-		BasicBlock *bb_no_ref = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
-		BasicBlock *bb_ref = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
-
-		zend_jit_check_arg_send_type(
-			llvm_ctx,
-			call,
-			OP2_OP()->num,
-			ZEND_SEND_PREFER_REF,
-			bb_ref,
-			bb_no_ref);
-
-		llvm_ctx.builder.SetInsertPoint(bb_no_ref);
-		//JIT: zend_error(E_NOTICE, "Only variables should be passed by reference");
-		zend_jit_error(llvm_ctx, opline, E_NOTICE, "Only variables should be passed by reference");
-		llvm_ctx.builder.CreateBr(bb_ref);
-		llvm_ctx.builder.SetInsertPoint(bb_ref);
-	}
-
-	if (bb_common) {
-		llvm_ctx.builder.CreateBr(bb_common);
-		llvm_ctx.builder.SetInsertPoint(bb_common);
-	}
+	Value *op1_type_info = zend_jit_load_type_info_c(llvm_ctx, op1_addr, OP1_OP_TYPE(), OP1_OP(), OP1_SSA_VAR(), OP1_INFO());
 
 	//JIT: arg = ZEND_CALL_ARG(EX(call), opline->op2.num);
 	Value *arg_addr = zend_jit_GEP(
@@ -11550,10 +11477,43 @@ static int zend_jit_send_var_no_ref(zend_llvm_ctx    &llvm_ctx,
 
 	//JIT: ZVAL_COPY_VALUE(arg, varptr);
 	zend_jit_copy_value(llvm_ctx, arg_addr, 0, -1, MAY_BE_ANY,
-		op1_addr, /*???op1_type_info*/NULL, OP1_OP_TYPE(), OP1_OP(),
+		op1_addr, op1_type_info, OP1_OP_TYPE(), OP1_OP(),
 		OP1_SSA_VAR(),
 		OP1_MAY_BE(MAY_BE_OBJECT) ? MAY_BE_ANY : OP1_INFO());
 	
+	if (OP1_MAY_BE(MAY_BE_REF)) {
+		BasicBlock *bb_next = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
+		
+		if (!bb_finish) {
+			bb_finish = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
+		}
+		zend_jit_expected_br(llvm_ctx,
+			llvm_ctx.builder.CreateICmpEQ(
+				op1_type_info,
+				llvm_ctx.builder.getInt32(IS_REFERENCE_EX)),
+				bb_finish,
+				bb_next);
+		llvm_ctx.builder.SetInsertPoint(bb_next);
+	}
+	if (opline->opcode == ZEND_SEND_VAR_NO_REF_EX) {
+		BasicBlock *bb_next = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
+
+		if (!bb_finish) {
+			bb_finish = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
+		}
+		zend_jit_check_arg_send_type(
+			llvm_ctx,
+			call,
+			OP2_OP()->num,
+			ZEND_SEND_PREFER_REF,
+			bb_finish,
+			bb_next);
+		llvm_ctx.builder.SetInsertPoint(bb_next);
+	}
+
+	//JIT: zend_error(E_NOTICE, "Only variables should be passed by reference");
+	zend_jit_error(llvm_ctx, opline, E_NOTICE, "Only variables should be passed by reference");
+
 	//JIT: CHECK_EXCEPTION();
 	JIT_CHECK(zend_jit_check_exception(llvm_ctx, opline));
 
@@ -17733,6 +17693,7 @@ static int zend_jit_codegen_ex(zend_jit_context *ctx,
 					if (!zend_jit_send_var(llvm_ctx, op_array, opline, 1)) return 0;
 					break;
 				case ZEND_SEND_VAR_NO_REF:
+				case ZEND_SEND_VAR_NO_REF_EX:
 					if (!zend_jit_send_var_no_ref(llvm_ctx, op_array, opline)) return 0;
 					break;
 				case ZEND_ECHO:
@@ -18332,6 +18293,7 @@ int zend_opline_supports_jit(zend_op_array    *op_array,
 		case ZEND_SEND_VAR_EX:
 		case ZEND_SEND_REF:
 		case ZEND_SEND_VAR_NO_REF:
+		case ZEND_SEND_VAR_NO_REF_EX:
 		case ZEND_RECV:
 		case ZEND_RECV_INIT:
 		case ZEND_RETURN:
