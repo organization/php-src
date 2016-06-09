@@ -3869,8 +3869,8 @@ static Value* zend_jit_load_operand_addr(zend_llvm_ctx &llvm_ctx,
 			*should_free = NULL;
 			return NULL;
 		}
-		PHI_DCL(zv_addr, 3);
-		PHI_DCL(to_free, 3);
+		PHI_DCL(zv_addr, 2);
+		PHI_DCL(to_free, 2);
 		BasicBlock *bb_follow = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
 		BasicBlock *bb_next = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
 		BasicBlock *bb_common = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
@@ -3894,49 +3894,14 @@ static Value* zend_jit_load_operand_addr(zend_llvm_ctx &llvm_ctx,
 		PHI_ADD(zv_addr, tmp);
 		llvm_ctx.builder.CreateBr(bb_common);
 
-		//JIT: } else if (!Z_REFCOUNTED_P(ret) || Z_REFCOUNT_P(ret) == 1) {
+		//JIT: } else {
 		llvm_ctx.builder.SetInsertPoint(bb_next);
-		bb_follow = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
-		bb_next = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
-		zend_jit_unexpected_br(llvm_ctx,
-			llvm_ctx.builder.CreateICmpEQ(
-				llvm_ctx.builder.CreateAnd(
-					zv_type,
-					llvm_ctx.builder.getInt32(IS_TYPE_REFCOUNTED << Z_TYPE_FLAGS_SHIFT)),
-				llvm_ctx.builder.getInt32(0)),
-				bb_follow,
-				bb_next);
-		llvm_ctx.builder.SetInsertPoint(bb_next);
-		bb_next = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
-		Value *counted = zend_jit_load_counted(llvm_ctx, zv_addr, ssa_var, info);
-		zend_jit_unexpected_br(llvm_ctx,				
-			llvm_ctx.builder.CreateICmpEQ(
-				llvm_ctx.builder.CreateAlignedLoad(
-					zend_jit_refcount_addr(llvm_ctx, counted), 4),
-				llvm_ctx.builder.getInt32(1)),
-			bb_follow,
-			bb_next);
-
-		llvm_ctx.builder.SetInsertPoint(bb_follow);
 		//JIT: should_free->var = ret;
 		//JIT: return ret;
 		PHI_ADD(to_free, zv_addr);
 		PHI_ADD(zv_addr, zv_addr);
 		llvm_ctx.builder.CreateBr(bb_common);
 		
-		//JIT: } else {
-		llvm_ctx.builder.SetInsertPoint(bb_next);
-
-		//JIT: Z_DELREF_P(ret);
-		zend_jit_delref(llvm_ctx, counted);
-		//JIT: should_free->var = NULL;
-		to_free = llvm_ctx.builder.CreateIntToPtr(
-			LLVM_GET_LONG(0), llvm_ctx.zval_ptr_type);
-		//JIT: return ret;
-		PHI_ADD(to_free, to_free);
-		PHI_ADD(zv_addr, zv_addr);
-		llvm_ctx.builder.CreateBr(bb_common);
-
 		llvm_ctx.builder.SetInsertPoint(bb_common);
 		PHI_SET(to_free, to_free, llvm_ctx.zval_ptr_type);
 		PHI_SET(zv_addr, zv_addr, llvm_ctx.zval_ptr_type);
