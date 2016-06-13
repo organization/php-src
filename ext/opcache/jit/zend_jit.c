@@ -130,7 +130,7 @@ static int zend_jit_op_array_analyze_ssa(zend_jit_context *ctx, zend_op_array *o
 			if (ZCG(accel_directives).jit_debug & JIT_DEBUG_DUMP_PHI) {
 				build_flags |= ZEND_SSA_DEBUG_PHI_PLACEMENT;
 			}
-			if (zend_build_ssa(&ctx->arena, op_array, build_flags, &info->ssa, &info->flags) != SUCCESS) {
+			if (zend_build_ssa(&ctx->arena, ctx->main_script, op_array, build_flags, &info->ssa, &info->flags) != SUCCESS) {
 				return FAILURE;
 			}
 			if (ZCG(accel_directives).jit_debug & JIT_DEBUG_DUMP_SSA) {

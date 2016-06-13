@@ -1640,54 +1640,56 @@ static void zend_jit_ip_infer_ranges_warmup(zend_jit_context *ctx, zend_jit_ip_v
 					    info->ssa.var_info[ip_var[j].num].has_range &&
 					    info->ssa.vars[ip_var[j].num].definition_phi &&
 					    info->ssa.vars[ip_var[j].num].definition_phi->pi >= 0 &&
-					    info->ssa.vars[ip_var[j].num].definition_phi->constraint.negative &&
-					    info->ssa.vars[ip_var[j].num].definition_phi->constraint.min_ssa_var < 0 &&
-					    info->ssa.vars[ip_var[j].num].definition_phi->constraint.min_ssa_var < 0) {
+					    info->ssa.vars[ip_var[j].num].definition_phi->constraint.range.negative &&
+					    info->ssa.vars[ip_var[j].num].definition_phi->constraint.range.min_ssa_var < 0 &&
+					    info->ssa.vars[ip_var[j].num].definition_phi->constraint.range.min_ssa_var < 0) {
+						zend_ssa_range_constraint *constraint =
+							&info->ssa.vars[ip_var[j].num].definition_phi->constraint.range;
 						if (tmp.min == info->ssa.var_info[ip_var[j].num].range.min &&
 						    tmp.max == info->ssa.var_info[ip_var[j].num].range.max) {
-							if (info->ssa.vars[ip_var[j].num].definition_phi->constraint.negative == NEG_INIT) {
+							if (constraint->negative == NEG_INIT) {
 #ifdef LOG_NEG_RANGE
 								fprintf(stderr, "#%d INVARIANT\n", j);
 #endif
-								info->ssa.vars[ip_var[j].num].definition_phi->constraint.negative = NEG_INVARIANT;
+								constraint->negative = NEG_INVARIANT;
 							}
 						} else if (tmp.min == info->ssa.var_info[ip_var[j].num].range.min &&
 						           tmp.max == info->ssa.var_info[ip_var[j].num].range.max + 1 &&
-						           tmp.max < info->ssa.vars[ip_var[j].num].definition_phi->constraint.range.min) {
-							if (info->ssa.vars[ip_var[j].num].definition_phi->constraint.negative == NEG_INIT ||
-							    info->ssa.vars[ip_var[j].num].definition_phi->constraint.negative == NEG_INVARIANT) {
+						           tmp.max < constraint->range.min) {
+							if (constraint->negative == NEG_INIT ||
+							    constraint->negative == NEG_INVARIANT) {
 #ifdef LOG_NEG_RANGE
 								fprintf(stderr, "#%d LT\n", j);
 #endif
-								info->ssa.vars[ip_var[j].num].definition_phi->constraint.negative = NEG_USE_LT;
+								constraint->negative = NEG_USE_LT;
 //???NEG
-							} else if (info->ssa.vars[ip_var[j].num].definition_phi->constraint.negative == NEG_USE_GT) {
+							} else if (constraint->negative == NEG_USE_GT) {
 #ifdef LOG_NEG_RANGE
 								fprintf(stderr, "#%d UNKNOWN\n", j);
 #endif
-								info->ssa.vars[ip_var[j].num].definition_phi->constraint.negative = NEG_UNKNOWN;
+								constraint->negative = NEG_UNKNOWN;
 							}
 						} else if (tmp.max == info->ssa.var_info[ip_var[j].num].range.max &&
 						           tmp.min == info->ssa.var_info[ip_var[j].num].range.min - 1 &&
-						           tmp.min > info->ssa.vars[ip_var[j].num].definition_phi->constraint.range.max) {
-							if (info->ssa.vars[ip_var[j].num].definition_phi->constraint.negative == NEG_INIT ||
-							    info->ssa.vars[ip_var[j].num].definition_phi->constraint.negative == NEG_INVARIANT) {
+						           tmp.min > constraint->range.max) {
+							if (constraint->negative == NEG_INIT ||
+							    constraint->negative == NEG_INVARIANT) {
 #ifdef LOG_NEG_RANGE
 								fprintf(stderr, "#%d GT\n", j);
 #endif
-								info->ssa.vars[ip_var[j].num].definition_phi->constraint.negative = NEG_USE_GT;
+								constraint->negative = NEG_USE_GT;
 //???NEG
-							} else if (info->ssa.vars[ip_var[j].num].definition_phi->constraint.negative == NEG_USE_LT) {
+							} else if (constraint->negative == NEG_USE_LT) {
 #ifdef LOG_NEG_RANGE
 								fprintf(stderr, "#%d UNKNOWN\n", j);
 #endif
-								info->ssa.vars[ip_var[j].num].definition_phi->constraint.negative = NEG_UNKNOWN;
+								constraint->negative = NEG_UNKNOWN;
 							}
 						} else {
 #ifdef LOG_NEG_RANGE
 							fprintf(stderr, "#%d UNKNOWN\n", j);
 #endif
-							info->ssa.vars[ip_var[j].num].definition_phi->constraint.negative = NEG_UNKNOWN;
+							constraint->negative = NEG_UNKNOWN;
 						}
 					}
 #endif
