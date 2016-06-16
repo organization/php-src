@@ -603,7 +603,6 @@ int zend_inference_calc_range(const zend_op_array *op_array, zend_ssa *ssa, int 
 		return (tmp->min <= tmp->max);
 	} else if (ssa->vars[var].definition < 0) {
 		if (var < op_array->last_var &&
-		    var != EX_VAR_TO_NUM(op_array->this_var) &&
 		    op_array->function_name) {
 
 			tmp->min = 0;
@@ -2895,12 +2894,6 @@ static void zend_update_type_info(const zend_op_array *op_array,
 			if (func_info && (int)opline->op1.num-1 < func_info->num_args) {
 				tmp = (tmp & (MAY_BE_RC1|MAY_BE_RCN|MAY_BE_REF)) |
 					(tmp & func_info->arg_info[opline->op1.num-1].info.type);
-			} else {
-				if (opline->opcode == ZEND_RECV && (!arg_info || arg_info->type_hint == IS_UNDEF)) {
-					/* If the argument has no default value and no typehint, it is possible
-					 * to pass less arguments than the function expects */
-					tmp |= MAY_BE_UNDEF|MAY_BE_RC1;
-				}
 			}
 #if 0
 			/* We won't recieve unused arguments */
@@ -3245,6 +3238,10 @@ static void zend_update_type_info(const zend_op_array *op_array,
 				tmp |= MAY_BE_NULL;
 			}
 			UPDATE_SSA_TYPE(tmp, ssa_ops[i].result_def);
+			break;
+		case ZEND_FETCH_THIS:
+			UPDATE_SSA_OBJ_TYPE(op_array->scope, 1, ssa_ops[i].result_def);
+			UPDATE_SSA_TYPE(MAY_BE_RC1|MAY_BE_RCN|MAY_BE_OBJECT, ssa_ops[i].result_def);
 			break;
 		case ZEND_FETCH_OBJ_R:
 		case ZEND_FETCH_OBJ_IS:
@@ -4009,13 +4006,7 @@ int zend_ssa_inference(zend_arena **arena, const zend_op_array *op_array, const 
 		}
 	} else {
 		for (i = 0; i < op_array->last_var; i++) {
-			if (i == EX_VAR_TO_NUM(op_array->this_var)) {
-				ssa_var_info[i].type = MAY_BE_UNDEF | MAY_BE_RC1 | MAY_BE_RCN | MAY_BE_OBJECT;
-				ssa_var_info[i].ce = op_array->scope;
-				ssa_var_info[i].is_instanceof = 1;
-			} else {
-				ssa_var_info[i].type = MAY_BE_UNDEF | MAY_BE_RCN;
-			}
+			ssa_var_info[i].type = MAY_BE_UNDEF | MAY_BE_RCN;
 			ssa_var_info[i].has_range = 0;
 		}
 	}
