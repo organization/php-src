@@ -73,8 +73,12 @@ static void zend_delete_call_instructions(zend_op *opline)
 			case ZEND_SEND_VAR_NO_REF:
 			case ZEND_SEND_REF:
 				if (call == 0) {
-					if (opline->op1_type & (IS_CONST|IS_CV)) {
+					if (opline->op1_type == IS_CONST) {
 						MAKE_NOP(opline);
+					} else if (opline->op1_type == IS_CV) {
+						opline->opcode = ZEND_CHECK_VAR;
+						opline->extended_value = 0;
+						opline->result.var = 0;
 					} else {
 						opline->opcode = ZEND_FREE;
 						opline->extended_value = 0;
@@ -98,12 +102,18 @@ static void zend_try_inline_call(zend_op_array *op_array, zend_op *fcall, zend_o
 
 		if (ret_opline->op1_type == IS_CONST) {
 
+			if (fcall->opcode == ZEND_INIT_METHOD_CALL && fcall->op1_type == IS_UNUSED) {
+				/* TODO: we can't inlne methods, because $this may be used
+				 *       not in object context ???
+				 */
+				return;
+			}
 			if (fcall->extended_value < func->op_array.num_args) {
 				/* don't inline funcions with named constants in default arguments */
 				uint32_t n = fcall->extended_value;
 
 				do {
-					if (Z_CONSTANT_P(RT_CONSTANT_EX(&func->op_array, func->op_array.opcodes[n].op2))) {
+					if (Z_CONSTANT_P(RT_CONSTANT(&func->op_array, func->op_array.opcodes[n].op2))) {
 						return;
 					}
 					n++;
@@ -112,7 +122,7 @@ static void zend_try_inline_call(zend_op_array *op_array, zend_op *fcall, zend_o
 			if (RETURN_VALUE_USED(opline)) {
 				zval zv;
 
-				ZVAL_DUP(&zv, RT_CONSTANT_EX(&func->op_array, ret_opline->op1));
+				ZVAL_DUP(&zv, RT_CONSTANT(&func->op_array, ret_opline->op1));
 				opline->opcode = ZEND_QM_ASSIGN;
 				opline->op1_type = IS_CONST;
 				opline->op1.constant = zend_optimizer_add_literal(op_array, &zv);
