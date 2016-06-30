@@ -51,9 +51,8 @@ ZEND_API size_t (*zend_printf)(const char *format, ...);
 ZEND_API zend_write_func_t zend_write;
 ZEND_API FILE *(*zend_fopen)(const char *filename, zend_string **opened_path);
 ZEND_API int (*zend_stream_open_function)(const char *filename, zend_file_handle *handle);
-ZEND_API void (*zend_block_interruptions)(void);
-ZEND_API void (*zend_unblock_interruptions)(void);
 ZEND_API void (*zend_ticks_function)(int ticks);
+ZEND_API void (*zend_interrupt_function)(zend_execute_data *execute_data);
 ZEND_API void (*zend_error_cb)(int type, const char *error_filename, const uint error_lineno, const char *format, va_list args);
 size_t (*zend_vspprintf)(char **pbuf, size_t max_len, const char *format, va_list ap);
 zend_string *(*zend_vstrpprintf)(size_t max_len, const char *format, va_list ap);
@@ -676,10 +675,6 @@ int zend_startup(zend_utility_functions *utility_functions, char **extensions) /
 	}
 	zend_stream_open_function = utility_functions->stream_open_function;
 	zend_message_dispatcher_p = utility_functions->message_handler;
-#ifndef ZEND_SIGNALS
-	zend_block_interruptions = utility_functions->block_interruptions;
-	zend_unblock_interruptions = utility_functions->unblock_interruptions;
-#endif
 	zend_get_configuration_directive_p = utility_functions->get_configuration_directive;
 	zend_ticks_function = utility_functions->ticks_function;
 	zend_on_timeout = utility_functions->on_timeout;
@@ -687,6 +682,8 @@ int zend_startup(zend_utility_functions *utility_functions, char **extensions) /
 	zend_vstrpprintf = utility_functions->vstrpprintf_function;
 	zend_getenv = utility_functions->getenv_function;
 	zend_resolve_path = utility_functions->resolve_path_function;
+
+	zend_interrupt_function = NULL;
 
 #if HAVE_DTRACE
 /* build with dtrace support */
@@ -764,6 +761,11 @@ int zend_startup(zend_utility_functions *utility_functions, char **extensions) /
 #endif
 
 	zend_ini_startup();
+
+#ifdef ZEND_WIN32
+	/* Uses INI settings, so needs to be run after it. */
+	php_win32_cp_setup();
+#endif
 
 #ifdef ZTS
 	tsrm_set_new_thread_end_handler(zend_new_thread_end_handler);
