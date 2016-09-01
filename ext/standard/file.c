@@ -1546,6 +1546,11 @@ PHP_NAMED_FUNCTION(php_if_ftruncate)
 		RETURN_FALSE;
 	}
 
+	if (size < 0) {
+		php_error_docref(NULL, E_WARNING, "Negative size is not supported");
+		RETURN_FALSE;
+	}
+
 	PHP_STREAM_TO_ZVAL(stream, fp);
 
 	if (!php_stream_truncate_supported(stream)) {
@@ -2254,6 +2259,7 @@ PHPAPI void php_fgetcsv(php_stream *stream, char delimiter, char enclosure, char
 								memcpy(tptr, hunk_begin, bptr - hunk_begin);
 								tptr += (bptr - hunk_begin);
 								hunk_begin = bptr;
+								state = 0;
 								break;
 							default:
 								bptr += inc_len;

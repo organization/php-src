@@ -91,6 +91,15 @@ static void strip_leading_nops(zend_op_array *op_array, zend_basic_block *b)
 	zend_op *opcodes = op_array->opcodes;
 
 	while (b->len > 0 && opcodes[b->start].opcode == ZEND_NOP) {
+	    /* check if NOP breaks incorrect smart branch */
+		if (b->len == 2
+		 && (op_array->opcodes[b->start + 1].opcode == ZEND_JMPZ
+		  || op_array->opcodes[b->start + 1].opcode == ZEND_JMPNZ)
+		 && (op_array->opcodes[b->start + 1].op1_type & (IS_CV|IS_CONST))
+		 && b->start > 0
+		 && zend_is_smart_branch(op_array->opcodes + b->start - 1)) {
+			break;
+		}
 		b->start++;
 		b->len--;
 	}
@@ -112,6 +121,14 @@ static void strip_nops(zend_op_array *op_array, zend_basic_block *b)
 			if (i != j) {
 				op_array->opcodes[j] = op_array->opcodes[i];
 			}
+			j++;
+		}
+		if (i + 1 < b->start + b->len
+		 && (op_array->opcodes[i+1].opcode == ZEND_JMPZ
+		  || op_array->opcodes[i+1].opcode == ZEND_JMPNZ)
+		 && op_array->opcodes[i+1].op1_type & (IS_CV|IS_CONST)
+		 && zend_is_smart_branch(op_array->opcodes + j - 1)) {
+			/* don't remove NOP, that splits incorrect smart branch */
 			j++;
 		}
 		i++;
@@ -733,10 +750,26 @@ optimize_const_unary_op:
 				if (opline->op1_type & (IS_TMP_VAR|IS_VAR)) {
 					src = VAR_SOURCE(opline->op1);
 					if (src && src->opcode == ZEND_QM_ASSIGN) {
-						/* T = QM_ASSIGN(X), RETURN(T) to NOP, RETURN(X) */
-						VAR_SOURCE(opline->op1) = NULL;
-						COPY_NODE(opline->op1, src->op1);
-						MAKE_NOP(src);
+						zend_op *op = src + 1;
+						zend_bool optimize = 1;
+
+						while (op < opline) {
+							if ((op->op1_type == opline->op1_type
+							  && op->op1.var == opline->op1.var)
+							 || (op->op2_type == opline->op1_type
+							  && op->op2.var == opline->op1.var)) {
+								optimize = 0;
+								break;
+							}
+							op++;
+						}
+
+						if (optimize) {
+							/* T = QM_ASSIGN(X), RETURN(T) to NOP, RETURN(X) */
+							VAR_SOURCE(opline->op1) = NULL;
+							COPY_NODE(opline->op1, src->op1);
+							MAKE_NOP(src);
+						}
 					}
 				}
 				break;

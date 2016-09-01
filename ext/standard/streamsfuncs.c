@@ -322,7 +322,7 @@ PHP_FUNCTION(stream_socket_get_name)
 	if (0 != php_stream_xport_get_name(stream, want_peer,
 				&name,
 				NULL, NULL
-				)) {
+				) || !name) {
 		RETURN_FALSE;
 	}
 
@@ -394,7 +394,7 @@ PHP_FUNCTION(stream_socket_recvfrom)
 			);
 
 	if (recvd >= 0) {
-		if (zremote) {
+		if (zremote && remote_addr) {
 			ZVAL_STR(zremote, remote_addr);
 		}
 		ZSTR_VAL(read_buf)[recvd] = '\0';

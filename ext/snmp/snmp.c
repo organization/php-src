@@ -1008,7 +1008,7 @@ static int php_snmp_parse_oid(zval *object, int st, struct objid_query *objid_qu
 			php_error_docref(NULL, E_WARNING, "Got empty OID array");
 			return FALSE;
 		}
-		objid_query->vars = (snmpobjarg *)emalloc(sizeof(snmpobjarg) * zend_hash_num_elements(Z_ARRVAL_P(oid)));
+		objid_query->vars = (snmpobjarg *)safe_emalloc(sizeof(snmpobjarg), zend_hash_num_elements(Z_ARRVAL_P(oid)), 0);
 		if (objid_query->vars == NULL) {
 			php_error_docref(NULL, E_WARNING, "emalloc() failed while parsing oid array: %s", strerror(errno));
 			efree(objid_query->vars);
@@ -2068,6 +2068,14 @@ static int php_snmp_has_property(zval *object, zval *member, int has_set_exists,
 }
 /* }}} */
 
+static HashTable *php_snmp_get_gc(zval *object, zval ***gc_data, int *gc_data_count TSRMLS_DC) /* {{{ */
+{
+	*gc_data = NULL;
+	*gc_data_count = 0;
+	return zend_std_get_properties(object TSRMLS_CC);
+}
+/* }}} */
+
 /* {{{ php_snmp_get_properties(zval *object)
    Returns all object properties. Injects SNMP properties into object on first call */
 static HashTable *php_snmp_get_properties(zval *object)
@@ -2357,6 +2365,7 @@ PHP_MINIT_FUNCTION(snmp)
 	php_snmp_object_handlers.write_property = php_snmp_write_property;
 	php_snmp_object_handlers.has_property = php_snmp_has_property;
 	php_snmp_object_handlers.get_properties = php_snmp_get_properties;
+	php_snmp_object_handlers.get_gc = php_snmp_get_gc;
 
 	/* Register SNMP Class */
 	INIT_CLASS_ENTRY(ce, "SNMP", php_snmp_class_methods);

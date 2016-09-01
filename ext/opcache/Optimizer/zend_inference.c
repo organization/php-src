@@ -2153,6 +2153,7 @@ static void check_type_narrowing(const zend_op_array *op_array, zend_ssa *ssa, z
 	 * type inference)
 	 */
 	if (old_type & ~new_type) {
+		ZEND_ASSERT(0); /* Currently this should never happen */
 		reset_dependent_vars(op_array, ssa, worklist, var);
 	}
 }
@@ -2349,7 +2350,7 @@ static inline zend_uchar get_compound_assign_op(zend_uchar opcode) {
 }
 
 static inline zend_class_entry *get_class_entry(const zend_script *script, zend_string *lcname) {
-	zend_class_entry *ce = zend_hash_find_ptr(&script->class_table, lcname);
+	zend_class_entry *ce = script ? zend_hash_find_ptr(&script->class_table, lcname) : NULL;
 	if (ce) {
 		return ce;
 	}
@@ -2378,6 +2379,8 @@ static uint32_t zend_fetch_arg_info(const zend_script *script, zend_arg_info *ar
 			tmp |= MAY_BE_NULL;
 		} else if (arg_info->type_hint == IS_CALLABLE) {
 			tmp |= MAY_BE_STRING|MAY_BE_OBJECT|MAY_BE_ARRAY|MAY_BE_ARRAY_KEY_ANY|MAY_BE_ARRAY_OF_ANY|MAY_BE_ARRAY_OF_REF;
+		} else if (arg_info->type_hint == IS_ITERABLE) {
+			tmp |= MAY_BE_OBJECT|MAY_BE_ARRAY|MAY_BE_ARRAY_KEY_ANY|MAY_BE_ARRAY_OF_ANY|MAY_BE_ARRAY_OF_REF;
 		} else if (arg_info->type_hint == IS_ARRAY) {
 			tmp |= MAY_BE_ARRAY|MAY_BE_ARRAY_KEY_ANY|MAY_BE_ARRAY_OF_ANY|MAY_BE_ARRAY_OF_REF;
 		} else if (arg_info->type_hint == _IS_BOOL) {
@@ -2940,7 +2943,7 @@ static void zend_update_type_info(const zend_op_array *op_array,
 		case ZEND_DECLARE_ANON_CLASS:
 		case ZEND_DECLARE_ANON_INHERITED_CLASS:
 			UPDATE_SSA_TYPE(MAY_BE_CLASS, ssa_ops[i].result_def);
-			if ((ce = zend_hash_find_ptr(&script->class_table, Z_STR_P(CRT_CONSTANT_EX(op_array, opline->op1, ssa->rt_constants)))) != NULL) {
+			if (script && (ce = zend_hash_find_ptr(&script->class_table, Z_STR_P(CRT_CONSTANT_EX(op_array, opline->op1, ssa->rt_constants)))) != NULL) {
 				UPDATE_SSA_OBJ_TYPE(ce, 0, ssa_ops[i].result_def);
 			}
 			break;
@@ -3137,9 +3140,6 @@ static void zend_update_type_info(const zend_op_array *op_array,
 					if (t1 & MAY_BE_ARRAY_KEY_STRING) {
 						tmp |= MAY_BE_STRING;
 					}
-					if (!(tmp & (MAY_BE_LONG|MAY_BE_STRING))) {
-						tmp |= MAY_BE_NULL;
-					}
 				}
 				UPDATE_SSA_TYPE(tmp, ssa_ops[i].result_def);
 			}
@@ -3227,6 +3227,7 @@ static void zend_update_type_info(const zend_op_array *op_array,
 						case ZEND_ADD_ARRAY_ELEMENT:
 						case ZEND_RETURN_BY_REF:
 						case ZEND_VERIFY_RETURN_TYPE:
+						case ZEND_MAKE_REF:
 							tmp |= MAY_BE_ARRAY_OF_ANY | MAY_BE_ARRAY_OF_REF;
 							break;
 						case ZEND_PRE_INC:
@@ -3694,12 +3695,14 @@ static zend_bool can_convert_to_double(
 static int zend_type_narrowing(const zend_op_array *op_array, const zend_script *script, zend_ssa *ssa)
 {
 	uint32_t bitset_len = zend_bitset_len(ssa->vars_count);
-	ALLOCA_FLAG(use_heap);
-	zend_bitset visited = ZEND_BITSET_ALLOCA(2 * bitset_len, use_heap);
-	zend_bitset worklist = visited + bitset_len;
+	zend_bitset visited, worklist;
 	int i, v;
 	zend_op *opline;
 	zend_bool narrowed = 0;
+	ALLOCA_FLAG(use_heap)
+
+	visited = ZEND_BITSET_ALLOCA(2 * bitset_len, use_heap);
+	worklist = visited + bitset_len;
 
 	zend_bitset_clear(worklist, bitset_len);
 

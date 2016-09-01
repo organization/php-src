@@ -36,6 +36,7 @@ ZEND_API zend_class_entry *zend_ce_error_exception;
 ZEND_API zend_class_entry *zend_ce_error;
 ZEND_API zend_class_entry *zend_ce_parse_error;
 ZEND_API zend_class_entry *zend_ce_type_error;
+ZEND_API zend_class_entry *zend_ce_argument_count_error;
 ZEND_API zend_class_entry *zend_ce_arithmetic_error;
 ZEND_API zend_class_entry *zend_ce_division_by_zero_error;
 
@@ -303,9 +304,8 @@ ZEND_METHOD(exception, __construct)
 /* {{{ proto Exception::__wakeup()
    Exception unserialize checks */
 #define CHECK_EXC_TYPE(id, type) \
-	ZVAL_UNDEF(&value); \
 	pvalue = zend_read_property_ex(i_get_exception_base(object), (object), CG(known_strings)[id], 1, &value); \
-	if(Z_TYPE_P(pvalue) != IS_UNDEF && Z_TYPE_P(pvalue) != type) { \
+	if (Z_TYPE_P(pvalue) != IS_NULL && Z_TYPE_P(pvalue) != type) { \
 		zval tmp; \
 		ZVAL_STR_COPY(&tmp, CG(known_strings)[id]); \
 		Z_OBJ_HANDLER_P(object, unset_property)(object, &tmp, NULL); \
@@ -532,6 +532,7 @@ static void _build_trace_args(zval *arg, smart_str *str) /* {{{ */
 			smart_str_appends(str, "Object(");
 			smart_str_appends(str, ZSTR_VAL(class_name));
 			smart_str_appends(str, "), ");
+			zend_string_release(class_name);
 			break;
 		}
 	}
@@ -709,7 +710,7 @@ ZEND_METHOD(exception, __toString)
 			ZVAL_UNDEF(&trace);
 		}
 
-		if (Z_OBJCE_P(exception) == zend_ce_type_error && strstr(ZSTR_VAL(message), ", called in ")) {
+		if ((Z_OBJCE_P(exception) == zend_ce_type_error || Z_OBJCE_P(exception) == zend_ce_argument_count_error) && strstr(ZSTR_VAL(message), ", called in ")) {
 			zend_string *real_message = zend_strpprintf(0, "%s and defined", ZSTR_VAL(message));
 			zend_string_release(message);
 			message = real_message;
@@ -858,6 +859,10 @@ void zend_register_default_exception(void) /* {{{ */
 	INIT_CLASS_ENTRY(ce, "TypeError", NULL);
 	zend_ce_type_error = zend_register_internal_class_ex(&ce, zend_ce_error);
 	zend_ce_type_error->create_object = zend_default_exception_new;
+
+	INIT_CLASS_ENTRY(ce, "ArgumentCountError", NULL);
+	zend_ce_argument_count_error = zend_register_internal_class_ex(&ce, zend_ce_type_error);
+	zend_ce_argument_count_error->create_object = zend_default_exception_new;
 
 	INIT_CLASS_ENTRY(ce, "ArithmeticError", NULL);
 	zend_ce_arithmetic_error = zend_register_internal_class_ex(&ce, zend_ce_error);
@@ -1040,6 +1045,7 @@ ZEND_API ZEND_COLD void zend_throw_exception_object(zval *exception) /* {{{ */
 
 	if (!exception_ce || !instanceof_function(exception_ce, zend_ce_throwable)) {
 		zend_throw_error(NULL, "Cannot throw objects that do not implement Throwable");
+		zval_ptr_dtor(exception);
 		return;
 	}
 	zend_throw_exception_internal(exception);

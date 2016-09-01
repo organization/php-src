@@ -449,7 +449,7 @@ struct _zend_execute_data {
 	const zend_op       *opline;           /* executed opline                */
 	zend_execute_data   *call;             /* current call                   */
 	zval                *return_value;
-	zend_function       *func;             /* executed funcrion              */
+	zend_function       *func;             /* executed function              */
 	zval                 This;             /* this + call_info + num_args    */
 	zend_execute_data   *prev_execute_data;
 	zend_array          *symbol_table;
@@ -791,6 +791,7 @@ ZEND_API char *zend_make_compiled_string_description(const char *name);
 ZEND_API void zend_initialize_class_data(zend_class_entry *ce, zend_bool nullify_handlers);
 uint32_t zend_get_class_fetch_type(zend_string *name);
 ZEND_API zend_uchar zend_get_call_op(const zend_op *init_op, zend_function *fbc);
+ZEND_API int zend_is_smart_branch(zend_op *opline);
 
 typedef zend_bool (*zend_auto_global_callback)(zend_string *name);
 typedef struct _zend_auto_global {
@@ -840,6 +841,10 @@ ZEND_API void zend_assert_valid_class_name(const zend_string *const_name);
 #define ZEND_NAME_RELATIVE 2
 
 #define ZEND_TYPE_NULLABLE (1<<8)
+
+#define ZEND_ARRAY_SYNTAX_LIST 1  /* list() */
+#define ZEND_ARRAY_SYNTAX_LONG 2  /* array() */
+#define ZEND_ARRAY_SYNTAX_SHORT 3 /* [] */
 
 /* var status for backpatching */
 #define BP_VAR_R			0

@@ -294,6 +294,11 @@ static int ps_files_cleanup_dir(const char *dirname, zend_long maxlifetime)
 
 	dirname_len = strlen(dirname);
 
+	if (dirname_len >= MAXPATHLEN) {
+		php_error_docref(NULL, E_NOTICE, "ps_files_cleanup_dir: dirname(%s) is too long", dirname);
+		return (0);
+	}
+
 	/* Prepare buffer (dirname never changes) */
 	memcpy(buf, dirname, dirname_len);
 	buf[dirname_len] = PHP_DIR_SEPARATOR;
@@ -638,9 +643,11 @@ PS_GC_FUNC(files)
 
 	if (data->dirdepth == 0) {
 		*nrdels = ps_files_cleanup_dir(data->basedir, maxlifetime);
+	} else {
+		*nrdels = -1; // Cannot process multiple depth save dir
 	}
 
-	return SUCCESS;
+	return *nrdels;
 }
 
 

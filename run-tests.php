@@ -269,7 +269,7 @@ More .INIs  : " , (function_exists(\'php_ini_scanned_files\') ? str_replace("\n"
 	@unlink($info_file);
 
 	// load list of enabled extensions
-	save_text($info_file, '<?php echo join(",", get_loaded_extensions()); ?>');
+	save_text($info_file, '<?php echo str_replace("Zend OPcache", "opcache", join(",", get_loaded_extensions())); ?>');
 	$exts_to_test = explode(',',`$php $pass_options $info_params $no_file_cache "$info_file"`);
 	// check for extensions that need special handling and regenerate
 	$info_params_ex = array(
@@ -1366,6 +1366,7 @@ TEST $file
 				return 'SKIPPED';
 			}
 		}
+		$uses_cgi = true;
 	}
 
 	/* For phpdbg tests, check if phpdbg sapi is available and if it is, use it. */
@@ -1916,7 +1917,7 @@ COMMAND $cmd
 	/* when using CGI, strip the headers from the output */
 	$headers = "";
 
-	if (isset($old_php) && preg_match("/^(.*?)\r?\n\r?\n(.*)/s", $out, $match)) {
+	if (!empty($uses_cgi) && preg_match("/^(.*?)\r?\n\r?\n(.*)/s", $out, $match)) {
 		$output = trim($match[2]);
 		$rh = preg_split("/[\n\r]+/", $match[1]);
 		$headers = array();

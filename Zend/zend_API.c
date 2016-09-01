@@ -27,6 +27,7 @@
 #include "zend_modules.h"
 #include "zend_extensions.h"
 #include "zend_constants.h"
+#include "zend_interfaces.h"
 #include "zend_exceptions.h"
 #include "zend_closures.h"
 #include "zend_inheritance.h"
@@ -156,7 +157,7 @@ ZEND_API ZEND_COLD void zend_wrong_param_count(void) /* {{{ */
 	const char *space;
 	const char *class_name = get_active_class_name(&space);
 
-	zend_internal_type_error(ZEND_ARG_USES_STRICT_TYPES(), "Wrong parameter count for %s%s%s()", class_name, space, get_active_function_name());
+	zend_internal_argument_count_error(ZEND_ARG_USES_STRICT_TYPES(), "Wrong parameter count for %s%s%s()", class_name, space, get_active_function_name());
 }
 /* }}} */
 
@@ -182,6 +183,8 @@ ZEND_API char *zend_get_type_by_const(int type) /* {{{ */
 			return "null";
 		case IS_CALLABLE:
 			return "callable";
+		case IS_ITERABLE:
+			return "iterable";
 		case IS_ARRAY:
 			return "array";
 		case IS_VOID:
@@ -205,14 +208,16 @@ ZEND_API ZEND_COLD void ZEND_FASTCALL zend_wrong_parameters_count_error(int num_
 	zend_function *active_function = EG(current_execute_data)->func;
 	const char *class_name = active_function->common.scope ? ZSTR_VAL(active_function->common.scope->name) : "";
 
-	zend_internal_type_error(ZEND_ARG_USES_STRICT_TYPES(), "%s%s%s() expects %s %d parameter%s, %d given",
-		class_name, \
-		class_name[0] ? "::" : "", \
-		ZSTR_VAL(active_function->common.function_name),
-		min_num_args == max_num_args ? "exactly" : num_args < min_num_args ? "at least" : "at most",
-		num_args < min_num_args ? min_num_args : max_num_args,
-		(num_args < min_num_args ? min_num_args : max_num_args) == 1 ? "" : "s",
-		num_args);
+	zend_internal_argument_count_error(
+				ZEND_ARG_USES_STRICT_TYPES(), 
+				"%s%s%s() expects %s %d parameter%s, %d given", 
+				class_name, \
+				class_name[0] ? "::" : "", \
+				ZSTR_VAL(active_function->common.function_name),
+				min_num_args == max_num_args ? "exactly" : num_args < min_num_args ? "at least" : "at most",
+				num_args < min_num_args ? min_num_args : max_num_args,
+				(num_args < min_num_args ? min_num_args : max_num_args) == 1 ? "" : "s",
+				num_args);
 }
 /* }}} */
 
@@ -872,7 +877,7 @@ static int zend_parse_va_args(int num_args, const char *type_spec, va_list *va, 
 			zend_function *active_function = EG(current_execute_data)->func;
 			const char *class_name = active_function->common.scope ? ZSTR_VAL(active_function->common.scope->name) : "";
 			zend_bool throw_exception = ZEND_ARG_USES_STRICT_TYPES() || (flags & ZEND_PARSE_PARAMS_THROW);
-			zend_internal_type_error(throw_exception, "%s%s%s() expects %s %d parameter%s, %d given",
+			zend_internal_argument_count_error(throw_exception, "%s%s%s() expects %s %d parameter%s, %d given",
 					class_name,
 					class_name[0] ? "::" : "",
 					ZSTR_VAL(active_function->common.function_name),
@@ -3095,13 +3100,13 @@ get_function_via_handler:
 
 	if (retval) {
 		if (fcc->calling_scope && !call_via_handler) {
-			if (!fcc->object && (fcc->function_handler->common.fn_flags & ZEND_ACC_ABSTRACT)) {
+			if (fcc->function_handler->common.fn_flags & ZEND_ACC_ABSTRACT) {
 				if (error) {
 					zend_spprintf(error, 0, "cannot call abstract method %s::%s()", ZSTR_VAL(fcc->calling_scope->name), ZSTR_VAL(fcc->function_handler->common.function_name));
 					retval = 0;
 				} else {
 					zend_throw_error(NULL, "Cannot call abstract method %s::%s()", ZSTR_VAL(fcc->calling_scope->name), ZSTR_VAL(fcc->function_handler->common.function_name));
-					return 0;
+					retval = 0;
 				}
 			} else if (!fcc->object && !(fcc->function_handler->common.fn_flags & ZEND_ACC_STATIC)) {
 				int severity;
@@ -4199,6 +4204,19 @@ ZEND_API const char *zend_get_object_type(const zend_class_entry *ce) /* {{{ */
 		return "interface";
 	} else {
 		return "class";
+	}
+}
+/* }}} */
+
+ZEND_API zend_bool zend_is_iterable(zval *iterable) /* {{{ */
+{
+	switch (Z_TYPE_P(iterable)) {
+		case IS_ARRAY:
+			return 1;
+		case IS_OBJECT:
+			return instanceof_function(Z_OBJCE_P(iterable), zend_ce_traversable);
+		default:
+			return 0;
 	}
 }
 /* }}} */

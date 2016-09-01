@@ -300,6 +300,9 @@ ZEND_API void zend_print_flat_zval_r(zval *expr) /* {{{ */
 			ZEND_PUTS(")");
 			break;
 		}
+		case IS_REFERENCE:
+			zend_print_flat_zval_r(Z_REFVAL_P(expr));
+			break;
 		default:
 			zend_print_variable(expr);
 			break;
@@ -354,6 +357,9 @@ static void zend_print_zval_r_to_buf(smart_str *buf, zval *expr, int indent) /* 
 			}
 		case IS_LONG:
 			smart_str_append_long(buf, Z_LVAL_P(expr));
+			break;
+		case IS_REFERENCE:
+			zend_print_zval_r_to_buf(buf, Z_REFVAL_P(expr), indent);
 			break;
 		default:
 			{
@@ -1358,6 +1364,23 @@ ZEND_API ZEND_COLD void zend_internal_type_error(zend_bool throw_exception, cons
 	zend_vspprintf(&message, 0, format, va);
 	if (throw_exception) {
 		zend_throw_exception(zend_ce_type_error, message, 0);
+	} else {
+		zend_error(E_WARNING, "%s", message);
+	}
+	efree(message);
+
+	va_end(va);
+} /* }}} */
+
+ZEND_API ZEND_COLD void zend_internal_argument_count_error(zend_bool throw_exception, const char *format, ...) /* {{{ */
+{
+	va_list va;
+	char *message = NULL;
+
+	va_start(va, format);
+	zend_vspprintf(&message, 0, format, va);
+	if (throw_exception) {
+		zend_throw_exception(zend_ce_argument_count_error, message, 0);
 	} else {
 		zend_error(E_WARNING, "%s", message);
 	}

@@ -261,7 +261,7 @@ static char **make_subpats_table(int num_subpats, pcre_cache_entry *pce)
 
 	subpat_names = (char **)ecalloc(num_subpats, sizeof(char *));
 	while (ni++ < name_cnt) {
-		name_idx = 0xff * (unsigned char)name_table[0] + (unsigned char)name_table[1];
+		name_idx = 0x100 * (unsigned char)name_table[0] + (unsigned char)name_table[1];
 		subpat_names[name_idx] = name_table + 2;
 		if (is_numeric_string(subpat_names[name_idx], strlen(subpat_names[name_idx]), NULL, NULL, 0) > 0) {
 			php_error_docref(NULL, E_WARNING, "Numeric named subpatterns are not allowed");
@@ -1176,6 +1176,11 @@ PHPAPI zend_string *php_pcre_replace_impl(pcre_cache_entry *pce, zend_string *su
 	if (UNEXPECTED(pce->name_count > 0)) {
 		subpat_names = make_subpats_table(num_subpats, pce);
 		if (!subpat_names) {
+			if (size_offsets <= 32) {
+				free_alloca(offsets, use_heap);
+			} else {
+				efree(offsets);
+			}
 			return NULL;
 		}
 	}
