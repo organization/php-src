@@ -653,6 +653,15 @@ static int zend_ssa_rename(const zend_op_array *op_array, uint32_t build_flags, 
 						//NEW_SSA_VAR(opline+->op1.var)
 					}
 					break;
+				case ZEND_SEND_VAR:
+				case ZEND_CAST:
+					if ((build_flags & ZEND_SSA_RC_INFERENCE) && opline->op1_type == IS_CV) {
+						ssa_ops[k].op1_def = ssa_vars_count;
+						var[EX_VAR_TO_NUM(opline->op1.var)] = ssa_vars_count;
+						ssa_vars_count++;
+						//NEW_SSA_VAR(opline->op1.var)
+					}
+					break;
 				case ZEND_SEND_VAR_NO_REF:
 				case ZEND_SEND_VAR_NO_REF_EX:
 				case ZEND_SEND_VAR_EX:
@@ -845,6 +854,11 @@ int zend_build_ssa(zend_arena **arena, const zend_script *script, const zend_op_
 	zend_dfg dfg;
 	ALLOCA_FLAG(dfg_use_heap)
 	ALLOCA_FLAG(var_use_heap)
+
+	if ((blocks_count * (op_array->last_var + op_array->T)) > 4 * 1024 * 1024) {
+	    /* Don't buld SSA for very big functions */
+		return FAILURE;
+	}
 
 	ssa->rt_constants = (build_flags & ZEND_RT_CONSTANTS);
 	ssa_blocks = zend_arena_calloc(arena, blocks_count, sizeof(zend_ssa_block));
