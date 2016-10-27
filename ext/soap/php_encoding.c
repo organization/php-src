@@ -1225,7 +1225,7 @@ static void unset_zval_property(zval* object, char* name)
 
 static void model_to_zval_any(zval *ret, xmlNodePtr node)
 {
-	zval rv, arr, val;
+	zval rv, arr, val, keepVal;
 	zval* any = NULL;
 	char* name = NULL;
 
@@ -1254,6 +1254,7 @@ static void model_to_zval_any(zval *ret, xmlNodePtr node)
 					ZVAL_NULL(&val2);
 					master_to_zval(&val2, get_conversion(XSD_ANYXML), node->next);
 					if (Z_TYPE(val2) != IS_STRING ||  *Z_STRVAL(val) != '<') {
+						Z_TRY_DELREF(val2);
 						break;
 					}
 					concat_function(&val, &val, &val2);
@@ -1272,7 +1273,8 @@ static void model_to_zval_any(zval *ret, xmlNodePtr node)
 					any = &arr;
 					name = NULL;
 				} else {
-					any = &val;
+					ZVAL_COPY_VALUE(&keepVal, &val);
+					any = &keepVal;
 				}
 			} else {
 				/* Add array element */
@@ -3480,6 +3482,10 @@ static int is_map(zval *array)
 	zend_ulong index;
 	zend_string *key;
 	zend_ulong i = 0;
+
+	if (HT_IS_PACKED(Z_ARRVAL_P(array)) && HT_IS_WITHOUT_HOLES(Z_ARRVAL_P(array))) {
+		return FALSE;
+	}
 
 	ZEND_HASH_FOREACH_KEY(Z_ARRVAL_P(array), index, key) {
 		if (key || index != i) {

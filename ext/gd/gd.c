@@ -63,9 +63,7 @@
 static int le_gd, le_gd_font;
 
 #include <gd.h>
-#ifndef HAVE_GD_BUNDLED
-# include <gd_errors.h>
-#endif
+#include <gd_errors.h>
 #include <gdfontt.h>  /* 1 Tiny font */
 #include <gdfonts.h>  /* 2 Small font */
 #include <gdfontmb.h> /* 3 Medium bold font */
@@ -578,6 +576,13 @@ ZEND_BEGIN_ARG_INFO(arginfo_imagepolygon, 0)
 	ZEND_ARG_INFO(0, col)
 ZEND_END_ARG_INFO()
 
+ZEND_BEGIN_ARG_INFO(arginfo_imageopenpolygon, 0)
+	ZEND_ARG_INFO(0, im)
+	ZEND_ARG_INFO(0, points) /* ARRAY_INFO(0, points, 0) */
+	ZEND_ARG_INFO(0, num_pos)
+	ZEND_ARG_INFO(0, col)
+ZEND_END_ARG_INFO()
+
 ZEND_BEGIN_ARG_INFO(arginfo_imagefilledpolygon, 0)
 	ZEND_ARG_INFO(0, im)
 	ZEND_ARG_INFO(0, points) /* ARRAY_INFO(0, points, 0) */
@@ -831,6 +836,12 @@ ZEND_BEGIN_ARG_INFO(arginfo_imagesetinterpolation, 0)
 	ZEND_ARG_INFO(0, method)
 ZEND_END_ARG_INFO()
 
+ZEND_BEGIN_ARG_INFO_EX(arginfo_imageresolution, 0, 0, 1)
+	ZEND_ARG_INFO(0, im)
+	ZEND_ARG_INFO(0, res_x)
+	ZEND_ARG_INFO(0, res_y)
+ZEND_END_ARG_INFO()
+
 /* }}} */
 
 /* {{{ gd_functions[]
@@ -938,6 +949,7 @@ const zend_function_entry gd_functions[] = {
 	PHP_FE(imageline,								arginfo_imageline)
 	PHP_FE(imageloadfont,							arginfo_imageloadfont)
 	PHP_FE(imagepolygon,							arginfo_imagepolygon)
+	PHP_FE(imageopenpolygon,						arginfo_imageopenpolygon)
 	PHP_FE(imagerectangle,							arginfo_imagerectangle)
 	PHP_FE(imagesetpixel,							arginfo_imagesetpixel)
 	PHP_FE(imagestring,								arginfo_imagestring)
@@ -974,6 +986,8 @@ const zend_function_entry gd_functions[] = {
 /* gd filters */
 	PHP_FE(imagefilter,     						arginfo_imagefilter)
 	PHP_FE(imageconvolution,						arginfo_imageconvolution)
+
+	PHP_FE(imageresolution,							arginfo_imageresolution)
 
 	PHP_FE_END
 };
@@ -1028,15 +1042,16 @@ static void php_free_gd_font(zend_resource *rsrc)
 }
 /* }}} */
 
-#ifndef HAVE_GD_BUNDLED
 /* {{{ php_gd_error_method
  */
 void php_gd_error_method(int type, const char *format, va_list args)
 {
 
 	switch (type) {
+#ifndef PHP_WIN32
 		case GD_DEBUG:
 		case GD_INFO:
+#endif
 		case GD_NOTICE:
 			type = E_NOTICE;
 			break;
@@ -1049,7 +1064,6 @@ void php_gd_error_method(int type, const char *format, va_list args)
 	php_verror(NULL, "", type, format, args TSRMLS_CC);
 }
 /* }}} */
-#endif
 
 /* {{{ PHP_MINIT_FUNCTION
  */
@@ -1061,9 +1075,8 @@ PHP_MINIT_FUNCTION(gd)
 #if HAVE_GD_BUNDLED && HAVE_LIBFREETYPE
 	gdFontCacheMutexSetup();
 #endif
-#ifndef HAVE_GD_BUNDLED
 	gdSetErrorMethod(php_gd_error_method);
-#endif
+
 	REGISTER_INI_ENTRIES();
 
 	REGISTER_LONG_CONSTANT("IMG_GIF", 1, CONST_CS | CONST_PERSISTENT);
@@ -3349,6 +3362,7 @@ PHP_FUNCTION(imageinterlace)
 /* }}} */
 
 /* {{{ php_imagepolygon
+   arg = -1 open polygon
    arg = 0  normal polygon
    arg = 1  filled polygon */
 /* im, points, num_points, col */
@@ -3401,10 +3415,16 @@ static void php_imagepolygon(INTERNAL_FUNCTION_PARAMETERS, int filled)
 		gdImageSetAntiAliased(im, col);
 		col = gdAntiAliased;
 	}
-	if (filled) {
-		gdImageFilledPolygon(im, points, npoints, col);
-	} else {
-		gdImagePolygon(im, points, npoints, col);
+	switch (filled) {
+		case -1:
+			gdImageOpenPolygon(im, points, npoints, col);
+			break;
+		case 0:
+			gdImagePolygon(im, points, npoints, col);
+			break;
+		case 1:
+			gdImageFilledPolygon(im, points, npoints, col);
+			break;
 	}
 
 	efree(points);
@@ -3417,6 +3437,14 @@ static void php_imagepolygon(INTERNAL_FUNCTION_PARAMETERS, int filled)
 PHP_FUNCTION(imagepolygon)
 {
 	php_imagepolygon(INTERNAL_FUNCTION_PARAM_PASSTHRU, 0);
+}
+/* }}} */
+
+/* {{{ proto bool imageopenpolygon(resource im, array point, int num_points, int col)
+   Draw a polygon */
+PHP_FUNCTION(imageopenpolygon)
+{
+	php_imagepolygon(INTERNAL_FUNCTION_PARAM_PASSTHRU, -1);
 }
 /* }}} */
 
@@ -4126,15 +4154,6 @@ static void _php_image_convert(INTERNAL_FUNCTION_PARAMETERS, int image_type )
 	}
 
 	switch (image_type) {
-		case PHP_GDIMG_TYPE_GIF:
-			im_org = gdImageCreateFromGif(org);
-			if (im_org == NULL) {
-				php_error_docref(NULL, E_WARNING, "Unable to open '%s' Not a valid GIF file", fn_dest);
-                fclose(org);
-                fclose(dest);
-				RETURN_FALSE;
-			}
-			break;
 
 #ifdef HAVE_GD_JPG
 		case PHP_GDIMG_TYPE_JPG:
@@ -4743,7 +4762,7 @@ PHP_FUNCTION(imagescale)
 	gdImagePtr im_scaled = NULL;
 	int new_width, new_height;
 	zend_long tmp_w, tmp_h=-1, tmp_m = GD_BILINEAR_FIXED;
-	gdInterpolationMethod method;
+	gdInterpolationMethod method, old_method;
 
 	if (zend_parse_parameters(ZEND_NUM_ARGS(), "rl|ll", &IM, &tmp_w, &tmp_h, &tmp_m) == FAILURE)  {
 		return;
@@ -4772,9 +4791,12 @@ PHP_FUNCTION(imagescale)
 	new_width = tmp_w;
 	new_height = tmp_h;
 
+	/* gdImageGetInterpolationMethod() is only available as of GD 2.1.1 */
+	old_method = im->interpolation_id;
 	if (gdImageSetInterpolationMethod(im, method)) {
 		im_scaled = gdImageScale(im, new_width, new_height);
 	}
+	gdImageSetInterpolationMethod(im, old_method);
 
 	if (im_scaled == NULL) {
 		RETURN_FALSE;
@@ -5049,6 +5071,37 @@ PHP_FUNCTION(imagesetinterpolation)
 		 method = GD_BILINEAR_FIXED;
 	}
 	RETURN_BOOL(gdImageSetInterpolationMethod(im, (gdInterpolationMethod) method));
+}
+/* }}} */
+
+/* {{{ proto array imageresolution(resource im [, res_x, [res_y]])
+   Get or set the resolution of the image in DPI. */
+PHP_FUNCTION(imageresolution)
+{
+	zval *IM;
+	gdImagePtr im;
+	zend_long res_x = GD_RESOLUTION, res_y = GD_RESOLUTION;
+
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "r|ll", &IM, &res_x, &res_y) == FAILURE)  {
+		return;
+	}
+
+	if ((im = (gdImagePtr)zend_fetch_resource(Z_RES_P(IM), "Image", le_gd)) == NULL) {
+		RETURN_FALSE;
+	}
+
+	switch (ZEND_NUM_ARGS()) {
+		case 3:
+			gdImageSetResolution(im, res_x, res_y);
+			RETURN_TRUE;
+		case 2:
+			gdImageSetResolution(im, res_x, res_x);
+			RETURN_TRUE;
+		default:
+			array_init(return_value);
+			add_next_index_long(return_value, gdImageResolutionX(im));
+			add_next_index_long(return_value, gdImageResolutionY(im));
+	}
 }
 /* }}} */
 

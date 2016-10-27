@@ -25,6 +25,7 @@
 #include "php_math.h"
 #include "zend_multiply.h"
 #include "zend_exceptions.h"
+#include "zend_portability.h"
 
 #include <math.h>
 #include <float.h>
@@ -239,7 +240,7 @@ static double php_acosh(double x)
 	if (x >= 1) {
 		return log(x + sqrt(x * x - 1));
 	} else {
-		return (DBL_MAX+DBL_MAX)-(DBL_MAX+DBL_MAX);
+		return ZEND_NAN;
 	}
 # else
 	return(log(x + sqrt(x * x - 1)));
@@ -707,7 +708,7 @@ PHP_FUNCTION(log)
 	}
 
 	if (base == 1.0) {
-		RETURN_DOUBLE(php_get_nan());
+		RETURN_DOUBLE(ZEND_NAN);
 	}
 
 	if (base <= 0.0) {
@@ -951,7 +952,7 @@ PHPAPI zend_string * _php_math_zvaltobase(zval *arg, int base)
 		char buf[(sizeof(double) << 3) + 1];
 
 		/* Don't try to convert +/- infinity */
-		if (fvalue == HUGE_VAL || fvalue == -HUGE_VAL) {
+		if (fvalue == ZEND_INFINITY || fvalue == -ZEND_INFINITY) {
 			php_error_docref(NULL, E_WARNING, "Number too large");
 			return ZSTR_EMPTY_ALLOC();
 		}
@@ -1111,8 +1112,8 @@ PHPAPI zend_string *_php_math_number_format_ex(double d, int dec, char *dec_poin
 	zend_string *tmpbuf;
 	char *s, *t;  /* source, target */
 	char *dp;
-	int integral;
-	int reslen = 0;
+	size_t integral;
+	size_t reslen = 0;
 	int count = 0;
 	int is_negative=0;
 
@@ -1147,7 +1148,11 @@ PHPAPI zend_string *_php_math_number_format_ex(double d, int dec, char *dec_poin
 
 	/* allow for thousand separators */
 	if (thousand_sep) {
-		integral += (int)(thousand_sep_len * ((integral-1) / 3));
+		if (integral + thousand_sep_len * ((integral-1) / 3) < integral) {
+			/* overflow */
+			php_error_docref(NULL, E_ERROR, "String overflow");
+		}
+		integral += thousand_sep_len * ((integral-1) / 3);
 	}
 
 	reslen = integral;
@@ -1156,7 +1161,11 @@ PHPAPI zend_string *_php_math_number_format_ex(double d, int dec, char *dec_poin
 		reslen += dec;
 
 		if (dec_point) {
-			reslen += (int)dec_point_len;
+			if (reslen + dec_point_len < dec_point_len) {
+				/* overflow */
+				php_error_docref(NULL, E_ERROR, "String overflow");
+			}
+			reslen += dec_point_len;
 		}
 	}
 
@@ -1258,7 +1267,6 @@ PHP_FUNCTION(number_format)
 		break;
 	default:
 		WRONG_PARAM_COUNT;
-		break;
 	}
 }
 /* }}} */
