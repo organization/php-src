@@ -3319,14 +3319,14 @@ static int zend_jit_zval_copy_ctor(zend_llvm_ctx &llvm_ctx,
 		BasicBlock *bb_end = NULL;
 
 		if (info & (MAY_BE_ANY - (MAY_BE_ARRAY|MAY_BE_OBJECT|MAY_BE_RESOURCE))) {
-			//JIT: if (Z_OPT_REFCOUNTED_P(zvalue) || Z_OPT_IMMUTABLE_P(zvalue)) {
+			//JIT: if (Z_OPT_REFCOUNTED_P(zvalue) || Z_OPT_COPYABLE_P(zvalue)) {
 			BasicBlock *bb_copy = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
 			bb_end = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
 			zend_jit_unexpected_br(llvm_ctx,
 				llvm_ctx.builder.CreateICmpNE(
 					llvm_ctx.builder.CreateAnd(
 						type_info,
-						llvm_ctx.builder.getInt32((IS_TYPE_IMMUTABLE | IS_TYPE_REFCOUNTED) << Z_TYPE_FLAGS_SHIFT)),
+						llvm_ctx.builder.getInt32((IS_TYPE_REFCOUNTED | IS_TYPE_COPYABLE) << Z_TYPE_FLAGS_SHIFT)),
 					llvm_ctx.builder.getInt32(0)),
 				bb_copy,
 				bb_end);
@@ -3336,14 +3336,14 @@ static int zend_jit_zval_copy_ctor(zend_llvm_ctx &llvm_ctx,
 		if (info & (MAY_BE_STRING|MAY_BE_ARRAY)) {
 			BasicBlock *bb_no_copy = NULL;
 			if (info & (MAY_BE_ANY - (MAY_BE_STRING|MAY_BE_ARRAY))) {
-				//JIT: if (Z_OPT_IMMUTABLE_P(var_ptr) || Z_OPT_COPYABLE_P(var_ptr)) {
+				//JIT: if (Z_OPT_COPYABLE_P(var_ptr)) {
 				BasicBlock *bb_copy = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
 				bb_no_copy = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
 				zend_jit_unexpected_br(llvm_ctx,
 					llvm_ctx.builder.CreateICmpNE(
 						llvm_ctx.builder.CreateAnd(
 							type_info,
-							llvm_ctx.builder.getInt32((IS_TYPE_IMMUTABLE | IS_TYPE_COPYABLE) << Z_TYPE_FLAGS_SHIFT)),
+							llvm_ctx.builder.getInt32(IS_TYPE_COPYABLE << Z_TYPE_FLAGS_SHIFT)),
 					llvm_ctx.builder.getInt32(0)),
 					bb_copy,
 					bb_no_copy);
@@ -3391,7 +3391,7 @@ static int zend_jit_separate_zval_noref(zend_llvm_ctx &llvm_ctx,
 		BasicBlock *bb_end = NULL;
 
 		if (info & (MAY_BE_ANY - MAY_BE_ARRAY)) {
-			//JIT: if (Z_COPYABLE_P(_zv) || Z_IMMUTABLE_P(_zv))
+			//JIT: if (Z_COPYABLE_P(_zv))
 			BasicBlock *bb_copy = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
 			if (!bb_end) {
 				bb_end = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
@@ -3405,7 +3405,7 @@ static int zend_jit_separate_zval_noref(zend_llvm_ctx &llvm_ctx,
 				llvm_ctx.builder.CreateICmpNE(
 					llvm_ctx.builder.CreateAnd(
 						type_info,
-						llvm_ctx.builder.getInt32((IS_TYPE_IMMUTABLE | IS_TYPE_COPYABLE) << Z_TYPE_FLAGS_SHIFT)),
+						llvm_ctx.builder.getInt32(IS_TYPE_COPYABLE << Z_TYPE_FLAGS_SHIFT)),
 					llvm_ctx.builder.getInt32(0)),
 				bb_copy,
 				bb_end);
@@ -3436,17 +3436,17 @@ static int zend_jit_separate_zval_noref(zend_llvm_ctx &llvm_ctx,
 		BasicBlock *bb_copy3 = NULL;
 
 		if (info & MAY_BE_ARRAY) {
-			//JIT: if (!Z_IMMUTABLE_P(_zv))
+			//JIT: if (Z_REFCOUNTED_P(_zv))
 			BasicBlock *bb_rc = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
 			bb_copy3 = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
 			if (!type_info) {
 				type_info = zend_jit_load_type_info_c(llvm_ctx, zval_addr, op_type, op, ssa_var, info);
 			}
 			zend_jit_expected_br(llvm_ctx,
-				llvm_ctx.builder.CreateICmpEQ(
+				llvm_ctx.builder.CreateICmpNE(
 					llvm_ctx.builder.CreateAnd(
 						type_info,
-						llvm_ctx.builder.getInt32(IS_TYPE_IMMUTABLE << Z_TYPE_FLAGS_SHIFT)),
+						llvm_ctx.builder.getInt32(IS_TYPE_REFCOUNTED << Z_TYPE_FLAGS_SHIFT)),
 				llvm_ctx.builder.getInt32(0)),
 			bb_rc,
 			bb_copy3);
@@ -3512,14 +3512,14 @@ static int zend_jit_separate_array(zend_llvm_ctx  &llvm_ctx,
 			type_info = zend_jit_load_type_info_c(llvm_ctx, zval_addr, op_type, op, ssa_var, info);
 		}
 
-		//JIT: if (!Z_IMMUTABLE_P(_zv))
+		//JIT: if (Z_REFCOUNTED_P(_zv))
 		BasicBlock *bb_delref = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
 		BasicBlock *bb_copy = BasicBlock::Create(llvm_ctx.context, "", llvm_ctx.function);
 		zend_jit_expected_br(llvm_ctx,
-				llvm_ctx.builder.CreateICmpEQ(
+				llvm_ctx.builder.CreateICmpNE(
 					llvm_ctx.builder.CreateAnd(
 						type_info,
-						llvm_ctx.builder.getInt32(IS_TYPE_IMMUTABLE << Z_TYPE_FLAGS_SHIFT)),
+						llvm_ctx.builder.getInt32(IS_TYPE_REFCOUNTED << Z_TYPE_FLAGS_SHIFT)),
 					llvm_ctx.builder.getInt32(0)),
 				bb_delref,
 				bb_copy);
