@@ -60,7 +60,7 @@
 /* Common */
 #include <time.h>
 
-#if defined(NETWARE) || (defined(PHP_WIN32) && defined(_MSC_VER) && _MSC_VER >= 1900)
+#if (defined(PHP_WIN32) && defined(_MSC_VER) && _MSC_VER >= 1900)
 #define timezone _timezone	/* timezone is called _timezone in LibC */
 #endif
 
@@ -1208,7 +1208,7 @@ static void php_openssl_dispose_config(struct php_x509_request * req) /* {{{ */
 }
 /* }}} */
 
-#ifdef PHP_WIN32
+#if defined(PHP_WIN32) || (OPENSSL_VERSION_NUMBER >= 0x10100000L && !defined(LIBRESSL_VERSION_NUMBER))
 #define PHP_OPENSSL_RAND_ADD_TIME() ((void) 0)
 #else
 #define PHP_OPENSSL_RAND_ADD_TIME() php_openssl_rand_add_timeval()
@@ -3563,7 +3563,22 @@ PHP_FUNCTION(openssl_csr_get_public_key)
 		RETURN_FALSE;
 	}
 
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L && !defined(LIBRESSL_VERSION_NUMBER)
+	/* Due to changes in OpenSSL 1.1 related to locking when decoding CSR,
+	 * the pub key is not changed after assigning. It means if we pass
+	 * a private key, it will be returned including the private part.
+	 * If we duplicate it, then we get just the public part which is
+	 * the same behavior as for OpenSSL 1.0 */
+	csr = X509_REQ_dup(csr);
+#endif
+	/* Retrieve the public key from the CSR */
 	tpubkey = X509_REQ_get_pubkey(csr);
+
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L && !defined(LIBRESSL_VERSION_NUMBER)
+	/* We need to free the CSR as it was duplicated */
+	X509_REQ_free(csr);
+#endif
+
 	if (tpubkey == NULL) {
 		php_openssl_store_errors();
 		RETURN_FALSE;
@@ -4076,6 +4091,47 @@ zend_bool php_openssl_pkey_init_dsa(DSA *dsa, zval *data)
 }
 /* }}} */
 
+/* {{{ php_openssl_dh_pub_from_priv */
+static BIGNUM *php_openssl_dh_pub_from_priv(BIGNUM *priv_key, BIGNUM *g, BIGNUM *p)
+{
+	BIGNUM *pub_key, *priv_key_const_time;
+	BN_CTX *ctx;
+
+	pub_key = BN_new();
+	if (pub_key == NULL) {
+		php_openssl_store_errors();
+		return NULL;
+	}
+
+	priv_key_const_time = BN_new();
+	if (priv_key_const_time == NULL) {
+		BN_free(pub_key);
+		php_openssl_store_errors();
+		return NULL;
+	}
+	ctx = BN_CTX_new();
+	if (ctx == NULL) {
+		BN_free(pub_key);
+		BN_free(priv_key_const_time);
+		php_openssl_store_errors();
+		return NULL;
+	}
+
+	BN_with_flags(priv_key_const_time, priv_key, BN_FLG_CONSTTIME);
+
+	if (!BN_mod_exp_mont(pub_key, g, priv_key_const_time, p, ctx, NULL)) {
+		BN_free(pub_key);
+		php_openssl_store_errors();
+		pub_key = NULL;
+	}
+
+	BN_free(priv_key_const_time);
+	BN_CTX_free(ctx);
+
+	return pub_key;
+}
+/* }}} */
+
 /* {{{ php_openssl_pkey_init_dh */
 zend_bool php_openssl_pkey_init_dh(DH *dh, zval *data)
 {
@@ -4091,6 +4147,13 @@ zend_bool php_openssl_pkey_init_dh(DH *dh, zval *data)
 	OPENSSL_PKEY_SET_BN(data, priv_key);
 	OPENSSL_PKEY_SET_BN(data, pub_key);
 	if (pub_key) {
+		return DH_set0_key(dh, pub_key, priv_key);
+	}
+	if (priv_key) {
+		pub_key = php_openssl_dh_pub_from_priv(priv_key, g, p);
+		if (pub_key == NULL) {
+			return 0;
+		}
 		return DH_set0_key(dh, pub_key, priv_key);
 	}
 

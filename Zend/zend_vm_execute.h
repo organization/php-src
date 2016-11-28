@@ -995,7 +995,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_DO_FCALL_SPEC_RETVAL_UNUSED_HA
 
 		call->prev_execute_data = execute_data;
 
-		if (UNEXPECTED(!zend_do_fcall_overloaded(fbc, call, ret))) {
+		if (UNEXPECTED(!zend_do_fcall_overloaded(call, ret))) {
 			HANDLE_EXCEPTION();
 		}
 
@@ -1122,7 +1122,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_DO_FCALL_SPEC_RETVAL_USED_HAND
 
 		call->prev_execute_data = execute_data;
 
-		if (UNEXPECTED(!zend_do_fcall_overloaded(fbc, call, ret))) {
+		if (UNEXPECTED(!zend_do_fcall_overloaded(call, ret))) {
 			HANDLE_EXCEPTION();
 		}
 
@@ -1976,9 +1976,6 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_CALL_TRAMPOLINE_SPEC_HANDLER(Z
 	fbc = call->func;
 
 	if (EXPECTED(fbc->type == ZEND_USER_FUNCTION)) {
-
-		ZEND_ASSERT(!(fbc->common.fn_flags & ZEND_ACC_GENERATOR));
-
 		if (UNEXPECTED(!fbc->op_array.run_time_cache)) {
 			init_func_run_time_cache(&fbc->op_array);
 		}
@@ -2706,9 +2703,6 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_JMPZ_SPEC_CONST_HANDLER(ZEND_O
 		opline = OP_JMP_ADDR(opline, opline->op2);
 	}
 
-	if (UNEXPECTED(EG(exception) != NULL)) {
-		HANDLE_EXCEPTION();
-	}
 	ZEND_VM_JMP(opline);
 }
 
@@ -2740,9 +2734,6 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_JMPNZ_SPEC_CONST_HANDLER(ZEND_
 		opline++;
 	}
 
-	if (UNEXPECTED(EG(exception) != NULL)) {
-		HANDLE_EXCEPTION();
-	}
 	ZEND_VM_JMP(opline);
 }
 
@@ -2777,9 +2768,6 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_JMPZNZ_SPEC_CONST_HANDLER(ZEND
 		opline = OP_JMP_ADDR(opline, opline->op2);
 	}
 
-	if (UNEXPECTED(EG(exception) != NULL)) {
-		HANDLE_EXCEPTION();
-	}
 	ZEND_VM_JMP(opline);
 }
 
@@ -2820,9 +2808,6 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_JMPZ_EX_SPEC_CONST_HANDLER(ZEN
 		ZVAL_FALSE(EX_VAR(opline->result.var));
 		opline = OP_JMP_ADDR(opline, opline->op2);
 	}
-	if (UNEXPECTED(EG(exception) != NULL)) {
-		HANDLE_EXCEPTION();
-	}
 	ZEND_VM_JMP(opline);
 }
 
@@ -2859,9 +2844,6 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_JMPNZ_EX_SPEC_CONST_HANDLER(ZE
 	} else {
 		ZVAL_FALSE(EX_VAR(opline->result.var));
 		opline++;
-	}
-	if (UNEXPECTED(EG(exception) != NULL)) {
-		HANDLE_EXCEPTION();
 	}
 	ZEND_VM_JMP(opline);
 }
@@ -3540,11 +3522,11 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FE_RESET_R_SPEC_CONST_HANDLER(
 					Z_FE_ITER_P(EX_VAR(opline->result.var)) = (uint32_t)-1;
 					ZEND_VM_JMP(OP_JMP_ADDR(opline, opline->op2));
 				}
-				if ((EXPECTED(Z_TYPE(p->val) != IS_UNDEF) &&
-				     (EXPECTED(Z_TYPE(p->val) != IS_INDIRECT) ||
-				      EXPECTED(Z_TYPE_P(Z_INDIRECT(p->val)) != IS_UNDEF))) &&
-				    (UNEXPECTED(!p->key) ||
-				     EXPECTED(zend_check_property_access(Z_OBJ_P(array_ptr), p->key) == SUCCESS))) {
+				if (EXPECTED(Z_TYPE(p->val) != IS_UNDEF) &&
+				    (EXPECTED(Z_TYPE(p->val) != IS_INDIRECT) ||
+				     (EXPECTED(Z_TYPE_P(Z_INDIRECT(p->val)) != IS_UNDEF) &&
+				      EXPECTED(zend_check_property_access(Z_OBJ_P(array_ptr), p->key) == SUCCESS)))
+				) {
 					break;
 				}
 				pos++;
@@ -3692,11 +3674,11 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FE_RESET_RW_SPEC_CONST_HANDLER
 					Z_FE_ITER_P(EX_VAR(opline->result.var)) = (uint32_t)-1;
 					ZEND_VM_JMP(OP_JMP_ADDR(opline, opline->op2));
 				}
-				if ((EXPECTED(Z_TYPE(p->val) != IS_UNDEF) &&
-				     (EXPECTED(Z_TYPE(p->val) != IS_INDIRECT) ||
-				      EXPECTED(Z_TYPE_P(Z_INDIRECT(p->val)) != IS_UNDEF))) &&
-				    (UNEXPECTED(!p->key) ||
-				     EXPECTED(zend_check_property_access(Z_OBJ_P(array_ptr), p->key) == SUCCESS))) {
+				if (EXPECTED(Z_TYPE(p->val) != IS_UNDEF) &&
+				    (EXPECTED(Z_TYPE(p->val) != IS_INDIRECT) ||
+				     (EXPECTED(Z_TYPE_P(Z_INDIRECT(p->val)) != IS_UNDEF) &&
+				      EXPECTED(zend_check_property_access(Z_OBJ_P(array_ptr), p->key) == SUCCESS)))
+				) {
 					break;
 				}
 				pos++;
@@ -4910,7 +4892,8 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL zend_fetch_static_prop_helper_SPEC_
 		}
 	}
 	retval = zend_std_get_static_property(ce, name, 0);
-	if (UNEXPECTED(EG(exception))) {
+	if (UNEXPECTED(retval == NULL)) {
+		ZEND_ASSERT(EG(exception));
 		if (IS_CONST != IS_CONST) {
 			zend_string_release(name);
 		}
@@ -4926,7 +4909,6 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL zend_fetch_static_prop_helper_SPEC_
 	}
 
 fetch_static_prop_return:
-	ZEND_ASSERT(retval != NULL);
 	if (type == BP_VAR_R || type == BP_VAR_IS) {
 		ZVAL_COPY_UNREF(EX_VAR(opline->result.var), retval);
 	} else {
@@ -6763,7 +6745,8 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL zend_fetch_static_prop_helper_SPEC_
 		}
 	}
 	retval = zend_std_get_static_property(ce, name, 0);
-	if (UNEXPECTED(EG(exception))) {
+	if (UNEXPECTED(retval == NULL)) {
+		ZEND_ASSERT(EG(exception));
 		if (IS_CONST != IS_CONST) {
 			zend_string_release(name);
 		}
@@ -6779,7 +6762,6 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL zend_fetch_static_prop_helper_SPEC_
 	}
 
 fetch_static_prop_return:
-	ZEND_ASSERT(retval != NULL);
 	if (type == BP_VAR_R || type == BP_VAR_IS) {
 		ZVAL_COPY_UNREF(EX_VAR(opline->result.var), retval);
 	} else {
@@ -7335,7 +7317,8 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL zend_fetch_static_prop_helper_SPEC_
 		}
 	}
 	retval = zend_std_get_static_property(ce, name, 0);
-	if (UNEXPECTED(EG(exception))) {
+	if (UNEXPECTED(retval == NULL)) {
+		ZEND_ASSERT(EG(exception));
 		if (IS_CONST != IS_CONST) {
 			zend_string_release(name);
 		}
@@ -7351,7 +7334,6 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL zend_fetch_static_prop_helper_SPEC_
 	}
 
 fetch_static_prop_return:
-	ZEND_ASSERT(retval != NULL);
 	if (type == BP_VAR_R || type == BP_VAR_IS) {
 		ZVAL_COPY_UNREF(EX_VAR(opline->result.var), retval);
 	} else {
@@ -12848,11 +12830,11 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FE_RESET_R_SPEC_TMP_HANDLER(ZE
 					Z_FE_ITER_P(EX_VAR(opline->result.var)) = (uint32_t)-1;
 					ZEND_VM_JMP(OP_JMP_ADDR(opline, opline->op2));
 				}
-				if ((EXPECTED(Z_TYPE(p->val) != IS_UNDEF) &&
-				     (EXPECTED(Z_TYPE(p->val) != IS_INDIRECT) ||
-				      EXPECTED(Z_TYPE_P(Z_INDIRECT(p->val)) != IS_UNDEF))) &&
-				    (UNEXPECTED(!p->key) ||
-				     EXPECTED(zend_check_property_access(Z_OBJ_P(array_ptr), p->key) == SUCCESS))) {
+				if (EXPECTED(Z_TYPE(p->val) != IS_UNDEF) &&
+				    (EXPECTED(Z_TYPE(p->val) != IS_INDIRECT) ||
+				     (EXPECTED(Z_TYPE_P(Z_INDIRECT(p->val)) != IS_UNDEF) &&
+				      EXPECTED(zend_check_property_access(Z_OBJ_P(array_ptr), p->key) == SUCCESS)))
+				) {
 					break;
 				}
 				pos++;
@@ -13001,11 +12983,11 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FE_RESET_RW_SPEC_TMP_HANDLER(Z
 					Z_FE_ITER_P(EX_VAR(opline->result.var)) = (uint32_t)-1;
 					ZEND_VM_JMP(OP_JMP_ADDR(opline, opline->op2));
 				}
-				if ((EXPECTED(Z_TYPE(p->val) != IS_UNDEF) &&
-				     (EXPECTED(Z_TYPE(p->val) != IS_INDIRECT) ||
-				      EXPECTED(Z_TYPE_P(Z_INDIRECT(p->val)) != IS_UNDEF))) &&
-				    (UNEXPECTED(!p->key) ||
-				     EXPECTED(zend_check_property_access(Z_OBJ_P(array_ptr), p->key) == SUCCESS))) {
+				if (EXPECTED(Z_TYPE(p->val) != IS_UNDEF) &&
+				    (EXPECTED(Z_TYPE(p->val) != IS_INDIRECT) ||
+				     (EXPECTED(Z_TYPE_P(Z_INDIRECT(p->val)) != IS_UNDEF) &&
+				      EXPECTED(zend_check_property_access(Z_OBJ_P(array_ptr), p->key) == SUCCESS)))
+				) {
 					break;
 				}
 				pos++;
@@ -16409,11 +16391,11 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FE_RESET_R_SPEC_VAR_HANDLER(ZE
 					Z_FE_ITER_P(EX_VAR(opline->result.var)) = (uint32_t)-1;
 					ZEND_VM_JMP(OP_JMP_ADDR(opline, opline->op2));
 				}
-				if ((EXPECTED(Z_TYPE(p->val) != IS_UNDEF) &&
-				     (EXPECTED(Z_TYPE(p->val) != IS_INDIRECT) ||
-				      EXPECTED(Z_TYPE_P(Z_INDIRECT(p->val)) != IS_UNDEF))) &&
-				    (UNEXPECTED(!p->key) ||
-				     EXPECTED(zend_check_property_access(Z_OBJ_P(array_ptr), p->key) == SUCCESS))) {
+				if (EXPECTED(Z_TYPE(p->val) != IS_UNDEF) &&
+				    (EXPECTED(Z_TYPE(p->val) != IS_INDIRECT) ||
+				     (EXPECTED(Z_TYPE_P(Z_INDIRECT(p->val)) != IS_UNDEF) &&
+				      EXPECTED(zend_check_property_access(Z_OBJ_P(array_ptr), p->key) == SUCCESS)))
+				) {
 					break;
 				}
 				pos++;
@@ -16564,11 +16546,11 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FE_RESET_RW_SPEC_VAR_HANDLER(Z
 					Z_FE_ITER_P(EX_VAR(opline->result.var)) = (uint32_t)-1;
 					ZEND_VM_JMP(OP_JMP_ADDR(opline, opline->op2));
 				}
-				if ((EXPECTED(Z_TYPE(p->val) != IS_UNDEF) &&
-				     (EXPECTED(Z_TYPE(p->val) != IS_INDIRECT) ||
-				      EXPECTED(Z_TYPE_P(Z_INDIRECT(p->val)) != IS_UNDEF))) &&
-				    (UNEXPECTED(!p->key) ||
-				     EXPECTED(zend_check_property_access(Z_OBJ_P(array_ptr), p->key) == SUCCESS))) {
+				if (EXPECTED(Z_TYPE(p->val) != IS_UNDEF) &&
+				    (EXPECTED(Z_TYPE(p->val) != IS_INDIRECT) ||
+				     (EXPECTED(Z_TYPE_P(Z_INDIRECT(p->val)) != IS_UNDEF) &&
+				      EXPECTED(zend_check_property_access(Z_OBJ_P(array_ptr), p->key) == SUCCESS)))
+				) {
 					break;
 				}
 				pos++;
@@ -16725,13 +16707,13 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FE_FETCH_R_SPEC_VAR_HANDLER(ZE
 						p++;
 						continue;
 					}
+					if (UNEXPECTED(zend_check_property_access(Z_OBJ_P(array), p->key) == FAILURE)) {
+						pos++;
+						p++;
+						continue;
+					}
 				}
-				if (UNEXPECTED(!p->key) ||
-				    EXPECTED(zend_check_property_access(Z_OBJ_P(array), p->key) == SUCCESS)) {
-					break;
-				}
-				pos++;
-				p++;
+				break;
 			}
 			if (opline->result_type & (IS_TMP_VAR|IS_CV)) {
 				if (UNEXPECTED(!p->key)) {
@@ -16753,11 +16735,11 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FE_FETCH_R_SPEC_VAR_HANDLER(ZE
 					break;
 				}
 				p++;
-				if ((EXPECTED(Z_TYPE(p->val) != IS_UNDEF) &&
-				     (EXPECTED(Z_TYPE(p->val) != IS_INDIRECT) ||
-				      EXPECTED(Z_TYPE_P(Z_INDIRECT(p->val)) != IS_UNDEF))) &&
-				    (UNEXPECTED(!p->key) ||
-				     EXPECTED(zend_check_property_access(Z_OBJ_P(array), p->key) == SUCCESS))) {
+				if (EXPECTED(Z_TYPE(p->val) != IS_UNDEF) &&
+				    (EXPECTED(Z_TYPE(p->val) != IS_INDIRECT) ||
+				     (EXPECTED(Z_TYPE_P(Z_INDIRECT(p->val)) != IS_UNDEF) &&
+				      EXPECTED(zend_check_property_access(Z_OBJ_P(array), p->key) == SUCCESS)))
+				) {
 					break;
 				}
 			}
@@ -34637,9 +34619,6 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_JMPZ_SPEC_CV_HANDLER(ZEND_OPCO
 		opline = OP_JMP_ADDR(opline, opline->op2);
 	}
 
-	if (UNEXPECTED(EG(exception) != NULL)) {
-		HANDLE_EXCEPTION();
-	}
 	ZEND_VM_JMP(opline);
 }
 
@@ -34671,9 +34650,6 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_JMPNZ_SPEC_CV_HANDLER(ZEND_OPC
 		opline++;
 	}
 
-	if (UNEXPECTED(EG(exception) != NULL)) {
-		HANDLE_EXCEPTION();
-	}
 	ZEND_VM_JMP(opline);
 }
 
@@ -34708,9 +34684,6 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_JMPZNZ_SPEC_CV_HANDLER(ZEND_OP
 		opline = OP_JMP_ADDR(opline, opline->op2);
 	}
 
-	if (UNEXPECTED(EG(exception) != NULL)) {
-		HANDLE_EXCEPTION();
-	}
 	ZEND_VM_JMP(opline);
 }
 
@@ -34751,9 +34724,6 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_JMPZ_EX_SPEC_CV_HANDLER(ZEND_O
 		ZVAL_FALSE(EX_VAR(opline->result.var));
 		opline = OP_JMP_ADDR(opline, opline->op2);
 	}
-	if (UNEXPECTED(EG(exception) != NULL)) {
-		HANDLE_EXCEPTION();
-	}
 	ZEND_VM_JMP(opline);
 }
 
@@ -34790,9 +34760,6 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_JMPNZ_EX_SPEC_CV_HANDLER(ZEND_
 	} else {
 		ZVAL_FALSE(EX_VAR(opline->result.var));
 		opline++;
-	}
-	if (UNEXPECTED(EG(exception) != NULL)) {
-		HANDLE_EXCEPTION();
 	}
 	ZEND_VM_JMP(opline);
 }
@@ -35487,11 +35454,11 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FE_RESET_R_SPEC_CV_HANDLER(ZEN
 					Z_FE_ITER_P(EX_VAR(opline->result.var)) = (uint32_t)-1;
 					ZEND_VM_JMP(OP_JMP_ADDR(opline, opline->op2));
 				}
-				if ((EXPECTED(Z_TYPE(p->val) != IS_UNDEF) &&
-				     (EXPECTED(Z_TYPE(p->val) != IS_INDIRECT) ||
-				      EXPECTED(Z_TYPE_P(Z_INDIRECT(p->val)) != IS_UNDEF))) &&
-				    (UNEXPECTED(!p->key) ||
-				     EXPECTED(zend_check_property_access(Z_OBJ_P(array_ptr), p->key) == SUCCESS))) {
+				if (EXPECTED(Z_TYPE(p->val) != IS_UNDEF) &&
+				    (EXPECTED(Z_TYPE(p->val) != IS_INDIRECT) ||
+				     (EXPECTED(Z_TYPE_P(Z_INDIRECT(p->val)) != IS_UNDEF) &&
+				      EXPECTED(zend_check_property_access(Z_OBJ_P(array_ptr), p->key) == SUCCESS)))
+				) {
 					break;
 				}
 				pos++;
@@ -35639,11 +35606,11 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FE_RESET_RW_SPEC_CV_HANDLER(ZE
 					Z_FE_ITER_P(EX_VAR(opline->result.var)) = (uint32_t)-1;
 					ZEND_VM_JMP(OP_JMP_ADDR(opline, opline->op2));
 				}
-				if ((EXPECTED(Z_TYPE(p->val) != IS_UNDEF) &&
-				     (EXPECTED(Z_TYPE(p->val) != IS_INDIRECT) ||
-				      EXPECTED(Z_TYPE_P(Z_INDIRECT(p->val)) != IS_UNDEF))) &&
-				    (UNEXPECTED(!p->key) ||
-				     EXPECTED(zend_check_property_access(Z_OBJ_P(array_ptr), p->key) == SUCCESS))) {
+				if (EXPECTED(Z_TYPE(p->val) != IS_UNDEF) &&
+				    (EXPECTED(Z_TYPE(p->val) != IS_INDIRECT) ||
+				     (EXPECTED(Z_TYPE_P(Z_INDIRECT(p->val)) != IS_UNDEF) &&
+				      EXPECTED(zend_check_property_access(Z_OBJ_P(array_ptr), p->key) == SUCCESS)))
+				) {
 					break;
 				}
 				pos++;
@@ -37909,7 +37876,8 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL zend_fetch_static_prop_helper_SPEC_
 		}
 	}
 	retval = zend_std_get_static_property(ce, name, 0);
-	if (UNEXPECTED(EG(exception))) {
+	if (UNEXPECTED(retval == NULL)) {
+		ZEND_ASSERT(EG(exception));
 		if (IS_CV != IS_CONST) {
 			zend_string_release(name);
 		}
@@ -37925,7 +37893,6 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL zend_fetch_static_prop_helper_SPEC_
 	}
 
 fetch_static_prop_return:
-	ZEND_ASSERT(retval != NULL);
 	if (type == BP_VAR_R || type == BP_VAR_IS) {
 		ZVAL_COPY_UNREF(EX_VAR(opline->result.var), retval);
 	} else {
@@ -40969,7 +40936,8 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL zend_fetch_static_prop_helper_SPEC_
 		}
 	}
 	retval = zend_std_get_static_property(ce, name, 0);
-	if (UNEXPECTED(EG(exception))) {
+	if (UNEXPECTED(retval == NULL)) {
+		ZEND_ASSERT(EG(exception));
 		if (IS_CV != IS_CONST) {
 			zend_string_release(name);
 		}
@@ -40985,7 +40953,6 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL zend_fetch_static_prop_helper_SPEC_
 	}
 
 fetch_static_prop_return:
-	ZEND_ASSERT(retval != NULL);
 	if (type == BP_VAR_R || type == BP_VAR_IS) {
 		ZVAL_COPY_UNREF(EX_VAR(opline->result.var), retval);
 	} else {
@@ -42017,7 +41984,8 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL zend_fetch_static_prop_helper_SPEC_
 		}
 	}
 	retval = zend_std_get_static_property(ce, name, 0);
-	if (UNEXPECTED(EG(exception))) {
+	if (UNEXPECTED(retval == NULL)) {
+		ZEND_ASSERT(EG(exception));
 		if (IS_CV != IS_CONST) {
 			zend_string_release(name);
 		}
@@ -42033,7 +42001,6 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL zend_fetch_static_prop_helper_SPEC_
 	}
 
 fetch_static_prop_return:
-	ZEND_ASSERT(retval != NULL);
 	if (type == BP_VAR_R || type == BP_VAR_IS) {
 		ZVAL_COPY_UNREF(EX_VAR(opline->result.var), retval);
 	} else {
@@ -51199,9 +51166,6 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_JMPZ_SPEC_TMPVAR_HANDLER(ZEND_
 		opline = OP_JMP_ADDR(opline, opline->op2);
 	}
 	zval_ptr_dtor_nogc(free_op1);
-	if (UNEXPECTED(EG(exception) != NULL)) {
-		HANDLE_EXCEPTION();
-	}
 	ZEND_VM_JMP(opline);
 }
 
@@ -51233,9 +51197,6 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_JMPNZ_SPEC_TMPVAR_HANDLER(ZEND
 		opline++;
 	}
 	zval_ptr_dtor_nogc(free_op1);
-	if (UNEXPECTED(EG(exception) != NULL)) {
-		HANDLE_EXCEPTION();
-	}
 	ZEND_VM_JMP(opline);
 }
 
@@ -51270,9 +51231,6 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_JMPZNZ_SPEC_TMPVAR_HANDLER(ZEN
 		opline = OP_JMP_ADDR(opline, opline->op2);
 	}
 	zval_ptr_dtor_nogc(free_op1);
-	if (UNEXPECTED(EG(exception) != NULL)) {
-		HANDLE_EXCEPTION();
-	}
 	ZEND_VM_JMP(opline);
 }
 
@@ -51313,9 +51271,6 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_JMPZ_EX_SPEC_TMPVAR_HANDLER(ZE
 		ZVAL_FALSE(EX_VAR(opline->result.var));
 		opline = OP_JMP_ADDR(opline, opline->op2);
 	}
-	if (UNEXPECTED(EG(exception) != NULL)) {
-		HANDLE_EXCEPTION();
-	}
 	ZEND_VM_JMP(opline);
 }
 
@@ -51352,9 +51307,6 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_JMPNZ_EX_SPEC_TMPVAR_HANDLER(Z
 	} else {
 		ZVAL_FALSE(EX_VAR(opline->result.var));
 		opline++;
-	}
-	if (UNEXPECTED(EG(exception) != NULL)) {
-		HANDLE_EXCEPTION();
 	}
 	ZEND_VM_JMP(opline);
 }
@@ -52381,7 +52333,8 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL zend_fetch_static_prop_helper_SPEC_
 		}
 	}
 	retval = zend_std_get_static_property(ce, name, 0);
-	if (UNEXPECTED(EG(exception))) {
+	if (UNEXPECTED(retval == NULL)) {
+		ZEND_ASSERT(EG(exception));
 		if ((IS_TMP_VAR|IS_VAR) != IS_CONST) {
 			zend_string_release(name);
 		}
@@ -52399,7 +52352,6 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL zend_fetch_static_prop_helper_SPEC_
 	}
 
 fetch_static_prop_return:
-	ZEND_ASSERT(retval != NULL);
 	if (type == BP_VAR_R || type == BP_VAR_IS) {
 		ZVAL_COPY_UNREF(EX_VAR(opline->result.var), retval);
 	} else {
@@ -53330,7 +53282,8 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL zend_fetch_static_prop_helper_SPEC_
 		}
 	}
 	retval = zend_std_get_static_property(ce, name, 0);
-	if (UNEXPECTED(EG(exception))) {
+	if (UNEXPECTED(retval == NULL)) {
+		ZEND_ASSERT(EG(exception));
 		if ((IS_TMP_VAR|IS_VAR) != IS_CONST) {
 			zend_string_release(name);
 		}
@@ -53348,7 +53301,6 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL zend_fetch_static_prop_helper_SPEC_
 	}
 
 fetch_static_prop_return:
-	ZEND_ASSERT(retval != NULL);
 	if (type == BP_VAR_R || type == BP_VAR_IS) {
 		ZVAL_COPY_UNREF(EX_VAR(opline->result.var), retval);
 	} else {
@@ -53818,7 +53770,8 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL zend_fetch_static_prop_helper_SPEC_
 		}
 	}
 	retval = zend_std_get_static_property(ce, name, 0);
-	if (UNEXPECTED(EG(exception))) {
+	if (UNEXPECTED(retval == NULL)) {
+		ZEND_ASSERT(EG(exception));
 		if ((IS_TMP_VAR|IS_VAR) != IS_CONST) {
 			zend_string_release(name);
 		}
@@ -53836,7 +53789,6 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL zend_fetch_static_prop_helper_SPEC_
 	}
 
 fetch_static_prop_return:
-	ZEND_ASSERT(retval != NULL);
 	if (type == BP_VAR_R || type == BP_VAR_IS) {
 		ZVAL_COPY_UNREF(EX_VAR(opline->result.var), retval);
 	} else {
