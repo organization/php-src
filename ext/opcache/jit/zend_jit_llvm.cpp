@@ -15605,7 +15605,7 @@ static int zend_jit_check_type_hints(zend_llvm_ctx    &llvm_ctx,
 				} else {
 					break;
 				}
-				if (cur_arg_info->class_name || cur_arg_info->type_hint) {
+				if (ZEND_TYPE_IS_SET(cur_arg_info->type)) {
 					ret = 2;
 					zend_jit_check_internal_type_hint(
 						llvm_ctx,
@@ -16704,7 +16704,7 @@ static int zend_jit_recv(zend_llvm_ctx    &llvm_ctx,
 			} else {
 				break;
 			}
-			if (cur_arg_info->class_name || cur_arg_info->type_hint) {
+			if (ZEND_TYPE_IS_SET(cur_arg_info->type)) {
 				//JIT: SAVE_OPLINE();
 				if (!llvm_ctx.valid_opline) {
 					JIT_CHECK(zend_jit_store_opline(llvm_ctx, opline, false));

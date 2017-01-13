@@ -785,9 +785,9 @@ static void zend_jit_check_no_symtab(zend_op_array *op_array)
 				case ZEND_RECV_INIT:
 					if (op_array->arg_info && (int)opline->op1.num-1 < op_array->num_args) {
 					    /* TODO: type check */
-						if (op_array->arg_info[opline->op1.num-1].class_name) {
+						if (ZEND_TYPE_IS_CLASS(op_array->arg_info[opline->op1.num-1].type)) {
 							return;
-						} else if (op_array->arg_info[opline->op1.num-1].type_hint) {
+						} else if (ZEND_TYPE_IS_CODE(op_array->arg_info[opline->op1.num-1].type)) {
 							return;
 						}
 					}
