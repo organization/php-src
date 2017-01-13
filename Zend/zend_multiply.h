@@ -2,7 +2,7 @@
    +----------------------------------------------------------------------+
    | Zend Engine                                                          |
    +----------------------------------------------------------------------+
-   | Copyright (c) 1998-2016 Zend Technologies Ltd. (http://www.zend.com) |
+   | Copyright (c) 1998-2017 Zend Technologies Ltd. (http://www.zend.com) |
    +----------------------------------------------------------------------+
    | This source file is subject to version 2.00 of the Zend license,     |
    | that is bundled with this package in the file LICENSE, and is        |
@@ -75,15 +75,29 @@
 	__asm__("mul %0, %2, %3\n"										\
 		"smulh %1, %2, %3\n"										\
 		"sub %1, %1, %0, asr #63\n"									\
-			: "=X"(__tmpvar), "=X"(usedval)							\
-			: "X"(a), "X"(b));										\
+			: "=&r"(__tmpvar), "=&r"(usedval)						\
+			: "r"(a), "r"(b));										\
 	if (usedval) (dval) = (double) (a) * (double) (b);				\
 	else (lval) = __tmpvar;											\
 } while (0)
 
 #elif defined(ZEND_WIN32)
 
-#define ZEND_SIGNED_MULTIPLY_LONG(a, b, lval, dval, usedval) do {	\
+# ifdef _M_X64
+#  pragma intrinsic(_mul128)
+#  define ZEND_SIGNED_MULTIPLY_LONG(a, b, lval, dval, usedval) do {       \
+	__int64 __high; \
+	__int64 __low = _mul128((a), (b), &__high); \
+	if ((__low >> 63I64) == __high) { \
+		(usedval) = 0; \
+		(lval) = __low; \
+	} else { \
+		(usedval) = 1; \
+		(dval) = (double)(a) * (double)(b); \
+	} \
+} while (0)
+# else
+#  define ZEND_SIGNED_MULTIPLY_LONG(a, b, lval, dval, usedval) do {	\
 	zend_long   __lres  = (a) * (b);										\
 	long double __dres  = (long double)(a) * (long double)(b);		\
 	long double __delta = (long double) __lres - __dres;			\
@@ -93,6 +107,7 @@
 		(lval) = __lres;											\
 	}																\
 } while (0)
+# endif
 
 #elif defined(__powerpc64__) && defined(__GNUC__)
 
