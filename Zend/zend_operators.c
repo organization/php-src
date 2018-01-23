@@ -165,10 +165,12 @@ try_again:
 			goto try_again;
 		case IS_STRING:
 			{
-				zend_string *str;
+				zend_string *str = Z_STR_P(op);
+				zend_uchar type = is_numeric_string(ZSTR_VAL(str), ZSTR_LEN(str), &Z_LVAL_P(op), &Z_DVAL_P(op), silent ? 1 : -1);
 
-				str = Z_STR_P(op);
-				if ((Z_TYPE_INFO_P(op)=is_numeric_string(ZSTR_VAL(str), ZSTR_LEN(str), &Z_LVAL_P(op), &Z_DVAL_P(op), silent ? 1 : -1)) == 0) {
+				if (EXPECTED(type != 0)) {
+					Z_SET_TYPE_INFO_P(op, type);
+				} else {
 					ZVAL_LONG(op, 0);
 					if (!silent) {
 						zend_error(E_WARNING, "A non-numeric value encountered");
@@ -223,13 +225,18 @@ ZEND_API void ZEND_FASTCALL convert_scalar_to_number(zval *op) /* {{{ */
 		} else {													\
 			switch (Z_TYPE_P(op)) {									\
 				case IS_STRING:										\
-					if ((Z_TYPE_INFO(holder)=is_numeric_string(Z_STRVAL_P(op), Z_STRLEN_P(op), &Z_LVAL(holder), &Z_DVAL(holder), silent ? 1 : -1)) == 0) {	\
+					{												\
+					zend_uchar type = is_numeric_string(Z_STRVAL_P(op), Z_STRLEN_P(op), &Z_LVAL(holder), &Z_DVAL(holder), silent ? 1 : -1);\
+					if (EXPECTED(type != 0)) {                      \
+						Z_SET_TYPE_INFO(holder, type);            \
+					} else {										\
 						ZVAL_LONG(&(holder), 0);					\
 						if (!silent) {								\
 							zend_error(E_WARNING, "A non-numeric value encountered");	\
 						}											\
 					}												\
 					(op) = &(holder);								\
+					}												\
 					break;											\
 				case IS_NULL:										\
 				case IS_FALSE:										\
@@ -1034,7 +1041,7 @@ ZEND_API int ZEND_FASTCALL mul_function(zval *result, zval *op1, zval *op2) /* {
 			zend_long overflow;
 
 			ZEND_SIGNED_MULTIPLY_LONG(Z_LVAL_P(op1),Z_LVAL_P(op2), Z_LVAL_P(result),Z_DVAL_P(result),overflow);
-			Z_TYPE_INFO_P(result) = overflow ? IS_DOUBLE : IS_LONG;
+			Z_SET_TYPE_INFO_P(result, overflow ? IS_DOUBLE : IS_LONG);
 			return SUCCESS;
 
 		} else if (EXPECTED(type_pair == TYPE_PAIR(IS_DOUBLE, IS_DOUBLE))) {
@@ -2313,7 +2320,7 @@ static void ZEND_FASTCALL increment_string(zval *str) /* {{{ */
 
 	if (!Z_REFCOUNTED_P(str)) {
 		Z_STR_P(str) = zend_string_init(Z_STRVAL_P(str), Z_STRLEN_P(str), 0);
-		Z_TYPE_INFO_P(str) = IS_STRING_EX;
+		Z_SET_TYPE_INFO_P(str, IS_STRING_EX);
 	} else if (Z_REFCOUNT_P(str) > 1) {
 		Z_DELREF_P(str);
 		Z_STR_P(str) = zend_string_init(Z_STRVAL_P(str), Z_STRLEN_P(str), 0);

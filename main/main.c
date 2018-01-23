@@ -1833,7 +1833,12 @@ static size_t php_output_wrapper(const char *str, size_t str_length)
  */
 static void core_globals_ctor(php_core_globals *core_globals)
 {
+	int i;
+
 	memset(core_globals, 0, sizeof(*core_globals));
+	for (i = 0; i < sizeof(core_globals->http_globals)/sizeof(core_globals->http_globals[0]); i++) {
+		ZVAL_UNDEF(&core_globals->http_globals[i]);
+	}
 	php_startup_ticks();
 }
 /* }}} */
@@ -1948,6 +1953,9 @@ int php_module_startup(sapi_module_struct *sf, zend_module_entry *additional_mod
 	int retval = SUCCESS, module_number=0;	/* for REGISTER_INI_ENTRIES() */
 	char *php_os;
 	zend_module_entry *module;
+#ifndef ZTS
+	int i;
+#endif
 
 #ifdef PHP_WIN32
 	WORD wVersionRequested = MAKEWORD(2, 0);
@@ -1998,6 +2006,9 @@ int php_module_startup(sapi_module_struct *sf, zend_module_entry *additional_mod
 #endif
 #else
 	memset(&core_globals, 0, sizeof(core_globals));
+	for (i = 0; i < sizeof(PG(http_globals))/sizeof(PG(http_globals)[0]); i++) {
+		ZVAL_UNDEF(&PG(http_globals)[i]);
+	}
 	php_startup_ticks();
 #endif
 	gc_globals_ctor();

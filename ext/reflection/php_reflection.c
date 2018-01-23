@@ -272,6 +272,8 @@ static zend_object *reflection_objects_new(zend_class_entry *class_type) /* {{{ 
 {
 	reflection_object *intern = zend_object_alloc(sizeof(reflection_object), class_type);
 
+	ZVAL_UNDEF(&intern->dummy);
+	ZVAL_UNDEF(&intern->obj);
 	zend_object_std_init(&intern->zo, class_type);
 	object_properties_init(&intern->zo, class_type);
 	intern->zo.handlers = &reflection_object_handlers;

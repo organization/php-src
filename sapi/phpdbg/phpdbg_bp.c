@@ -836,7 +836,7 @@ static inline void phpdbg_create_conditional_break(phpdbg_breakcond_t *brake, co
 	memcpy(Z_STRVAL(pv) + sizeof("return ") - 1, expr, expr_len);
 	Z_STRVAL(pv)[Z_STRLEN(pv) - 1] = ';';
 	Z_STRVAL(pv)[Z_STRLEN(pv)] = '\0';
-	Z_TYPE_INFO(pv) = IS_STRING;
+	Z_SET_TYPE_INFO(pv, IS_STRING);
 
 	new_break.ops = zend_compile_string(&pv, "Conditional Breakpoint Code");
 

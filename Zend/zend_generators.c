@@ -368,6 +368,8 @@ static zend_object *zend_generator_create(zend_class_entry *class_type) /* {{{ *
 	/* The key will be incremented on first use, so it'll start at 0 */
 	generator->largest_used_integer_key = -1;
 
+	ZVAL_UNDEF(&generator->value);
+	ZVAL_UNDEF(&generator->key);
 	ZVAL_UNDEF(&generator->retval);
 	ZVAL_UNDEF(&generator->values);
 

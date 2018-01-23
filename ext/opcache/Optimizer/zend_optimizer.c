@@ -206,7 +206,7 @@ int zend_optimizer_add_literal(zend_op_array *op_array, zval *zv)
 	op_array->last_literal++;
 	op_array->literals = (zval*)erealloc(op_array->literals, op_array->last_literal * sizeof(zval));
 	ZVAL_COPY_VALUE(&op_array->literals[i], zv);
-	Z_CACHE_SLOT(op_array->literals[i]) = -1;
+	//???Z_CACHE_SLOT(op_array->literals[i]) = -1;
 	return i;
 }
 

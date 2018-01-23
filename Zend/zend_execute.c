@@ -2019,8 +2019,8 @@ static zend_always_inline zval* zend_fetch_static_property_address(zval *varname
 	}
 
 	if (op2_type == IS_CONST) {
-		if (varname_type == IS_CONST && EXPECTED((ce = CACHED_PTR(Z_CACHE_SLOT_P(varname))) != NULL)) {
-			retval = CACHED_PTR(Z_CACHE_SLOT_P(varname) + sizeof(void*));
+		if (varname_type == IS_CONST && EXPECTED((ce = CACHED_PTR(opline->cache_slot)) != NULL)) {
+			retval = CACHED_PTR(opline->cache_slot + sizeof(void*));
 
 			/* check if static properties were destoyed */
 			if (UNEXPECTED(CE_STATIC_MEMBERS(ce) == NULL)) {
@@ -2034,7 +2034,7 @@ static zend_always_inline zval* zend_fetch_static_property_address(zval *varname
 		} else {
 			zval *class_name = RT_CONSTANT(opline, op2);
 
-			if (UNEXPECTED((ce = CACHED_PTR(Z_CACHE_SLOT_P(class_name))) == NULL)) {
+			if (UNEXPECTED((ce = CACHED_PTR(opline->cache_slot)) == NULL)) {
 				ce = zend_fetch_class_by_name(Z_STR_P(class_name), class_name + 1, ZEND_FETCH_CLASS_DEFAULT | ZEND_FETCH_CLASS_EXCEPTION);
 				if (UNEXPECTED(ce == NULL)) {
 					if (varname_type != IS_CONST) {
@@ -2042,7 +2042,7 @@ static zend_always_inline zval* zend_fetch_static_property_address(zval *varname
 					}
 					return NULL;
 				}
-				CACHE_PTR(Z_CACHE_SLOT_P(class_name), ce);
+				CACHE_PTR(opline->cache_slot, ce);
 			}
 		}
 	} else {
@@ -2058,8 +2058,8 @@ static zend_always_inline zval* zend_fetch_static_property_address(zval *varname
 			ce = Z_CE_P(EX_VAR(op2.var));
 		}
 		if (varname_type == IS_CONST &&
-		    EXPECTED(CACHED_PTR(Z_CACHE_SLOT_P(varname)) == ce)) {
-			retval = CACHED_PTR(Z_CACHE_SLOT_P(varname) + sizeof(void*));
+		    EXPECTED(CACHED_PTR(opline->cache_slot) == ce)) {
+			retval = CACHED_PTR(opline->cache_slot + sizeof(void*));
 
 			/* check if static properties were destoyed */
 			if (UNEXPECTED(CE_STATIC_MEMBERS(ce) == NULL)) {
@@ -2084,7 +2084,7 @@ static zend_always_inline zval* zend_fetch_static_property_address(zval *varname
 	}
 
 	if (varname_type == IS_CONST) {
-		CACHE_POLYMORPHIC_PTR(Z_CACHE_SLOT_P(varname), ce, retval);
+		CACHE_POLYMORPHIC_PTR(opline->cache_slot, ce, retval);
 	}
 
 	return retval;

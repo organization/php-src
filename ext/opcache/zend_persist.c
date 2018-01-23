@@ -283,13 +283,13 @@ static void zend_persist_zval(zval *z)
 	switch (Z_TYPE_P(z)) {
 		case IS_STRING:
 			zend_accel_store_interned_string(Z_STR_P(z));
-			Z_TYPE_FLAGS_P(z) = 0;
+			Z_SET_TYPE_INFO_P(z, IS_STRING);
 			break;
 		case IS_ARRAY:
 			new_ptr = zend_shared_alloc_get_xlat_entry(Z_ARR_P(z));
 			if (new_ptr) {
 				Z_ARR_P(z) = new_ptr;
-				Z_TYPE_FLAGS_P(z) = 0;
+				Z_SET_TYPE_INFO_P(z, IS_ARRAY);
 			} else {
 				if (!Z_REFCOUNTED_P(z)) {
 					Z_ARR_P(z) = zend_accel_memdup(Z_ARR_P(z), sizeof(zend_array));
@@ -299,7 +299,7 @@ static void zend_persist_zval(zval *z)
 					zend_accel_store(Z_ARR_P(z), sizeof(zend_array));
 					zend_hash_persist(Z_ARRVAL_P(z), zend_persist_zval);
 					/* make immutable array */
-					Z_TYPE_FLAGS_P(z) = 0;
+					Z_SET_TYPE_INFO_P(z, IS_ARRAY);
 					GC_SET_REFCOUNT(Z_COUNTED_P(z), 2);
 					GC_FLAGS(Z_COUNTED_P(z)) |= IS_ARRAY_IMMUTABLE;
 					HT_FLAGS(Z_ARRVAL_P(z)) |= HASH_FLAG_STATIC_KEYS;
@@ -319,12 +319,12 @@ static void zend_persist_zval(zval *z)
 			new_ptr = zend_shared_alloc_get_xlat_entry(Z_AST_P(z));
 			if (new_ptr) {
 				Z_AST_P(z) = new_ptr;
-				Z_TYPE_FLAGS_P(z) = 0;
+				Z_SET_TYPE_INFO_P(z, IS_CONSTANT_AST);
 			} else {
 				zend_ast_ref *old_ref = Z_AST_P(z);
 				Z_ARR_P(z) = zend_accel_memdup(Z_AST_P(z), sizeof(zend_ast_ref));
 				zend_persist_ast(GC_AST(old_ref));
-				Z_TYPE_FLAGS_P(z) = 0;
+				Z_SET_TYPE_INFO_P(z, IS_CONSTANT_AST);
 				GC_SET_REFCOUNT(Z_COUNTED_P(z), 2);
 				efree(old_ref);
 			}

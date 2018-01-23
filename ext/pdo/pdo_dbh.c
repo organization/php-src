@@ -1557,6 +1557,8 @@ zend_object *pdo_dbh_new(zend_class_entry *ce)
 	rebuild_object_properties(&dbh->std);
 	dbh->inner = ecalloc(1, sizeof(pdo_dbh_t));
 	dbh->inner->def_stmt_ce = pdo_dbstmt_ce;
+	ZVAL_UNDEF(&dbh->inner->def_stmt_ctor_args);
+	ZVAL_UNDEF(&dbh->inner->query_stmt_zval);
 
 	dbh->std.handlers = &pdo_dbh_object_handlers;
 

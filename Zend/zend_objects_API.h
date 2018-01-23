@@ -81,9 +81,10 @@ static zend_always_inline void zend_object_release(zend_object *obj)
 
 static zend_always_inline size_t zend_object_properties_size(zend_class_entry *ce)
 {
+	/* Reserve two additional zvals for property guards */
 	return sizeof(zval) *
-		(ce->default_properties_count -
-			((ce->ce_flags & ZEND_ACC_USE_GUARDS) ? 0 : 1));
+		(ce->default_properties_count - 1 +
+			((ce->ce_flags & ZEND_ACC_USE_GUARDS) ? 2 : 0));
 }
 
 /* Allocates object type and zeros it, but not the properties.

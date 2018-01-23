@@ -2070,15 +2070,18 @@ ZEND_FUNCTION(get_defined_constants)
 		zend_module_entry *module;
 		int i = 1;
 
-		modules = ecalloc(zend_hash_num_elements(&module_registry) + 2, sizeof(zval));
+		modules = safe_emalloc(zend_hash_num_elements(&module_registry) + 2, sizeof(zval), 0);
 		module_names = emalloc((zend_hash_num_elements(&module_registry) + 2) * sizeof(char *));
 
 		module_names[0] = "internal";
+		ZVAL_UNDEF(&modules[0]);
 		ZEND_HASH_FOREACH_PTR(&module_registry, module) {
 			module_names[module->module_number] = (char *)module->name;
+			ZVAL_UNDEF(&modules[i]);
 			i++;
 		} ZEND_HASH_FOREACH_END();
 		module_names[i] = "user";
+		ZVAL_UNDEF(&modules[i]);
 
 		ZEND_HASH_FOREACH_PTR(EG(zend_constants), val) {
 			if (!val->name) {

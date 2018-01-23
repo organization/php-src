@@ -145,6 +145,7 @@ struct _zend_op {
 	znode_op result;
 	uint32_t extended_value;
 	uint32_t lineno;
+	uint32_t cache_slot;
 	zend_uchar opcode;
 	zend_uchar op1_type;
 	zend_uchar op2_type;
@@ -328,6 +329,7 @@ typedef struct _zend_property_info {
 
 typedef struct _zend_class_constant {
 	zval value; /* access flags are stored in reserved: zval.u2.access_flags */
+	uint32_t access_flags;
 	zend_string *doc_comment;
 	zend_class_entry *ce;
 } zend_class_constant;
@@ -461,6 +463,8 @@ struct _zend_execute_data {
 	zval                *return_value;
 	zend_function       *func;             /* executed function              */
 	zval                 This;             /* this + call_info + num_args    */
+	uint32_t             call_info;
+	uint32_t             num_args;
 	zend_execute_data   *prev_execute_data;
 	zend_array          *symbol_table;
 #if ZEND_EX_USE_RUN_TIME_CACHE
@@ -482,10 +486,9 @@ struct _zend_execute_data {
 #define ZEND_CALL_DYNAMIC            (1 << 9)
 #define ZEND_CALL_FAKE_CLOSURE       (1 << 10)
 
-#define ZEND_CALL_INFO_SHIFT         16
 
 #define ZEND_CALL_INFO(call) \
-	(Z_TYPE_INFO((call)->This) >> ZEND_CALL_INFO_SHIFT)
+	(call)->call_info
 
 #define ZEND_CALL_KIND_EX(call_info) \
 	(call_info & (ZEND_CALL_CODE | ZEND_CALL_TOP))
@@ -494,19 +497,20 @@ struct _zend_execute_data {
 	ZEND_CALL_KIND_EX(ZEND_CALL_INFO(call))
 
 #define ZEND_SET_CALL_INFO(call, object, info) do { \
-		Z_TYPE_INFO((call)->This) = ((object) ? IS_OBJECT_EX : IS_UNDEF) | ((info) << ZEND_CALL_INFO_SHIFT); \
+		Z_SET_TYPE_INFO((call)->This, ((object) ? IS_OBJECT_EX : IS_UNDEF)); \
+		(call)->call_info = (info); \
 	} while (0)
 
 #define ZEND_ADD_CALL_FLAG_EX(call_info, flag) do { \
-		call_info |= ((flag) << ZEND_CALL_INFO_SHIFT); \
+		call_info |= (flag); \
 	} while (0)
 
 #define ZEND_ADD_CALL_FLAG(call, flag) do { \
-		ZEND_ADD_CALL_FLAG_EX(Z_TYPE_INFO((call)->This), flag); \
+		(call)->call_info |= (flag); \
 	} while (0)
 
 #define ZEND_CALL_NUM_ARGS(call) \
-	(call)->This.u2.num_args
+	(call)->num_args
 
 #define ZEND_CALL_FRAME_SLOT \
 	((int)((ZEND_MM_ALIGNED_SIZE(sizeof(zend_execute_data)) + ZEND_MM_ALIGNED_SIZE(sizeof(zval)) - 1) / ZEND_MM_ALIGNED_SIZE(sizeof(zval))))

@@ -2876,7 +2876,7 @@ double_str:
 			RETURN_FALSE;
 		}
 
-		Z_TYPE_INFO(tmp) = IS_DOUBLE;
+		Z_SET_TYPE_INFO(tmp, IS_DOUBLE);
 		if (low > high) { 		/* Negative steps */
 			if (low - high < step || step <= 0) {
 				err = 1;
@@ -2926,7 +2926,7 @@ long_str:
 
 		lstep = (zend_ulong)step;
 
-		Z_TYPE_INFO(tmp) = IS_LONG;
+		Z_SET_TYPE_INFO(tmp, IS_LONG);
 		if (low > high) { 		/* Negative steps */
 			if ((zend_ulong)(low - high) < lstep) {
 				err = 1;

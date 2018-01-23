@@ -30,7 +30,7 @@ static int phpdbg_is_auto_global(char *name, int len) {
 PHPDBG_API void phpdbg_webdata_compress(char **msg, size_t *len) {
 	zval array;
 	HashTable *ht;
-	zval zv[9] = {{{0}}};
+	zval zv[9] = {{.i64=-1}};
 
 	array_init(&array);
 	ht = Z_ARRVAL(array);
@@ -69,7 +69,7 @@ PHPDBG_API void phpdbg_webdata_compress(char **msg, size_t *len) {
 		if (sapi_module.name) {
 			ZVAL_STRING(&zv[6], sapi_module.name);
 		} else {
-			Z_TYPE_INFO(zv[6]) = IS_NULL;
+			ZVAL_NULL(&zv[6]);
 		}
 		zend_hash_str_add(ht, ZEND_STRL("sapi_name"), &zv[6]);
 		Z_SET_REFCOUNT(zv[6], 1);

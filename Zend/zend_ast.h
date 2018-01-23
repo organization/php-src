@@ -172,6 +172,7 @@ typedef struct _zend_ast_list {
 typedef struct _zend_ast_zval {
 	zend_ast_kind kind;
 	zend_ast_attr attr;
+	uint32_t lineno;    /* Line number */
 	zval val;
 } zend_ast_zval;
 
@@ -246,12 +247,7 @@ static zend_always_inline uint32_t zend_ast_get_num_children(zend_ast *ast) {
 	return ast->kind >> ZEND_AST_NUM_CHILDREN_SHIFT;
 }
 static zend_always_inline uint32_t zend_ast_get_lineno(zend_ast *ast) {
-	if (ast->kind == ZEND_AST_ZVAL) {
-		zval *zv = zend_ast_get_zval(ast);
-		return Z_LINENO_P(zv);
-	} else {
-		return ast->lineno;
-	}
+	return ast->lineno;
 }
 
 static zend_always_inline zend_ast *zend_ast_create_zval(zval *zv) {
