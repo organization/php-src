@@ -617,6 +617,7 @@ struct _pdo_stmt_t {
 
 	/* defaults for fetches */
 	enum pdo_fetch_type default_fetch_type;
+	/* TODO: this overlapping data structures don't work well ??? */
 	union {
 		int column;
 		struct {
@@ -630,8 +631,8 @@ struct _pdo_stmt_t {
 			zval fetch_args;           /* freed */
 			zend_fcall_info fci;
 			zend_fcall_info_cache fcc;
-			zval object;
 			zval function;
+			zval object;
 			zval *values;              /* freed */
 		} func;
 		zval into;

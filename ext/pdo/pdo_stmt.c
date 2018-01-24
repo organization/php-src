@@ -2382,6 +2382,7 @@ zend_object *pdo_dbstmt_new(zend_class_entry *ce)
 	ZVAL_UNDEF(&stmt->database_object_handle);
 	ZVAL_UNDEF(&stmt->lazy_object_ref);
 	ZVAL_UNDEF(&stmt->fetch.cls.ctor_args);
+	ZVAL_UNDEF(&stmt->fetch.cls.retval);
 	ZVAL_UNDEF(&stmt->fetch.into);
 	zend_object_std_init(&stmt->std, ce);
 	object_properties_init(&stmt->std, ce);
