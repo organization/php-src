@@ -174,6 +174,8 @@ int phar_parse_zipfile(php_stream *fp, char *fname, int fname_len, char *alias, 
 	char *p = buf, *ext, *actual_alias = NULL;
 	char *metadata = NULL;
 
+	ZVAL_UNDEF(&entry.metadata);
+
 	size = php_stream_tell(fp);
 
 	if (size > sizeof(locator) + 65536) {
@@ -1195,6 +1197,7 @@ int phar_zip_flush(phar_archive_data *phar, char *user_stub, zend_long len, int 
 	phar_zip_dir_end eocd;
 	uint32_t cdir_size, cdir_offset;
 
+	ZVAL_UNDEF(&entry.metadata);
 	pass.error = &temperr;
 	entry.flags = PHAR_ENT_PERM_DEF_FILE;
 	entry.timestamp = time(NULL);

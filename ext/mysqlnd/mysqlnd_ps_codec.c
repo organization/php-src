@@ -517,6 +517,8 @@ mysqlnd_stmt_copy_it(zval ** copies, zval * original, unsigned int param_count, 
 {
 	if (!*copies) {
 		*copies = mnd_ecalloc(param_count, sizeof(zval));
+		/* Initialize to IS_UNDEF */
+		memset(*copies, 0xff, param_count * sizeof(zval));
 	}
 	if (*copies) {
 		ZVAL_COPY(&(*copies)[current], original);

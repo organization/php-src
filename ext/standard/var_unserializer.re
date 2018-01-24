@@ -70,6 +70,9 @@ PHPAPI void php_var_unserialize_set_allowed_classes(php_unserialize_data_t d, Ha
 #define VAR_ENTRIES_MAX 1024
 #define VAR_ENTRIES_DBG 0
 
+/* VAR_FLAG used in var_dtor entries to signify an entry on which __wakeup should be called */
+#define VAR_WAKEUP_FLAG 1
+
 typedef struct {
 	zval *data[VAR_ENTRIES_MAX];
 	zend_long used_slots;
@@ -208,8 +211,8 @@ PHPAPI void var_destroy(php_unserialize_data_t *var_hashx)
 
 			/* Perform delayed __wakeup calls */
 			if (Z_TYPE_P(zv) == IS_OBJECT
-			 && (OBJ_FLAGS(Z_OBJ_P(zv)) & IS_OBJ_HAS_GUARDS)) {
-				OBJ_FLAGS(Z_OBJ_P(zv)) &= ~IS_OBJ_HAS_GUARDS;
+			 && ((uintptr_t)Z_OBJ_P(zv) & VAR_WAKEUP_FLAG)) {
+				Z_OBJ_P(zv) = (zend_object*)((uintptr_t)Z_OBJ_P(zv) & ~VAR_WAKEUP_FLAG);
 				if (!wakeup_failed) {
 					zval retval;
 					if (Z_ISUNDEF(wakeup_name)) {
@@ -614,10 +617,8 @@ static inline int object_common2(UNSERIALIZE_PARAMETER, zend_long elements)
 	if (has_wakeup) {
 		/* Delay __wakeup call until end of serialization */
 		zval *wakeup_var = var_tmp_var(var_hash);
-		ZVAL_COPY(wakeup_var, rval);
-		/* Use IS_OBJ_HAS_GUARDS flags for delayed __wakeup call */
-		// TODO: Check if this is 100% safe ???
-		OBJ_FLAGS(Z_OBJ_P(wakeup_var)) |= IS_OBJ_HAS_GUARDS;
+		Z_ADDREF_P(rval);
+		ZVAL_OBJ(wakeup_var, (zend_object*)((uintptr_t)Z_OBJ_P(rval) | VAR_WAKEUP_FLAG));
 	}
 
 	return finish_nested_data(UNSERIALIZE_PASSTHRU);

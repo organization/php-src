@@ -845,7 +845,6 @@ static int phar_wrapper_rename(php_stream_wrapper *wrapper, const char *url_from
 		}
 		/* transfer all data over to the new entry */
 		memcpy((void *) &new, (void *) entry, sizeof(phar_entry_info));
-		ZVAL_UNDEF(&new.metadata);
 		/* mark the old one for deletion */
 		entry->is_deleted = 1;
 		entry->fp = NULL;

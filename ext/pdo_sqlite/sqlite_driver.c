@@ -341,15 +341,18 @@ static int do_callback(struct pdo_sqlite_fci *fc, zval *cb,
 	}
 
 	if (is_agg) {
-		agg_context = (zend_reference*)sqlite3_aggregate_context(context, sizeof(zend_reference));
+		agg_context = (zend_reference*)sqlite3_aggregate_context(context, 0);
 		if (!agg_context) {
-			ZVAL_NULL(&zargs[0]);
-		} else {
-			if (Z_ISUNDEF(agg_context->val)) {
+			agg_context = (zend_reference*)sqlite3_aggregate_context(context, sizeof(zend_reference));
+			if (!agg_context) {
+				ZVAL_NULL(&zargs[0]);
+			} else {
 				GC_SET_REFCOUNT(agg_context, 1);
 				GC_TYPE_INFO(agg_context) = IS_REFERENCE;
 				ZVAL_NULL(&agg_context->val);
+				ZVAL_REF(&zargs[0], agg_context);
 			}
+		} else {
 			ZVAL_REF(&zargs[0], agg_context);
 		}
 		ZVAL_LONG(&zargs[1], sqlite3_aggregate_count(context));

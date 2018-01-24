@@ -213,6 +213,8 @@ int phar_parse_tarfile(php_stream* fp, char *fname, int fname_len, char *alias, 
 	int last_was_longlink = 0;
 	int linkname_len;
 
+	ZVAL_UNDEF(&entry.metadata);
+
 	if (error) {
 		*error = NULL;
 	}
@@ -893,6 +895,7 @@ static int phar_tar_setupmetadata(zval *zv, void *argument) /* {{{ */
 	char *lookfor, **error = i->error;
 	phar_entry_info *entry = (phar_entry_info *)Z_PTR_P(zv), *metadata, newentry = {0};
 
+	ZVAL_UNDEF(&newentry.metadata);
 	if (entry->filename_len >= sizeof(".phar/.metadata") && !memcmp(entry->filename, ".phar/.metadata", sizeof(".phar/.metadata")-1)) {
 		if (entry->filename_len == sizeof(".phar/.metadata.bin")-1 && !memcmp(entry->filename, ".phar/.metadata.bin", sizeof(".phar/.metadata.bin")-1)) {
 			return phar_tar_setmetadata(&entry->phar->metadata, entry, error);
@@ -952,6 +955,7 @@ int phar_tar_flush(phar_archive_data *phar, char *user_stub, zend_long len, int 
 	char *buf, *signature, *tmp, sigbuf[8];
 	char halt_stub[] = "__HALT_COMPILER();";
 
+	ZVAL_UNDEF(&entry.metadata);
 	entry.flags = PHAR_ENT_PERM_DEF_FILE;
 	entry.timestamp = time(NULL);
 	entry.is_modified = 1;
@@ -1176,6 +1180,7 @@ nostub:
 		} else {
 			phar_entry_info newentry = {0};
 
+			ZVAL_UNDEF(&newentry.metadata);
 			newentry.filename = estrndup(".phar/.metadata.bin", sizeof(".phar/.metadata.bin")-1);
 			newentry.filename_len = sizeof(".phar/.metadata.bin")-1;
 			newentry.phar = phar;

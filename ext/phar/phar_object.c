@@ -3554,7 +3554,6 @@ PHP_METHOD(Phar, copy)
 	}
 
 	memcpy((void *) &newentry, oldentry, sizeof(phar_entry_info));
-	ZVAL_UNDEF(&newentry.metadata);
 
 	if (Z_TYPE(newentry.metadata) != IS_UNDEF) {
 		zval_copy_ctor(&newentry.metadata);

@@ -174,6 +174,8 @@ int phar_mount_entry(phar_archive_data *phar, char *filename, int filename_len, 
 	int is_phar;
 	const char *err;
 
+	ZVAL_UNDEF(&entry.metadata);
+
 	if (phar_path_check(&path, &path_len, &err) > pcr_is_ok) {
 		return FAILURE;
 	}
