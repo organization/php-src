@@ -132,11 +132,11 @@ const phpdbg_command_t phpdbg_watch_commands[] = {
 zend_bool phpdbg_check_watch_diff(phpdbg_watchtype type, void *oldPtr, void *newPtr) {
 	switch (type) {
 		case WATCH_ON_BUCKET:
-			if (memcmp(&((Bucket *) oldPtr)->h, &((Bucket *) newPtr)->h, sizeof(Bucket) - sizeof(zval) /* key/val comparison */) != 0) {
+			if (memcmp(&((Bucket *) oldPtr)->h, &((Bucket *) newPtr)->h, sizeof(Bucket) - sizeof(zval) - sizeof(uint32_t)/* key/val comparison */) != 0) {
 				return 2;
 			}
 		case WATCH_ON_ZVAL:
-			return memcmp(oldPtr, newPtr, sizeof(zend_value) + sizeof(uint32_t) /* value + typeinfo */) != 0;
+			return memcmp(oldPtr, newPtr, sizeof(zval)) != 0;
 		case WATCH_ON_HASHTABLE:
 			return zend_hash_num_elements(HT_PTR_HT(oldPtr)) != zend_hash_num_elements(HT_PTR_HT(newPtr));
 		case WATCH_ON_REFCOUNTED:
@@ -300,7 +300,7 @@ void phpdbg_set_addr_watchpoint(void *addr, size_t size, phpdbg_watchpoint_t *wa
 }
 
 void phpdbg_set_zval_watchpoint(zval *zv, phpdbg_watchpoint_t *watch) {
-	phpdbg_set_addr_watchpoint(zv, sizeof(zval) - sizeof(uint32_t), watch);
+	phpdbg_set_addr_watchpoint(zv, sizeof(zval), watch);
 	watch->type = WATCH_ON_ZVAL;
 }
 
