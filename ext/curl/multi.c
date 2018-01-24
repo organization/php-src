@@ -556,6 +556,7 @@ static int _php_curl_multi_setopt(php_curlm *mh, zend_long option, zval *zvalue,
 		case CURLMOPT_PUSHFUNCTION:
 			if (mh->handlers->server_push == NULL) {
 				mh->handlers->server_push = ecalloc(1, sizeof(php_curlm_server_push));
+				ZVAL_UNDEF(&mh->handlers->server_push->func_name);
 			} else if (!Z_ISUNDEF(mh->handlers->server_push->func_name)) {
 				zval_ptr_dtor(&mh->handlers->server_push->func_name);
 				mh->handlers->server_push->fci_cache = empty_fcall_info_cache;

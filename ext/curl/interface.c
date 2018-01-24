@@ -1849,9 +1849,19 @@ php_curl *alloc_curl_handle()
 	php_curl *ch               = ecalloc(1, sizeof(php_curl));
 	ch->to_free                = ecalloc(1, sizeof(struct _php_curl_free));
 	ch->handlers               = ecalloc(1, sizeof(php_curl_handlers));
+#if CURLOPT_PASSWDFUNCTION != 0
+	ZVAL_UNDEF(&ch->handlers->passwd);
+#endif
+	ZVAL_UNDEF(&ch->handlers->std_err);
 	ch->handlers->write        = ecalloc(1, sizeof(php_curl_write));
+	ZVAL_UNDEF(&ch->handlers->write->func_name);
+	ZVAL_UNDEF(&ch->handlers->write->stream);
 	ch->handlers->write_header = ecalloc(1, sizeof(php_curl_write));
+	ZVAL_UNDEF(&ch->handlers->write_header->func_name);
+	ZVAL_UNDEF(&ch->handlers->write_header->stream);
 	ch->handlers->read         = ecalloc(1, sizeof(php_curl_read));
+	ZVAL_UNDEF(&ch->handlers->read->func_name);
+	ZVAL_UNDEF(&ch->handlers->read->stream);
 	ch->handlers->progress     = NULL;
 #if LIBCURL_VERSION_NUM >= 0x071500 /* Available since 7.21.0 */
 	ch->handlers->fnmatch      = NULL;
@@ -2028,6 +2038,7 @@ void _php_setup_easy_copy_handlers(php_curl *ch, php_curl *source)
 
 	if (source->handlers->progress) {
 		ch->handlers->progress = ecalloc(1, sizeof(php_curl_progress));
+		ZVAL_UNDEF(&ch->handlers->progress->func_name);
 		if (!Z_ISUNDEF(source->handlers->progress->func_name)) {
 			ZVAL_COPY(&ch->handlers->progress->func_name, &source->handlers->progress->func_name);
 		}
@@ -2038,6 +2049,7 @@ void _php_setup_easy_copy_handlers(php_curl *ch, php_curl *source)
 #if LIBCURL_VERSION_NUM >= 0x071500
 	if (source->handlers->fnmatch) {
 		ch->handlers->fnmatch = ecalloc(1, sizeof(php_curl_fnmatch));
+		ZVAL_UNDEF(&ch->handlers->fnmatch->func_name);
 		if (!Z_ISUNDEF(source->handlers->fnmatch->func_name)) {
 			ZVAL_COPY(&ch->handlers->fnmatch->func_name, &source->handlers->fnmatch->func_name);
 		}
@@ -2775,6 +2787,7 @@ static int _php_curl_setopt(php_curl *ch, zend_long option, zval *zvalue) /* {{{
 			curl_easy_setopt(ch->cp, CURLOPT_PROGRESSDATA, ch);
 			if (ch->handlers->progress == NULL) {
 				ch->handlers->progress = ecalloc(1, sizeof(php_curl_progress));
+				ZVAL_UNDEF(&ch->handlers->progress->func_name);
 			} else if (!Z_ISUNDEF(ch->handlers->progress->func_name)) {
 				zval_ptr_dtor(&ch->handlers->progress->func_name);
 				ch->handlers->progress->fci_cache = empty_fcall_info_cache;
@@ -2894,6 +2907,7 @@ static int _php_curl_setopt(php_curl *ch, zend_long option, zval *zvalue) /* {{{
 			curl_easy_setopt(ch->cp, CURLOPT_FNMATCH_DATA, ch);
 			if (ch->handlers->fnmatch == NULL) {
 				ch->handlers->fnmatch = ecalloc(1, sizeof(php_curl_fnmatch));
+				ZVAL_UNDEF(&ch->handlers->fnmatch->func_name);
 			} else if (!Z_ISUNDEF(ch->handlers->fnmatch->func_name)) {
 				zval_ptr_dtor(&ch->handlers->fnmatch->func_name);
 				ch->handlers->fnmatch->fci_cache = empty_fcall_info_cache;
