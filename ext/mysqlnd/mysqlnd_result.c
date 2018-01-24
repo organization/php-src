@@ -1428,7 +1428,8 @@ MYSQLND_METHOD(mysqlnd_res, store_result)(MYSQLND_RES * result,
 					SET_OOM_ERROR(conn->error_info);
 					DBG_RETURN(NULL);
 				}
-				memset(set->data, 0, (size_t)(set->row_count * meta->field_count * sizeof(zval)));
+				/* Initialize to IS_UNDEF */
+				memset(set->data, 0xff, (size_t)(set->row_count * meta->field_count * sizeof(zval)));
 			}
 			/* Position at the first row */
 			set->data_cursor = set->data;

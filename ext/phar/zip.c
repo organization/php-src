@@ -219,6 +219,7 @@ int phar_parse_zipfile(php_stream *fp, char *fname, int fname_len, char *alias, 
 			}
 
 			mydata = pecalloc(1, sizeof(phar_archive_data), PHAR_G(persist));
+			ZVAL_UNDEF(&mydata->metadata);
 			mydata->is_persistent = PHAR_G(persist);
 
 			/* read in archive comment, if any */

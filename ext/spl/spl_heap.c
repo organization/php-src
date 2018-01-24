@@ -225,7 +225,9 @@ static spl_ptr_heap *spl_ptr_heap_init(spl_ptr_heap_cmp_func cmp, spl_ptr_heap_c
 	heap->dtor     = dtor;
 	heap->ctor     = ctor;
 	heap->cmp      = cmp;
-	heap->elements = ecalloc(PTR_HEAP_BLOCK_SIZE, sizeof(zval));
+	heap->elements = safe_emalloc(PTR_HEAP_BLOCK_SIZE, sizeof(zval), 0);
+	/* Initialize to IS_UNDEF */
+	memset(heap->elements, 0xff, PTR_HEAP_BLOCK_SIZE * sizeof(zval));
 	heap->max_size = PTR_HEAP_BLOCK_SIZE;
 	heap->count    = 0;
 	heap->flags    = 0;
@@ -240,7 +242,8 @@ static void spl_ptr_heap_insert(spl_ptr_heap *heap, zval *elem, void *cmp_userda
 	if (heap->count+1 > heap->max_size) {
 		/* we need to allocate more memory */
 		heap->elements  = erealloc(heap->elements, heap->max_size * 2 * sizeof(zval));
-		memset(heap->elements + heap->max_size, 0, heap->max_size * sizeof(zval));
+		/* Initialize to IS_UNDEF */
+		memset(heap->elements + heap->max_size, 0xff, heap->max_size * sizeof(zval));
 		heap->max_size *= 2;
 	}
 

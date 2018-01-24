@@ -1125,6 +1125,22 @@ static void php_xml_parser_create_impl(INTERNAL_FUNCTION_PARAMETERS, int ns_supp
 	}
 
 	parser = ecalloc(1, sizeof(xml_parser));
+	ZVAL_UNDEF(&parser->index);
+	ZVAL_UNDEF(&parser->startElementHandler);
+	ZVAL_UNDEF(&parser->endElementHandler);
+	ZVAL_UNDEF(&parser->characterDataHandler);
+	ZVAL_UNDEF(&parser->processingInstructionHandler);
+	ZVAL_UNDEF(&parser->defaultHandler);
+	ZVAL_UNDEF(&parser->unparsedEntityDeclHandler);
+	ZVAL_UNDEF(&parser->notationDeclHandler);
+	ZVAL_UNDEF(&parser->externalEntityRefHandler);
+	ZVAL_UNDEF(&parser->unknownEncodingHandler);
+	ZVAL_UNDEF(&parser->startNamespaceDeclHandler);
+	ZVAL_UNDEF(&parser->endNamespaceDeclHandler);
+	ZVAL_UNDEF(&parser->object);
+	ZVAL_UNDEF(&parser->data);
+	ZVAL_UNDEF(&parser->info);
+
 	parser->parser = XML_ParserCreate_MM((auto_detect ? NULL : encoding),
                                          &php_xml_mem_hdlrs, (XML_Char*)ns_param);
 

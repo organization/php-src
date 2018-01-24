@@ -280,6 +280,8 @@ static int spl_filesystem_file_open(spl_filesystem_object *intern, int use_inclu
 	zval tmp;
 
 	intern->type = SPL_FS_FILE;
+	ZVAL_UNDEF(&intern->u.file.current_zval);
+	ZVAL_UNDEF(&intern->u.file.zresource);
 
 	php_stat(intern->file_name, intern->file_name_len, FS_IS_DIR, &tmp);
 	if (Z_TYPE(tmp) == IS_TRUE) {

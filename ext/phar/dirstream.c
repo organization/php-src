@@ -494,6 +494,7 @@ int phar_wrapper_mkdir(php_stream_wrapper *wrapper, const char *url_from, int mo
 	}
 
 	memset((void *) &entry, 0, sizeof(phar_entry_info));
+	ZVAL_UNDEF(&entry.metadata);
 
 	/* strip leading "/" */
 	if (phar->is_zip) {

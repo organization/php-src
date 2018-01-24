@@ -551,6 +551,7 @@ phar_entry_data *phar_get_or_create_entry_data(char *fname, int fname_len, char 
 
 	/* create an entry, this is a new file */
 	memset(&etemp, 0, sizeof(phar_entry_info));
+	ZVAL_UNDEF(&etemp.metadata);
 	etemp.filename_len = path_len;
 	etemp.fp_type = PHAR_MOD;
 	etemp.fp = php_stream_fopen_tmpfile();
@@ -1282,6 +1283,7 @@ phar_entry_info *phar_get_entry_info_dir(phar_archive_data *phar, char *path, in
 		if (zend_hash_str_exists(&phar->virtual_dirs, path, path_len)) {
 			/* a file or directory exists in a sub-directory of this path */
 			entry = (phar_entry_info *) ecalloc(1, sizeof(phar_entry_info));
+			ZVAL_UNDEF(&entry->metadata);
 			/* this next line tells PharFileInfo->__destruct() to efree the filename */
 			entry->is_temp_dir = entry->is_dir = 1;
 			entry->filename = (char *) estrndup(path, path_len + 1);

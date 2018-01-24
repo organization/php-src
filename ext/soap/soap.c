@@ -1087,6 +1087,8 @@ static HashTable* soap_create_typemap(sdlPtr sdl, HashTable *ht)
 			new_enc->to_zval = enc->to_zval;
 			new_enc->details.map = emalloc(sizeof(soapMapping));
 			memset(new_enc->details.map, 0, sizeof(soapMapping));
+			ZVAL_UNDEF(&new_enc->details.map->to_xml);
+			ZVAL_UNDEF(&new_enc->details.map->to_zval);
 			if (to_xml) {
 				ZVAL_COPY(&new_enc->details.map->to_xml, to_xml);
 				new_enc->to_xml = to_xml_user;
@@ -1141,6 +1143,7 @@ PHP_METHOD(SoapServer, SoapServer)
 
 	service = emalloc(sizeof(soapService));
 	memset(service, 0, sizeof(soapService));
+	ZVAL_UNDEF(&service->soap_object);
 	service->send_errors = 1;
 
 	cache_wsdl = SOAP_GLOBAL(cache_enabled) ? SOAP_GLOBAL(cache_mode) : 0;

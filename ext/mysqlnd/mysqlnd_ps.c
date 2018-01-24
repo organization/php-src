@@ -107,7 +107,8 @@ MYSQLND_METHOD(mysqlnd_stmt, store_result)(MYSQLND_STMT * const s)
 					SET_OOM_ERROR(conn->error_info);
 					DBG_RETURN(NULL);
 				}
-				memset(set->data, 0, (size_t)(result->stored_data->row_count * result->meta->field_count * sizeof(zval)));
+				/* Initialize to IS_UNDEF */
+				memset(set->data, 0xff, (size_t)(result->stored_data->row_count * result->meta->field_count * sizeof(zval)));
 			}
 			/* Position at the first row */
 			set->data_cursor = set->data;
@@ -348,6 +349,8 @@ mysqlnd_stmt_prepare_read_eof(MYSQLND_STMT * s)
 				This bad handling is also in mysqlnd_result.c
 			*/
 			memset(stmt, 0, sizeof(MYSQLND_STMT_DATA));
+			ZVAL_UNDEF(&stmt->execute_read_cb);
+			ZVAL_UNDEF(&stmt->execute_err_cb);
 			stmt->state = MYSQLND_STMT_INITTED;
 		}
 	} else {

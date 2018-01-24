@@ -1021,6 +1021,7 @@ static int phar_parse_pharfile(php_stream *fp, char *fname, int fname_len, char 
 	}
 
 	mydata = pecalloc(1, sizeof(phar_archive_data), PHAR_G(persist));
+	ZVAL_UNDEF(&mydata->metadata);
 	mydata->is_persistent = PHAR_G(persist);
 
 	/* check whether we have meta data, zero check works regardless of byte order */
@@ -1054,6 +1055,7 @@ static int phar_parse_pharfile(php_stream *fp, char *fname, int fname_len, char 
 	mydata->fname_len = fname_len;
 	offset = halt_offset + manifest_len + 4;
 	memset(&entry, 0, sizeof(phar_entry_info));
+	ZVAL_UNDEF(&entry.metadata);
 	entry.phar = mydata;
 	entry.fp_type = PHAR_FP;
 	entry.is_persistent = mydata->is_persistent;
@@ -1391,6 +1393,7 @@ int phar_create_or_parse_filename(char *fname, int fname_len, char *alias, int a
 
 	/* set up our manifest */
 	mydata = ecalloc(1, sizeof(phar_archive_data));
+	ZVAL_UNDEF(&mydata->metadata);
 	mydata->fname = expand_filepath(fname, NULL);
 	fname_len = strlen(mydata->fname);
 #ifdef PHP_WIN32

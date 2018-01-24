@@ -2294,6 +2294,7 @@ static zend_object *phar_convert_to_other(phar_archive_data *source, int convert
 	PHAR_G(last_phar_name) = PHAR_G(last_alias) = NULL;
 
 	phar = (phar_archive_data *) ecalloc(1, sizeof(phar_archive_data));
+	ZVAL_UNDEF(&phar->metadata);
 	/* set whole-archive compression and type from parameter */
 	phar->flags = flags;
 	phar->is_data = source->is_data;
@@ -3553,6 +3554,7 @@ PHP_METHOD(Phar, copy)
 	}
 
 	memcpy((void *) &newentry, oldentry, sizeof(phar_entry_info));
+	ZVAL_UNDEF(&newentry.metadata);
 
 	if (Z_TYPE(newentry.metadata) != IS_UNDEF) {
 		zval_copy_ctor(&newentry.metadata);

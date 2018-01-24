@@ -261,6 +261,7 @@ static php_stream * phar_wrapper_open_url(php_stream_wrapper *wrapper, const cha
 				phar_entry_info *entry;
 
 				entry = (phar_entry_info *) ecalloc(1, sizeof(phar_entry_info));
+				ZVAL_UNDEF(&entry->metadata);
 				entry->is_temp_dir = 1;
 				entry->filename = estrndup("", 0);
 				entry->filename_len = 0;
@@ -844,6 +845,7 @@ static int phar_wrapper_rename(php_stream_wrapper *wrapper, const char *url_from
 		}
 		/* transfer all data over to the new entry */
 		memcpy((void *) &new, (void *) entry, sizeof(phar_entry_info));
+		ZVAL_UNDEF(&new.metadata);
 		/* mark the old one for deletion */
 		entry->is_deleted = 1;
 		entry->fp = NULL;

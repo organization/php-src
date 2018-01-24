@@ -3087,6 +3087,10 @@ static int php_session_rfc1867_callback(unsigned int event, void *event_data, vo
 		case MULTIPART_EVENT_START: {
 			multipart_event_start *data = (multipart_event_start *) event_data;
 			progress = ecalloc(1, sizeof(php_session_rfc1867_progress));
+			ZVAL_UNDEF(&progress->sid);
+			ZVAL_UNDEF(&progress->data);
+			ZVAL_UNDEF(&progress->files);
+			ZVAL_UNDEF(&progress->current_file);
 			progress->content_length = data->content_length;
 			progress->sname_len  = strlen(PS(session_name));
 			PS(rfc1867_progress) = progress;

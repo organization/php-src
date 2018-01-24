@@ -116,6 +116,7 @@ static inline spl_filesystem_iterator* spl_filesystem_object_to_iterator(spl_fil
 	spl_filesystem_iterator    *it;
 
 	it = ecalloc(1, sizeof(spl_filesystem_iterator));
+	ZVAL_UNDEF(&it->current);
 	it->object = (void *)obj;
 	zend_iterator_init(&it->intern);
 	return it;

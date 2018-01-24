@@ -443,6 +443,8 @@ static PHP_METHOD(PDOStatement, execute)
 
 		ZEND_HASH_FOREACH_KEY_VAL(Z_ARRVAL_P(input_params), num_index, key, tmp) {
 			memset(&param, 0, sizeof(param));
+			ZVAL_UNDEF(&param.parameter);
+			ZVAL_UNDEF(&param.driver_params);
 
 			if (key) {
 				/* yes this is correct.  we don't want to count the null byte.  ask wez */
@@ -1531,6 +1533,8 @@ static int register_bound_param(INTERNAL_FUNCTION_PARAMETERS, pdo_stmt_t *stmt, 
 	zval *parameter, *driver_params = NULL;
 
 	memset(&param, 0, sizeof(param));
+	ZVAL_UNDEF(&param.parameter);
+	ZVAL_UNDEF(&param.driver_params);
 	param.paramno = -1;
 
 	if (FAILURE == zend_parse_parameters_ex(ZEND_PARSE_PARAMS_QUIET, ZEND_NUM_ARGS(),
@@ -1576,6 +1580,8 @@ static PHP_METHOD(PDOStatement, bindValue)
 	PHP_STMT_GET_OBJ;
 
 	memset(&param, 0, sizeof(param));
+	ZVAL_UNDEF(&param.parameter);
+	ZVAL_UNDEF(&param.driver_params);
 	param.paramno = -1;
 
 	if (FAILURE == zend_parse_parameters_ex(ZEND_PARSE_PARAMS_QUIET, ZEND_NUM_ARGS(),
@@ -1905,6 +1911,7 @@ int pdo_stmt_setup_fetch_mode(INTERNAL_FUNCTION_PARAMETERS, pdo_stmt_t *stmt, in
 			break;
 
 		case PDO_FETCH_CLASS:
+			ZVAL_UNDEF(&stmt->fetch.cls.ctor_args);
 			/* Gets its class name from 1st column */
 			if ((flags & PDO_FETCH_CLASSTYPE) == PDO_FETCH_CLASSTYPE) {
 				if (argc != 1) {
@@ -1930,7 +1937,6 @@ int pdo_stmt_setup_fetch_mode(INTERNAL_FUNCTION_PARAMETERS, pdo_stmt_t *stmt, in
 			}
 
 			if (SUCCESS == retval) {
-				ZVAL_UNDEF(&stmt->fetch.cls.ctor_args);
 #ifdef ilia_0 /* we'll only need this when we have persistent statements, if ever */
 				if (stmt->dbh->is_persistent) {
 					php_error_docref(NULL, E_WARNING, "PHP might crash if you don't call $stmt->setFetchMode() to reset to defaults on this persistent statement.  This will be fixed in a later release");
@@ -2373,6 +2379,10 @@ zend_object *pdo_dbstmt_new(zend_class_entry *ce)
 	pdo_stmt_t *stmt;
 
 	stmt = zend_object_alloc(sizeof(pdo_stmt_t), ce);
+	ZVAL_UNDEF(&stmt->database_object_handle);
+	ZVAL_UNDEF(&stmt->lazy_object_ref);
+	ZVAL_UNDEF(&stmt->fetch.cls.ctor_args);
+	ZVAL_UNDEF(&stmt->fetch.into);
 	zend_object_std_init(&stmt->std, ce);
 	object_properties_init(&stmt->std, ce);
 
@@ -2473,6 +2483,7 @@ zend_object_iterator *pdo_stmt_iter_get(zend_class_entry *ce, zval *object, int 
 	}
 
 	I = ecalloc(1, sizeof(struct php_pdo_iterator));
+	ZVAL_UNDEF(&I->fetch_ahead);
 	zend_iterator_init(&I->iter);
 	I->iter.funcs = &pdo_stmt_iter_funcs;
 	ZVAL_COPY(&I->iter.data, object);

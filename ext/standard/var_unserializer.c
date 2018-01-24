@@ -72,9 +72,6 @@ PHPAPI void php_var_unserialize_set_allowed_classes(php_unserialize_data_t d, Ha
 #define VAR_ENTRIES_MAX 1024
 #define VAR_ENTRIES_DBG 0
 
-/* VAR_FLAG used in var_dtor entries to signify an entry on which __wakeup should be called */
-#define VAR_WAKEUP_FLAG 1
-
 typedef struct {
 	zval *data[VAR_ENTRIES_MAX];
 	zend_long used_slots;
@@ -143,7 +140,6 @@ PHPAPI zval *var_tmp_var(php_unserialize_data_t *var_hashx)
         (*var_hashx)->last_dtor = var_hash;
     }
     ZVAL_UNDEF(&var_hash->data[var_hash->used_slots]);
-	//???Z_EXTRA(var_hash->data[var_hash->used_slots]) = 0;
     return &var_hash->data[var_hash->used_slots++];
 }
 
@@ -213,7 +209,9 @@ PHPAPI void var_destroy(php_unserialize_data_t *var_hashx)
 #endif
 
 			/* Perform delayed __wakeup calls */
-			if (0) { //???Z_EXTRA_P(zv) == VAR_WAKEUP_FLAG) {
+			if (Z_TYPE_P(zv) == IS_OBJECT
+			 && (OBJ_FLAGS(Z_OBJ_P(zv)) & IS_OBJ_HAS_GUARDS)) {
+				OBJ_FLAGS(Z_OBJ_P(zv)) &= ~IS_OBJ_HAS_GUARDS;
 				if (!wakeup_failed) {
 					zval retval;
 					if (Z_ISUNDEF(wakeup_name)) {
@@ -317,7 +315,7 @@ static inline int unserialize_allowed_class(
 #define YYMARKER marker
 
 
-#line 325 "ext/standard/var_unserializer.re"
+#line 323 "ext/standard/var_unserializer.re"
 
 
 
@@ -613,7 +611,9 @@ static inline int object_common2(UNSERIALIZE_PARAMETER, zend_long elements)
 		/* Delay __wakeup call until end of serialization */
 		zval *wakeup_var = var_tmp_var(var_hash);
 		ZVAL_COPY(wakeup_var, rval);
-		//???Z_EXTRA_P(wakeup_var) = VAR_WAKEUP_FLAG;
+		/* Use IS_OBJ_HAS_GUARDS flags for delayed __wakeup call */
+		// TODO: Check if this is 100% safe ???
+		OBJ_FLAGS(Z_OBJ_P(wakeup_var)) |= IS_OBJ_HAS_GUARDS;
 	}
 
 	return finish_nested_data(UNSERIALIZE_PASSTHRU);

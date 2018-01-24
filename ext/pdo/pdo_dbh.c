@@ -312,6 +312,8 @@ static PHP_METHOD(PDO, dbh_constructor)
 				/* need a brand new pdbh */
 				pdbh = pecalloc(1, sizeof(*pdbh), 1);
 
+				ZVAL_UNDEF(&pdbh->def_stmt_ctor_args);
+				ZVAL_UNDEF(&pdbh->query_stmt_zval);
 				pdbh->refcount = 1;
 				pdbh->is_persistent = 1;
 				pdbh->persistent_id = pemalloc(plen + 1, 1);

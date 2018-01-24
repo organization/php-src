@@ -84,7 +84,9 @@ static void spl_fixedarray_init(spl_fixedarray *array, zend_long size) /* {{{ */
 {
 	if (size > 0) {
 		array->size = 0; /* reset size in case ecalloc() fails */
-		array->elements = ecalloc(size, sizeof(zval));
+		array->elements = safe_emalloc(size, sizeof(zval), 0);
+		/* Initialize to IS_UNDEF */
+		memset(array->elements, 0xff, size * sizeof(zval));
 		array->size = size;
 	} else {
 		array->elements = NULL;
@@ -120,7 +122,8 @@ static void spl_fixedarray_resize(spl_fixedarray *array, zend_long size) /* {{{ 
 		}
 	} else if (size > array->size) {
 		array->elements = safe_erealloc(array->elements, size, sizeof(zval), 0);
-		memset(array->elements + array->size, '\0', sizeof(zval) * (size - array->size));
+		/* Initialize to IS_UNDEF */
+		memset(array->elements + array->size, 0xff, sizeof(zval) * (size - array->size));
 	} else { /* size < array->size */
 		zend_long i;
 

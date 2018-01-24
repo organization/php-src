@@ -727,6 +727,7 @@ static sdlPtr load_wsdl(zval *this_ptr, char *struri)
 	int i,n;
 
 	memset(&ctx,0,sizeof(ctx));
+	ZVAL_UNDEF(&ctx.old_header);
 	ctx.sdl = emalloc(sizeof(sdl));
 	memset(ctx.sdl, 0, sizeof(sdl));
 	ctx.sdl->source = estrdup(struri);

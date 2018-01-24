@@ -1486,6 +1486,10 @@ static spl_dual_it_object* spl_dual_it_construct(INTERNAL_FUNCTION_PARAMETERS, z
 		case DIT_CachingIterator:
 		case DIT_RecursiveCachingIterator: {
 			zend_long flags = CIT_CALL_TOSTRING;
+
+			ZVAL_UNDEF(&intern->u.caching.zstr);
+			ZVAL_UNDEF(&intern->u.caching.zchildren);
+			ZVAL_UNDEF(&intern->u.caching.zcache);
 			if (zend_parse_parameters_throw(ZEND_NUM_ARGS(), "O|l", &zobject, ce_inner, &flags) == FAILURE) {
 				return NULL;
 			}
@@ -1534,6 +1538,7 @@ static spl_dual_it_object* spl_dual_it_construct(INTERNAL_FUNCTION_PARAMETERS, z
 			break;
 		}
 		case DIT_AppendIterator:
+			ZVAL_UNDEF(&intern->u.append.zarrayit);
 			zend_replace_error_handling(EH_THROW, spl_ce_InvalidArgumentException, &error_handling);
 			spl_instantiate(spl_ce_ArrayIterator, &intern->u.append.zarrayit);
 			zend_call_method_with_0_params(&intern->u.append.zarrayit, spl_ce_ArrayIterator, &spl_ce_ArrayIterator->constructor, "__construct", NULL);
@@ -2361,6 +2366,9 @@ static zend_object *spl_dual_it_new(zend_class_entry *class_type)
 	spl_dual_it_object *intern;
 
 	intern = zend_object_alloc(sizeof(spl_dual_it_object), class_type);
+	ZVAL_UNDEF(&intern->inner.zobject);
+	ZVAL_UNDEF(&intern->current.data);
+	ZVAL_UNDEF(&intern->current.key);
 	intern->dit_type = DIT_Unknown;
 
 	zend_object_std_init(&intern->std, class_type);

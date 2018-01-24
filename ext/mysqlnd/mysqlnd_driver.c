@@ -114,6 +114,8 @@ MYSQLND_METHOD(mysqlnd_object_factory, get_connection)(MYSQLND_CLASS_METHODS_TYP
 		mnd_pefree(new_object, persistent);
 		DBG_RETURN(NULL);
 	}
+	ZVAL_UNDEF(&new_object->data->async_read_cb);
+	ZVAL_UNDEF(&new_object->data->async_err_cb);
 	new_object->persistent = persistent;
 	new_object->m = mysqlnd_conn_get_methods();
 	data = new_object->data;
@@ -204,6 +206,8 @@ MYSQLND_METHOD(mysqlnd_object_factory, get_prepared_statement)(MYSQLND_CONN_DATA
 		if (!stmt) {
 			break;
 		}
+		ZVAL_UNDEF(&stmt->execute_read_cb);
+		ZVAL_UNDEF(&stmt->execute_err_cb);
 
 		if (FAIL == mysqlnd_error_info_init(&stmt->error_info_impl, 0)) {
 			break;

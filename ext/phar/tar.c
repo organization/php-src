@@ -234,6 +234,7 @@ int phar_parse_tarfile(php_stream* fp, char *fname, int fname_len, char *alias, 
 	old = (memcmp(hdr->magic, "ustar", sizeof("ustar")-1) != 0);
 
 	myphar = (phar_archive_data *) pecalloc(1, sizeof(phar_archive_data), PHAR_G(persist));
+	ZVAL_UNDEF(&myphar->metadata);
 	myphar->is_persistent = PHAR_G(persist);
 	/* estimate number of entries, can't be certain with tar files */
 	zend_hash_init(&myphar->manifest, 2 + (totalsize >> 12),
