@@ -28,16 +28,37 @@
 #include "zend_vm.h"
 #include "zend_bitset.h"
 
-#define GET_AVAILABLE_T()					\
-	for (i = 0; i < T; i++) {				\
-		if (!zend_bitset_in(taken_T, i)) {	\
-			break;							\
-		}									\
-	}										\
-	zend_bitset_incl(taken_T, i);			\
-	if (i > max) {							\
-		max = i;							\
+
+static zend_always_inline int get_available_T(zend_bitset taken_T, int n, int T)
+{
+	int i, j;
+
+	for (i = 0; i < T - n; i++) {
+		if (!zend_bitset_in(taken_T, i)) {
+			for (j = 0; j < n; j++) {
+				if (zend_bitset_in(taken_T, i + j + 1)) {
+					i += j + 1;
+					continue;
+				}
+			}
+			/* found */
+			zend_bitset_incl(taken_T, i);
+			for (j = 0; j < n; j++) {
+				zend_bitset_incl(taken_T, i + j + 1);
+			}
+			return i;
+		}
 	}
+	ZEND_ASSERT(0);
+	return -1;
+}
+
+#define GET_AVAILABLE_T(n) do { \
+		i = get_available_T(taken_T, n - 1, T); \
+		if (i + n - 1 > max) { \
+			max = i + n - 1; \
+		} \
+	} while (0)
 
 void zend_optimize_temporary_variables(zend_op_array *op_array, zend_optimizer_ctx *ctx)
 {
@@ -127,11 +148,25 @@ void zend_optimize_temporary_variables(zend_op_array *op_array, zend_optimizer_c
 							}
 						}
 					}
-					if (use_new_var) {
-						i = ++max;
-						zend_bitset_incl(taken_T, i);
+					if (opline->opcode == ZEND_FE_FREE ||
+					    opline->opcode == ZEND_FE_FETCH_R ||
+					    opline->opcode == ZEND_FE_FETCH_RW ||
+					    opline->opcode == ZEND_FAST_RET ||
+					    opline->opcode == ZEND_DISCARD_EXCEPTION) {
+						if (use_new_var) {
+							i = max + 1; max++;
+							zend_bitset_incl(taken_T, i);
+							zend_bitset_incl(taken_T, i + 1);
+						} else {
+							GET_AVAILABLE_T(2);
+						}
 					} else {
-						GET_AVAILABLE_T();
+						if (use_new_var) {
+							i = ++max;
+							zend_bitset_incl(taken_T, i);
+						} else {
+							GET_AVAILABLE_T(1);
+						}
 					}
 					map_T[currT] = i;
 					zend_bitset_incl(valid_T, currT);
@@ -143,7 +178,7 @@ void zend_optimize_temporary_variables(zend_op_array *op_array, zend_optimizer_c
 		if ((opline->op2_type & (IS_VAR | IS_TMP_VAR))) {
 			currT = VAR_NUM(opline->op2.var) - offset;
 			if (!zend_bitset_in(valid_T, currT)) {
-				GET_AVAILABLE_T();
+				GET_AVAILABLE_T(1);
 				map_T[currT] = i;
 				zend_bitset_incl(valid_T, currT);
 			}
@@ -163,17 +198,22 @@ void zend_optimize_temporary_variables(zend_op_array *op_array, zend_optimizer_c
 				}
 				opline->result.var = NUM_VAR(map_T[currT] + offset);
 				if (opline->opcode == ZEND_ROPE_INIT) {
-					if (start_of_T[currT] == opline) {
+				if (start_of_T[currT] == opline) {
 						uint32_t num = ((opline->extended_value * sizeof(zend_string*)) + (sizeof(zval) - 1)) / sizeof(zval);
 						while (num > 1) {
 							num--;
 							zend_bitset_excl(taken_T, map_T[currT]+num);
 						}
 					}
+				} else if (opline->opcode == ZEND_FE_RESET_R ||
+				           opline->opcode == ZEND_FE_RESET_RW) {
+					if (start_of_T[currT] == opline) {
+						zend_bitset_excl(taken_T, map_T[currT]+1);
+					}
 				}
 			} else {
 				/* Code which gets here is using a wrongly built opcode such as RECV() */
-				GET_AVAILABLE_T();
+				GET_AVAILABLE_T(1);
 				map_T[currT] = i;
 				zend_bitset_incl(valid_T, currT);
 				opline->result.var = NUM_VAR(i + offset);
