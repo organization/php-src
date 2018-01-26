@@ -2042,7 +2042,9 @@ static zend_always_inline zval* zend_fetch_static_property_address(zval *varname
 					}
 					return NULL;
 				}
-				CACHE_PTR(opline->cache_slot, ce);
+				if (varname_type != IS_CONST) {
+					CACHE_PTR(opline->cache_slot, ce);
+				}
 			}
 		}
 	} else {

@@ -3102,7 +3102,9 @@ ZEND_VM_HANDLER(113, ZEND_INIT_STATIC_METHOD_CALL, UNUSED|CLASS_FETCH|CONST|VAR,
 				ZEND_ASSERT(EG(exception));
 				HANDLE_EXCEPTION();
 			}
-			CACHE_PTR(opline->cache_slot, ce);
+			if (OP2_TYPE != IS_CONST) {
+				CACHE_PTR(opline->cache_slot, ce);
+			}
 		}
 	} else if (OP1_TYPE == IS_UNUSED) {
 		ce = zend_fetch_class(NULL, opline->op1.num);
@@ -3163,11 +3165,7 @@ ZEND_VM_HANDLER(113, ZEND_INIT_STATIC_METHOD_CALL, UNUSED|CLASS_FETCH|CONST|VAR,
 		if (OP2_TYPE == IS_CONST &&
 		    EXPECTED(fbc->type <= ZEND_USER_FUNCTION) &&
 		    EXPECTED(!(fbc->common.fn_flags & (ZEND_ACC_CALL_VIA_TRAMPOLINE|ZEND_ACC_NEVER_CACHE)))) {
-			if (OP1_TYPE == IS_CONST) {
-				CACHE_PTR(opline->cache_slot + sizeof(void*), fbc);
-			} else {
-				CACHE_POLYMORPHIC_PTR(opline->cache_slot, ce, fbc);
-			}
+			CACHE_POLYMORPHIC_PTR(opline->cache_slot, ce, fbc);
 		}
 		if (EXPECTED(fbc->type == ZEND_USER_FUNCTION) && UNEXPECTED(!fbc->op_array.run_time_cache)) {
 			init_func_run_time_cache(&fbc->op_array);
@@ -5047,7 +5045,6 @@ ZEND_VM_HANDLER(181, ZEND_FETCH_CLASS_CONSTANT, VAR|CONST|UNUSED|CLASS_FETCH, CO
 					ZVAL_UNDEF(EX_VAR(opline->result.var));
 					HANDLE_EXCEPTION();
 				}
-				CACHE_PTR(opline->cache_slot, ce);
 			}
 		} else {
 			if (OP1_TYPE == IS_UNUSED) {
@@ -5083,11 +5080,7 @@ ZEND_VM_HANDLER(181, ZEND_FETCH_CLASS_CONSTANT, VAR|CONST|UNUSED|CLASS_FETCH, CO
 					HANDLE_EXCEPTION();
 				}
 			}
-			if (OP1_TYPE == IS_CONST) {
-				CACHE_PTR(opline->cache_slot + sizeof(void*), value);
-			} else {
-				CACHE_POLYMORPHIC_PTR(opline->cache_slot, ce, value);
-			}
+			CACHE_POLYMORPHIC_PTR(opline->cache_slot, ce, value);
 		} else {
 			zend_throw_error(NULL, "Undefined class constant '%s'", Z_STRVAL_P(RT_CONSTANT(opline, opline->op2)));
 			ZVAL_UNDEF(EX_VAR(opline->result.var));
@@ -5458,7 +5451,7 @@ ZEND_VM_HANDLER(179, ZEND_UNSET_STATIC_PROP, CONST|TMPVAR|CV, UNUSED|CLASS_FETCH
 				FREE_OP1();
 				HANDLE_EXCEPTION();
 			}
-			CACHE_PTR(opline->cache_slot, ce);
+			/*CACHE_PTR(opline->cache_slot, ce);*/
 		}
 	} else if (OP2_TYPE == IS_UNUSED) {
 		ce = zend_fetch_class(NULL, opline->op2.num);
@@ -6288,7 +6281,9 @@ ZEND_VM_HANDLER(180, ZEND_ISSET_ISEMPTY_STATIC_PROP, CONST|TMPVAR|CV, UNUSED|CLA
 				ZVAL_UNDEF(EX_VAR(opline->result.var));
 				HANDLE_EXCEPTION();
 			}
-			CACHE_PTR(opline->cache_slot, ce);
+			if (OP1_TYPE != IS_CONST) {
+				CACHE_PTR(opline->cache_slot, ce);
+			}
 		}
 	} else {
 		if (OP2_TYPE == IS_UNUSED) {
