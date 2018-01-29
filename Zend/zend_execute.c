@@ -637,7 +637,7 @@ static inline void zend_assign_to_variable_reference(zval *variable_ptr, zval *v
 static inline int make_real_object(zval *object)
 {
 	if (UNEXPECTED(!Z_IS_OBJECT_P(object))) {
-		if (EXPECTED(Z_TYPE_P(object) <= IS_FALSE)) {
+		if (EXPECTED(Z_IS_LESS_THAN_TRUE_P(object))) {
 			/* nothing to destroy */
 		} else if (EXPECTED((Z_IS_STRING_P(object) && Z_STRLEN_P(object) == 0))) {
 			zval_ptr_dtor_nogc(object);
@@ -1744,7 +1744,7 @@ fetch_from_array:
 		if (/*dim_type == IS_CV &&*/ dim && UNEXPECTED(Z_IS_UNDEF_P(dim))) {
 			zval_undefined_cv(EX(opline)->op2.var EXECUTE_DATA_CC);
 		}
-		if (EXPECTED(Z_TYPE_P(container) <= IS_FALSE)) {
+		if (EXPECTED(Z_IS_LESS_THAN_TRUE_P(container))) {
 			if (type != BP_VAR_UNSET) {
 				array_init(container);
 				goto fetch_from_array;
@@ -1933,7 +1933,7 @@ static zend_always_inline void zend_fetch_property_address(zval *result, zval *c
 
 			/* this should modify object only if it's empty */
 			if (type != BP_VAR_UNSET &&
-			    EXPECTED(Z_TYPE_P(container) <= IS_FALSE ||
+			    EXPECTED(Z_IS_LESS_THAN_TRUE_P(container) ||
 			      (Z_IS_STRING_P(container) && Z_STRLEN_P(container)==0))) {
 				zval_ptr_dtor_nogc(container);
 				object_init(container);

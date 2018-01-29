@@ -567,7 +567,12 @@ static zend_always_inline uint32_t zval_get_raw_type_info(const zval* pz) {
 #define T_IS_REFERENCE(t)			((t) == (uint32_t)~IS_REFERENCE_EX)
 #define T_IS_INDIRECT(t)			((t) == (uint32_t)~IS_INDIRECT)
 
+// IS_UNDEF, IS_NULL, IS_FALSE or IS_TRUE
+#define T_IS_PRIMITIVE(t)			((t) >= (uint32_t)~IS_TRUE)
+// IS_UNDEF, IS_NULL or IS_FALSE
 #define T_IS_LESS_THAN_TRUE(t)	    ((t) > (uint32_t)~IS_TRUE)
+// !IS_UNDEF and !IS_NULL
+#define T_IS_SET(t)					((t) < (uint32_t)~IS_NULL)
 #define T_IS_CONSTANT(t)			(((t) | (uint32_t)(IS_TYPE_REFCOUNTED << Z_TYPE_FLAGS_SHIFT)) == (uint32_t)~IS_CONSTANT_AST)
 #define T_IS_ERROR(t)				((t) == (uint32_t)~_IS_ERROR)
 
@@ -598,6 +603,12 @@ static zend_always_inline uint32_t zval_get_raw_type_info(const zval* pz) {
 #define Z_IS_RESOURCE_P(zval)		Z_IS_RESOURCE(*(zval))
 #define Z_IS_REFERENCE_P(zval)		Z_IS_REFERENCE(*(zval))
 #define Z_IS_INDIRECT_P(zval)		Z_IS_INDIRECT(*(zval))
+
+#define Z_IS_SET(zval)				T_IS_SET((zval).u1.type_info)
+#define Z_IS_SET_P(zval)			Z_IS_SET(*(zval))
+
+#define Z_IS_PRIMITIVE(zval)		T_IS_PRIMITIVE((zval).u1.type_info)
+#define Z_IS_PRIMITIVE_P(zval)		Z_IS_PRIMITIVE(*(zval))
 
 #define Z_IS_LESS_THAN_TRUE(zval)	T_IS_LESS_THAN_TRUE((zval).u1.type_info)
 #define Z_IS_LESS_THAN_TRUE_P(zval)	Z_IS_LESS_THAN_TRUE(*(zval))
@@ -1021,7 +1032,7 @@ static zend_always_inline uint32_t zend_gc_delref_ex(zend_refcounted_h *p, uint3
 
 static zend_always_inline uint32_t zval_refcount_p(const zval* pz) {
 #if ZEND_DEBUG
-	ZEND_ASSERT(Z_REFCOUNTED_P(pz) || Z_TYPE_P(pz) == IS_ARRAY);
+	ZEND_ASSERT(Z_REFCOUNTED_P(pz) || Z_IS_ARRAY_P(pz));
 #endif
 	return GC_REFCOUNT(Z_COUNTED_P(pz));
 }
@@ -1084,7 +1095,7 @@ static zend_always_inline uint32_t zval_delref_p(zval* pz) {
 		const zval *_z2 = (v);							\
 		zend_refcounted *_gc = Z_COUNTED_P(_z2);		\
 		uint32_t _t = _z2->u1.type_info;				\
-		if ((_t & Z_TYPE_MASK) == (zend_uchar)~IS_ARRAY) {\
+		if (T_IS_ARRAY(_t)) {							\
 			ZVAL_ARR(_z1, zend_array_dup((zend_array*)_gc));\
 		} else {										\
 			if (T_IS_REFCOUNTED(_t)) {					\
@@ -1196,7 +1207,7 @@ static zend_always_inline uint32_t zval_delref_p(zval* pz) {
 
 #define SEPARATE_ZVAL_NOREF(zv) do {					\
 		zval *_zv = (zv);								\
-		ZEND_ASSERT(Z_TYPE_P(_zv) != IS_REFERENCE);		\
+		ZEND_ASSERT(!Z_IS_REFERENCE_P(_zv));			\
 		SEPARATE_ZVAL_IF_NOT_REF(_zv);					\
 	} while (0)
 

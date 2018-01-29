@@ -8637,7 +8637,7 @@ void zend_eval_const_expr(zend_ast **ast_ptr) /* {{{ */
 				}
 				c = (zend_uchar) Z_STRVAL_P(container)[offset];
 				ZVAL_INTERNED_STR(&result, ZSTR_CHAR(c));
-			} else if (Z_TYPE_P(container) <= IS_FALSE) {
+			} else if (Z_IS_LESS_THAN_TRUE_P(container)) {
 				ZVAL_NULL(&result);
 			} else {
 				return;

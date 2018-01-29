@@ -110,7 +110,7 @@ static void zend_ini_add_string(zval *result, zval *op1, zval *op2)
 {
 	int length, op1_len;
 
-	if (Z_TYPE_P(op1) != IS_STRING) {
+	if (!Z_IS_STRING_P(op1)) {
 		/* ZEND_ASSERT(!Z_REFCOUNTED_P(op1)); */
 		if (ZEND_SYSTEM_INI) {
 			zend_string *tmp_str;
@@ -123,7 +123,7 @@ static void zend_ini_add_string(zval *result, zval *op1, zval *op2)
 	}
 	op1_len = (int)Z_STRLEN_P(op1);
 	
-	if (Z_TYPE_P(op2) != IS_STRING) {
+	if (!Z_IS_STRING_P(op2)) {
 		convert_to_string(op2);
 	}
 	length = op1_len + (int)Z_STRLEN_P(op2);
@@ -142,7 +142,7 @@ static void zend_ini_get_constant(zval *result, zval *name)
 	/* If name contains ':' it is not a constant. Bug #26893. */
 	if (!memchr(Z_STRVAL_P(name), ':', Z_STRLEN_P(name))
 		   	&& (c = zend_get_constant(Z_STR_P(name))) != 0) {
-		if (Z_TYPE_P(c) != IS_STRING) {
+		if (!Z_IS_STRING_P(c)) {
 			ZVAL_COPY_OR_DUP(&tmp, c);
 			if (Z_OPT_CONSTANT(tmp)) {
 				zval_update_constant_ex(&tmp, NULL);
@@ -323,7 +323,7 @@ statement:
 #endif
 			ZEND_INI_PARSER_CB(&$1, &$5, &$2, ZEND_INI_PARSER_POP_ENTRY, ZEND_INI_PARSER_ARG);
 			zend_string_release(Z_STR($1));
-			if (Z_TYPE($2) == IS_STRING) {
+			if (Z_IS_STRING($2)) {
 				zend_string_release(Z_STR($2));
 			} else {
 				zval_dtor(&$2);

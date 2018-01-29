@@ -4200,7 +4200,7 @@ ZEND_API void zend_restore_error_handling(zend_error_handling *saved) /* {{{ */
 		&& !same_zval(&saved->user_handler, &EG(user_error_handler))) {
 		zval_ptr_dtor(&EG(user_error_handler));
 		ZVAL_COPY_VALUE(&EG(user_error_handler), &saved->user_handler);
-	} else if (Z_TYPE(saved->user_handler)) {
+	} else if (!Z_IS_UNDEF(saved->user_handler)) {
 		zval_ptr_dtor(&saved->user_handler);
 	}
 	ZVAL_UNDEF(&saved->user_handler);

@@ -378,7 +378,7 @@ ZEND_API int zend_ast_evaluate(zval *result, zend_ast *ast, zend_class_entry *sc
 				ret = FAILURE;
 				break;
 			}
-			if (Z_TYPE(op1) > IS_NULL) {
+			if (Z_IS_SET(op1)) {
 				*result = op1;
 			} else {
 				if (UNEXPECTED(zend_ast_evaluate(result, ast->child[1], scope) != SUCCESS)) {
