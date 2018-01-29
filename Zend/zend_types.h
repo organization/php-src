@@ -580,6 +580,9 @@ static zend_always_inline uint32_t zval_get_type_info(const zval* pz) {
 #define Z_IS_REFERENCE_P(zval)		Z_IS_REFERENCE(*(zval))
 #define Z_IS_INDIRECT_P(zval)		Z_IS_INDIRECT(*(zval))
 
+#define Z_IS_LESS_THAN_TRUE(zval)	((zval).u1.type_info > (uint32_t)~IS_TRUE)
+#define Z_IS_LESS_THAN_TRUE_P(zval)	Z_IS_LESS_THAN_TRUE(*(zval))
+
 /* All data types < IS_STRING have their constructor/destructors skipped */
 #define Z_CONSTANT(zval)			(Z_TYPE(zval) == IS_CONSTANT_AST)
 #define Z_CONSTANT_P(zval_p)		Z_CONSTANT(*(zval_p))

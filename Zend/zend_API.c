@@ -316,7 +316,7 @@ ZEND_API int ZEND_FASTCALL zend_parse_arg_long_weak(zval *arg, zend_long *dest) 
 				return 0;
 			}
 		}
-	} else if (EXPECTED(Z_TYPE_P(arg) < IS_TRUE)) {
+	} else if (EXPECTED(Z_IS_LESS_THAN_TRUE_P(arg))) {
 		*dest = 0;
 	} else if (EXPECTED(Z_IS_TRUE_P(arg))) {
 		*dest = 1;
@@ -357,7 +357,7 @@ ZEND_API int ZEND_FASTCALL zend_parse_arg_long_cap_weak(zval *arg, zend_long *de
 				return 0;
 			}
 		}
-	} else if (EXPECTED(Z_TYPE_P(arg) < IS_TRUE)) {
+	} else if (EXPECTED(Z_IS_LESS_THAN_TRUE_P(arg))) {
 		*dest = 0;
 	} else if (EXPECTED(Z_IS_TRUE_P(arg))) {
 		*dest = 1;
@@ -392,7 +392,7 @@ ZEND_API int ZEND_FASTCALL zend_parse_arg_double_weak(zval *arg, double *dest) /
 				return 0;
 			}
 		}
-	} else if (EXPECTED(Z_TYPE_P(arg) < IS_TRUE)) {
+	} else if (EXPECTED(Z_IS_LESS_THAN_TRUE_P(arg))) {
 		*dest = 0.0;
 	} else if (EXPECTED(Z_IS_TRUE_P(arg))) {
 		*dest = 1.0;
