@@ -359,7 +359,7 @@ ZEND_API zval *zend_get_constant_ex(zend_string *cname, zend_class_entry *scope,
 			}
 		}
 
-		if (ret_constant && Z_TYPE_P(ret_constant) == IS_CONSTANT_AST) {
+		if (ret_constant && Z_CONSTANT_P(ret_constant)) {
 			int ret;
 
 			if (IS_CONSTANT_VISITED(ret_constant)) {

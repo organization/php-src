@@ -5073,7 +5073,7 @@ ZEND_VM_HANDLER(181, ZEND_FETCH_CLASS_CONSTANT, VAR|CONST|UNUSED|CLASS_FETCH, CO
 				HANDLE_EXCEPTION();
 			}
 			value = &c->value;
-			if (Z_TYPE_P(value) == IS_CONSTANT_AST) {
+			if (Z_CONSTANT_P(value)) {
 				zval_update_constant_ex(value, c->ce);
 				if (UNEXPECTED(EG(exception) != NULL)) {
 					ZVAL_UNDEF(EX_VAR(opline->result.var));
@@ -7953,7 +7953,7 @@ ZEND_VM_HANDLER(183, ZEND_BIND_STATIC, CV, CONST, REF)
 	value = zend_hash_find_ex(ht, Z_STR_P(varname), 1);
 
 	if (opline->extended_value) {
-		if (Z_TYPE_P(value) == IS_CONSTANT_AST) {
+		if (Z_CONSTANT_P(value)) {
 			SAVE_OPLINE();
 			if (UNEXPECTED(zval_update_constant_ex(value, EX(func)->op_array.scope) != SUCCESS)) {
 				ZVAL_NULL(variable_ptr);

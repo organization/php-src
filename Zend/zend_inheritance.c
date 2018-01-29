@@ -512,7 +512,7 @@ static ZEND_COLD zend_string *zend_get_function_declaration(const zend_function 
 							smart_str_appendc(&str, '\'');
 						} else if (Z_IS_ARRAY_P(zv)) {
 							smart_str_appends(&str, "Array");
-						} else if (Z_TYPE_P(zv) == IS_CONSTANT_AST) {
+						} else if (Z_CONSTANT_P(zv)) {
 							zend_ast *ast = Z_ASTVAL_P(zv);
 							if (ast->kind == ZEND_AST_CONSTANT) {
 								smart_str_append(&str, zend_ast_get_constant_name(ast));
@@ -775,7 +775,7 @@ static void do_inherit_class_constant(zend_string *name, zend_class_constant *pa
 				ZSTR_VAL(ce->name), ZSTR_VAL(name), zend_visibility_string(Z_ACCESS_FLAGS(parent_const->value)), ZSTR_VAL(ce->parent->name), (Z_ACCESS_FLAGS(parent_const->value) & ZEND_ACC_PUBLIC) ? "" : " or weaker");
 		}
 	} else if (!(Z_ACCESS_FLAGS(parent_const->value) & ZEND_ACC_PRIVATE)) {
-		if (Z_TYPE(parent_const->value) == IS_CONSTANT_AST) {
+		if (Z_CONSTANT(parent_const->value)) {
 			ce->ce_flags &= ~ZEND_ACC_CONSTANTS_UPDATED;
 		}
 		if (ce->type & ZEND_INTERNAL_CLASS) {
@@ -914,7 +914,7 @@ ZEND_API void zend_do_inheritance(zend_class_entry *ce, zend_class_entry *parent
 					ZVAL_MAKE_REF_EX(src, 2);
 				}
 				ZVAL_REF(dst, Z_REF_P(src));
-				if (Z_TYPE_P(Z_REFVAL_P(dst)) == IS_CONSTANT_AST) {
+				if (Z_CONSTANT_P(Z_REFVAL_P(dst))) {
 					ce->ce_flags &= ~ZEND_ACC_CONSTANTS_UPDATED;
 				}
 			} while (dst != end);
@@ -1016,7 +1016,7 @@ static void do_inherit_iface_constant(zend_string *name, zend_class_constant *c,
 {
 	if (do_inherit_constant_check(&ce->constants_table, c, name, iface)) {
 		zend_class_constant *ct;
-		if (Z_TYPE(c->value) == IS_CONSTANT_AST) {
+		if (Z_CONSTANT(c->value)) {
 			ce->ce_flags &= ~ZEND_ACC_CONSTANTS_UPDATED;
 		}
 		if (ce->type & ZEND_INTERNAL_CLASS) {
@@ -1619,12 +1619,12 @@ static void zend_do_traits_property_binding(zend_class_entry *ce) /* {{{ */
 						}
 
 						/* if any of the values is a constant, we try to resolve it */
-						if (UNEXPECTED(Z_TYPE_P(op1) == IS_CONSTANT_AST)) {
+						if (UNEXPECTED(Z_CONSTANT_P(op1))) {
 							ZVAL_COPY_OR_DUP(&op1_tmp, op1);
 							zval_update_constant_ex(&op1_tmp, ce);
 							op1 = &op1_tmp;
 						}
-						if (UNEXPECTED(Z_TYPE_P(op2) == IS_CONSTANT_AST)) {
+						if (UNEXPECTED(Z_CONSTANT_P(op2))) {
 							ZVAL_COPY_OR_DUP(&op2_tmp, op2);
 							zval_update_constant_ex(&op2_tmp, ce);
 							op2 = &op2_tmp;

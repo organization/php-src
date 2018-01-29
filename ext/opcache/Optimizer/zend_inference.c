@@ -2766,7 +2766,7 @@ static int zend_update_type_info(const zend_op_array *op_array,
 			if (arg_info) {
 				tmp = zend_fetch_arg_info(script, arg_info, &ce);
 				if (opline->opcode == ZEND_RECV_INIT &&
-				           Z_TYPE_P(CRT_CONSTANT_EX(op_array, opline, opline->op2, ssa->rt_constants)) == IS_CONSTANT_AST) {
+				           Z_CONSTANT_P(CRT_CONSTANT_EX(op_array, opline, opline->op2, ssa->rt_constants))) {
 					/* The constant may resolve to NULL */
 					tmp |= MAY_BE_NULL;
 				}
@@ -4295,7 +4295,7 @@ int zend_may_throw(const zend_op *opline, zend_op_array *op_array, zend_ssa *ssa
 		case ZEND_COUNT:
 			return (t1 & MAY_BE_ANY) != MAY_BE_ARRAY;
 		case ZEND_RECV_INIT:
-			if (Z_TYPE_P(CRT_CONSTANT_EX(op_array, opline, opline->op2, ssa->rt_constants)) == IS_CONSTANT_AST) {
+			if (Z_CONSTANT_P(CRT_CONSTANT_EX(op_array, opline, opline->op2, ssa->rt_constants))) {
 				return 1;
 			}
 			if (op_array->fn_flags & ZEND_ACC_HAS_TYPE_HINTS) {

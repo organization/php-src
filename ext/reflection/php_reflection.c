@@ -2799,7 +2799,7 @@ ZEND_METHOD(reflection_parameter, getDefaultValue)
 	}
 
 	ZVAL_COPY(return_value, RT_CONSTANT(precv, precv->op2));
-	if (Z_TYPE_P(return_value) == IS_CONSTANT_AST) {
+	if (Z_CONSTANT_P(return_value)) {
 		zval_update_constant_ex(return_value, param->fptr->common.scope);
 	}
 }
@@ -2822,7 +2822,7 @@ ZEND_METHOD(reflection_parameter, isDefaultValueConstant)
 	}
 
 	precv = _reflection_param_get_default_precv(INTERNAL_FUNCTION_PARAM_PASSTHRU, param);
-	if (precv && Z_TYPE_P(RT_CONSTANT(precv, precv->op2)) == IS_CONSTANT_AST) {
+	if (precv && Z_CONSTANT_P(RT_CONSTANT(precv, precv->op2))) {
 		zend_ast *ast = Z_ASTVAL_P(RT_CONSTANT(precv, precv->op2));
 
 		if (ast->kind == ZEND_AST_CONSTANT
@@ -2852,7 +2852,7 @@ ZEND_METHOD(reflection_parameter, getDefaultValueConstantName)
 	}
 
 	precv = _reflection_param_get_default_precv(INTERNAL_FUNCTION_PARAM_PASSTHRU, param);
-	if (precv && Z_TYPE_P(RT_CONSTANT(precv, precv->op2)) == IS_CONSTANT_AST) {
+	if (precv && Z_CONSTANT_P(RT_CONSTANT(precv, precv->op2))) {
 		zend_ast *ast = Z_ASTVAL_P(RT_CONSTANT(precv, precv->op2));
 
 		if (ast->kind == ZEND_AST_CONSTANT) {
@@ -3701,7 +3701,7 @@ ZEND_METHOD(reflection_class_constant, getValue)
 	GET_REFLECTION_OBJECT_PTR(ref);
 
 	ZVAL_COPY_OR_DUP(return_value, &ref->value);
-	if (Z_TYPE_P(return_value) == IS_CONSTANT_AST) {
+	if (Z_CONSTANT_P(return_value)) {
 		zval_update_constant_ex(return_value, ref->ce);
 	}
 }
@@ -3836,7 +3836,7 @@ static void add_class_vars(zend_class_entry *ce, int statics, zval *return_value
 
 		/* this is necessary to make it able to work with default array
 		* properties, returned to user */
-		if (Z_TYPE(prop_copy) == IS_CONSTANT_AST) {
+		if (Z_CONSTANT(prop_copy)) {
 			if (UNEXPECTED(zval_update_constant_ex(&prop_copy, NULL) != SUCCESS)) {
 				return;
 			}

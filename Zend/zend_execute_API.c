@@ -581,7 +581,7 @@ ZEND_API int zend_use_undefined_constant(zend_string *name, zend_ast_attr attr, 
 
 ZEND_API int zval_update_constant_ex(zval *p, zend_class_entry *scope) /* {{{ */
 {
-	if (Z_TYPE_P(p) == IS_CONSTANT_AST) {
+	if (Z_CONSTANT_P(p)) {
 		zend_ast *ast = Z_ASTVAL_P(p);
 
 		if (ast->kind == ZEND_AST_CONSTANT) {

@@ -5603,7 +5603,7 @@ void zend_compile_params(zend_ast *ast, zend_ast *return_type_ast) /* {{{ */
 			zend_bool allow_null;
 			zend_bool has_null_default = default_ast
 				&& (Z_IS_NULL(default_node.u.constant)
-					|| (Z_TYPE(default_node.u.constant) == IS_CONSTANT_AST
+					|| (Z_CONSTANT(default_node.u.constant)
 						&& Z_ASTVAL(default_node.u.constant)->kind == ZEND_AST_CONSTANT
 						&& strcasecmp(ZSTR_VAL(zend_ast_get_constant_name(Z_ASTVAL(default_node.u.constant))), "NULL") == 0));
 			zend_bool is_explicitly_nullable = (type_ast->attr & ZEND_TYPE_NULLABLE) == ZEND_TYPE_NULLABLE;
@@ -5622,19 +5622,19 @@ void zend_compile_params(zend_ast *ast, zend_ast *return_type_ast) /* {{{ */
 				if (ZEND_TYPE_CODE(arg_info->type) == IS_ARRAY) {
 					if (default_ast && !has_null_default
 						&& !Z_IS_ARRAY(default_node.u.constant)
-						&& Z_TYPE(default_node.u.constant) != IS_CONSTANT_AST
+						&& !Z_CONSTANT(default_node.u.constant)
 					) {
 						zend_error_noreturn(E_COMPILE_ERROR, "Default value for parameters "
 							"with array type can only be an array or NULL");
 					}
 				} else if (ZEND_TYPE_CODE(arg_info->type) == IS_CALLABLE && default_ast) {
-					if (!has_null_default && Z_TYPE(default_node.u.constant) != IS_CONSTANT_AST) {
+					if (!has_null_default && !Z_CONSTANT(default_node.u.constant)) {
 						zend_error_noreturn(E_COMPILE_ERROR, "Default value for parameters "
 							"with callable type can only be NULL");
 					}
 				}
 			} else {
-				if (default_ast && !has_null_default && Z_TYPE(default_node.u.constant) != IS_CONSTANT_AST) {
+				if (default_ast && !has_null_default && !Z_CONSTANT(default_node.u.constant)) {
 					if (ZEND_TYPE_IS_CLASS(arg_info->type)) {
 						zend_error_noreturn(E_COMPILE_ERROR, "Default value for parameters "
 							"with a class type can only be NULL");

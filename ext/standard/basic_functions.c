@@ -3901,7 +3901,7 @@ PHP_FUNCTION(constant)
 	c = zend_get_constant_ex(const_name, scope, ZEND_FETCH_CLASS_SILENT);
 	if (c) {
 		ZVAL_COPY_OR_DUP(return_value, c);
-		if (Z_TYPE_P(return_value) == IS_CONSTANT_AST) {
+		if (Z_CONSTANT_P(return_value)) {
 			if (UNEXPECTED(zval_update_constant_ex(return_value, scope) != SUCCESS)) {
 				return;
 			}

@@ -241,7 +241,7 @@ void zend_optimizer_pass1(zend_op_array *op_array, zend_optimizer_ctx *ctx)
 						break;
 					}
 				}
-				if (Z_TYPE(c) == IS_CONSTANT_AST) {
+				if (Z_CONSTANT(c)) {
 					break;
 				}
 				literal_dtor(&ZEND_OP2_LITERAL(opline));
@@ -302,11 +302,11 @@ void zend_optimizer_pass1(zend_op_array *op_array, zend_optimizer_ctx *ctx)
 							Z_STR(ZEND_OP2_LITERAL(opline)))) != NULL &&
 						(Z_ACCESS_FLAGS(cc->value) & ZEND_ACC_PPP_MASK) == ZEND_ACC_PUBLIC) {
 						c = &cc->value;
-						if (Z_TYPE_P(c) == IS_CONSTANT_AST) {
+						if (Z_CONSTANT_P(c)) {
 							zend_ast *ast = Z_ASTVAL_P(c);
 							if (ast->kind != ZEND_AST_CONSTANT
 							 || !zend_optimizer_get_persistent_constant(zend_ast_get_constant_name(ast), &t, 1)
-							 || Z_TYPE(t) == IS_CONSTANT_AST) {
+							 || Z_CONSTANT(t)) {
 								break;
 							}
 						} else {

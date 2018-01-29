@@ -754,7 +754,7 @@ static ZEND_COLD void zend_verify_arg_error(
 
 static int is_null_constant(zend_class_entry *scope, zval *default_value)
 {
-	if (Z_TYPE_P(default_value) == IS_CONSTANT_AST) {
+	if (Z_CONSTANT_P(default_value)) {
 		zval constant;
 
 		ZVAL_COPY(&constant, default_value);

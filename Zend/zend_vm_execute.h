@@ -5685,7 +5685,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FETCH_CLASS_CONSTANT_SPEC_CONS
 				HANDLE_EXCEPTION();
 			}
 			value = &c->value;
-			if (Z_TYPE_P(value) == IS_CONSTANT_AST) {
+			if (Z_CONSTANT_P(value)) {
 				zval_update_constant_ex(value, c->ce);
 				if (UNEXPECTED(EG(exception) != NULL)) {
 					ZVAL_UNDEF(EX_VAR(opline->result.var));
@@ -24954,7 +24954,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FETCH_CLASS_CONSTANT_SPEC_VAR_
 				HANDLE_EXCEPTION();
 			}
 			value = &c->value;
-			if (Z_TYPE_P(value) == IS_CONSTANT_AST) {
+			if (Z_CONSTANT_P(value)) {
 				zval_update_constant_ex(value, c->ce);
 				if (UNEXPECTED(EG(exception) != NULL)) {
 					ZVAL_UNDEF(EX_VAR(opline->result.var));
@@ -33463,7 +33463,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FETCH_CLASS_CONSTANT_SPEC_UNUS
 				HANDLE_EXCEPTION();
 			}
 			value = &c->value;
-			if (Z_TYPE_P(value) == IS_CONSTANT_AST) {
+			if (Z_CONSTANT_P(value)) {
 				zval_update_constant_ex(value, c->ce);
 				if (UNEXPECTED(EG(exception) != NULL)) {
 					ZVAL_UNDEF(EX_VAR(opline->result.var));
@@ -43405,7 +43405,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_BIND_STATIC_SPEC_CV_CONST_HAND
 	value = zend_hash_find_ex(ht, Z_STR_P(varname), 1);
 
 	if (opline->extended_value) {
-		if (Z_TYPE_P(value) == IS_CONSTANT_AST) {
+		if (Z_CONSTANT_P(value)) {
 			SAVE_OPLINE();
 			if (UNEXPECTED(zval_update_constant_ex(value, EX(func)->op_array.scope) != SUCCESS)) {
 				ZVAL_NULL(variable_ptr);
