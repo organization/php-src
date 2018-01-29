@@ -3100,7 +3100,7 @@ static int php_session_rfc1867_callback(unsigned int event, void *event_data, vo
 			multipart_event_formdata *data = (multipart_event_formdata *) event_data;
 			size_t value_len;
 
-			if (Z_TYPE(progress->sid) && progress->key.s) {
+			if (!Z_IS_UNDEF(progress->sid) && progress->key.s) {
 				break;
 			}
 
@@ -3134,7 +3134,7 @@ static int php_session_rfc1867_callback(unsigned int event, void *event_data, vo
 
 			/* Do nothing when $_POST["PHP_SESSION_UPLOAD_PROGRESS"] is not set
 			 * or when we have no session id */
-			if (!Z_TYPE(progress->sid) || !progress->key.s) {
+			if (Z_IS_UNDEF(progress->sid) || !progress->key.s) {
 				break;
 			}
 
@@ -3193,7 +3193,7 @@ static int php_session_rfc1867_callback(unsigned int event, void *event_data, vo
 		case MULTIPART_EVENT_FILE_DATA: {
 			multipart_event_file_data *data = (multipart_event_file_data *) event_data;
 
-			if (!Z_TYPE(progress->sid) || !progress->key.s) {
+			if (Z_IS_UNDEF(progress->sid) || !progress->key.s) {
 				break;
 			}
 
@@ -3206,7 +3206,7 @@ static int php_session_rfc1867_callback(unsigned int event, void *event_data, vo
 		case MULTIPART_EVENT_FILE_END: {
 			multipart_event_file_end *data = (multipart_event_file_end *) event_data;
 
-			if (!Z_TYPE(progress->sid) || !progress->key.s) {
+			if (Z_IS_UNDEF(progress->sid) || !progress->key.s) {
 				break;
 			}
 
@@ -3225,7 +3225,7 @@ static int php_session_rfc1867_callback(unsigned int event, void *event_data, vo
 		case MULTIPART_EVENT_END: {
 			multipart_event_end *data = (multipart_event_end *) event_data;
 
-			if (Z_TYPE(progress->sid) && progress->key.s) {
+			if (!Z_IS_UNDEF(progress->sid) && progress->key.s) {
 				if (PS(rfc1867_cleanup)) {
 					php_session_rfc1867_cleanup(progress);
 				} else {

@@ -609,13 +609,13 @@ PHP_METHOD(Phar, webPhar)
 			zval *z_script_name, *z_path_info;
 
 			if (NULL == (z_script_name = zend_hash_str_find(_server, "SCRIPT_NAME", sizeof("SCRIPT_NAME")-1)) ||
-				IS_STRING != Z_TYPE_P(z_script_name) ||
+				!Z_IS_STRING_P(z_script_name) ||
 				!strstr(Z_STRVAL_P(z_script_name), basename)) {
 				return;
 			}
 
 			if (NULL != (z_path_info = zend_hash_str_find(_server, "PATH_INFO", sizeof("PATH_INFO")-1)) &&
-				IS_STRING == Z_TYPE_P(z_path_info)) {
+				Z_IS_STRING_P(z_path_info)) {
 				entry_len = (int)Z_STRLEN_P(z_path_info);
 				entry = estrndup(Z_STRVAL_P(z_path_info), entry_len);
 				path_info = emalloc(Z_STRLEN_P(z_script_name) + entry_len + 1);
@@ -4450,7 +4450,7 @@ PHP_METHOD(Phar, extractTo)
 
 				ZEND_HASH_FOREACH_VAL(Z_ARRVAL_P(zval_files), zval_file) {
 					ZVAL_DEREF(zval_file);
-					if (IS_STRING != Z_TYPE_P(zval_file)) {
+					if (!Z_IS_STRING_P(zval_file)) {
 						zend_throw_exception_ex(spl_ce_InvalidArgumentException, 0,
 							"Invalid argument, array of filenames to extract contains non-string value");
 						return;

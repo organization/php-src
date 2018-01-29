@@ -681,7 +681,7 @@ static inline int ct_eval_in_array(zval *result, uint32_t extended_value, zval *
 		} else {
 			res = 0;
 		}
-	} else if (Z_TYPE_P(op1) <= IS_FALSE) {
+	} else if (Z_IS_LESS_THAN_TRUE_P(op1)) {
 		res = zend_hash_exists(ht, ZSTR_EMPTY_ALLOC());
 	} else {
 		zend_string *key;

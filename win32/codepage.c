@@ -640,7 +640,7 @@ PHP_FUNCTION(sapi_windows_cp_conv)
 		RETURN_NULL();
 	}
 
-	if (IS_LONG == Z_TYPE_P(z_in_cp)) {
+	if (Z_IS_LONG_P(z_in_cp)) {
 		if (ZEND_LONG_UINT_OVFL(Z_LVAL_P(z_in_cp))) {
 			php_error_docref(NULL, E_WARNING, "Argument %d is out of range", Z_LVAL_P(z_in_cp));
 			RETURN_NULL();
@@ -661,7 +661,7 @@ PHP_FUNCTION(sapi_windows_cp_conv)
 		}
 	}
 
-	if (IS_LONG == Z_TYPE_P(z_out_cp)) {
+	if (Z_IS_LONG_P(z_out_cp)) {
 		if (ZEND_LONG_UINT_OVFL(Z_LVAL_P(z_out_cp))) {
 			php_error_docref(NULL, E_WARNING, "Argument %d is out of range", Z_LVAL_P(z_out_cp));
 			RETURN_NULL();
