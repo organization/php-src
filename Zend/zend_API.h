@@ -371,7 +371,7 @@ ZEND_API zval *zend_read_static_property(zend_class_entry *scope, const char *na
 
 ZEND_API char *zend_get_type_by_const(int type);
 
-#define getThis()							((Z_TYPE(EX(This)) == IS_OBJECT) ? &EX(This) : NULL)
+#define getThis()							((Z_IS_OBJECT(EX(This))) ? &EX(This) : NULL)
 #define ZEND_IS_METHOD_CALL()				(EX(func)->common.scope != NULL)
 
 #define WRONG_PARAM_COUNT					ZEND_WRONG_PARAM_COUNT()
@@ -662,8 +662,8 @@ END_EXTERN_C()
 #define RETURN_FALSE  					{ RETVAL_FALSE; return; }
 #define RETURN_TRUE   					{ RETVAL_TRUE; return; }
 
-#define HASH_OF(p) (Z_TYPE_P(p)==IS_ARRAY ? Z_ARRVAL_P(p) : ((Z_TYPE_P(p)==IS_OBJECT ? Z_OBJ_HT_P(p)->get_properties((p)) : NULL)))
-#define ZVAL_IS_NULL(z) (Z_TYPE_P(z) == IS_NULL)
+#define HASH_OF(p) (Z_IS_ARRAY_P(p) ? Z_ARRVAL_P(p) : ((Z_IS_OBJECT_P(p) ? Z_OBJ_HT_P(p)->get_properties((p)) : NULL)))
+#define ZVAL_IS_NULL(z) (Z_IS_NULL_P(z))
 
 /* For compatibility */
 #define ZEND_MINIT			ZEND_MODULE_STARTUP_N
@@ -1123,11 +1123,11 @@ static zend_always_inline int zend_parse_arg_bool(zval *arg, zend_bool *dest, ze
 	if (check_null) {
 		*is_null = 0;
 	}
-	if (EXPECTED(Z_TYPE_P(arg) == IS_TRUE)) {
+	if (EXPECTED(Z_IS_TRUE_P(arg))) {
 		*dest = 1;
-	} else if (EXPECTED(Z_TYPE_P(arg) == IS_FALSE)) {
+	} else if (EXPECTED(Z_IS_FALSE_P(arg))) {
 		*dest = 0;
-	} else if (check_null && Z_TYPE_P(arg) == IS_NULL) {
+	} else if (check_null && Z_IS_NULL_P(arg)) {
 		*is_null = 1;
 		*dest = 0;
 	} else {
@@ -1141,9 +1141,9 @@ static zend_always_inline int zend_parse_arg_long(zval *arg, zend_long *dest, ze
 	if (check_null) {
 		*is_null = 0;
 	}
-	if (EXPECTED(Z_TYPE_P(arg) == IS_LONG)) {
+	if (EXPECTED(Z_IS_LONG_P(arg))) {
 		*dest = Z_LVAL_P(arg);
-	} else if (check_null && Z_TYPE_P(arg) == IS_NULL) {
+	} else if (check_null && Z_IS_NULL_P(arg)) {
 		*is_null = 1;
 		*dest = 0;
 	} else if (cap) {
@@ -1159,9 +1159,9 @@ static zend_always_inline int zend_parse_arg_double(zval *arg, double *dest, zen
 	if (check_null) {
 		*is_null = 0;
 	}
-	if (EXPECTED(Z_TYPE_P(arg) == IS_DOUBLE)) {
+	if (EXPECTED(Z_IS_DOUBLE_P(arg))) {
 		*dest = Z_DVAL_P(arg);
-	} else if (check_null && Z_TYPE_P(arg) == IS_NULL) {
+	} else if (check_null && Z_IS_NULL_P(arg)) {
 		*is_null = 1;
 		*dest = 0.0;
 	} else {
@@ -1172,9 +1172,9 @@ static zend_always_inline int zend_parse_arg_double(zval *arg, double *dest, zen
 
 static zend_always_inline int zend_parse_arg_str(zval *arg, zend_string **dest, int check_null)
 {
-	if (EXPECTED(Z_TYPE_P(arg) == IS_STRING)) {
+	if (EXPECTED(Z_IS_STRING_P(arg))) {
 		*dest = Z_STR_P(arg);
-	} else if (check_null && Z_TYPE_P(arg) == IS_NULL) {
+	} else if (check_null && Z_IS_NULL_P(arg)) {
 		*dest = NULL;
 	} else {
 		return zend_parse_arg_str_slow(arg, dest);
@@ -1227,10 +1227,10 @@ static zend_always_inline int zend_parse_arg_path(zval *arg, char **dest, size_t
 
 static zend_always_inline int zend_parse_arg_array(zval *arg, zval **dest, int check_null, int or_object)
 {
-	if (EXPECTED(Z_TYPE_P(arg) == IS_ARRAY) ||
-		(or_object && EXPECTED(Z_TYPE_P(arg) == IS_OBJECT))) {
+	if (EXPECTED(Z_IS_ARRAY_P(arg)) ||
+		(or_object && EXPECTED(Z_IS_OBJECT_P(arg)))) {
 		*dest = arg;
-	} else if (check_null && EXPECTED(Z_TYPE_P(arg) == IS_NULL)) {
+	} else if (check_null && EXPECTED(Z_IS_NULL_P(arg))) {
 		*dest = NULL;
 	} else {
 		return 0;
@@ -1240,9 +1240,9 @@ static zend_always_inline int zend_parse_arg_array(zval *arg, zval **dest, int c
 
 static zend_always_inline int zend_parse_arg_array_ht(zval *arg, HashTable **dest, int check_null, int or_object, int separate)
 {
-	if (EXPECTED(Z_TYPE_P(arg) == IS_ARRAY)) {
+	if (EXPECTED(Z_IS_ARRAY_P(arg))) {
 		*dest = Z_ARRVAL_P(arg);
-	} else if (or_object && EXPECTED(Z_TYPE_P(arg) == IS_OBJECT)) {
+	} else if (or_object && EXPECTED(Z_IS_OBJECT_P(arg))) {
 		if (separate
 		 && Z_OBJ_P(arg)->properties
 		 && UNEXPECTED(GC_REFCOUNT(Z_OBJ_P(arg)->properties) > 1)) {
@@ -1252,7 +1252,7 @@ static zend_always_inline int zend_parse_arg_array_ht(zval *arg, HashTable **des
 			Z_OBJ_P(arg)->properties = zend_array_dup(Z_OBJ_P(arg)->properties);
 		}
 		*dest = Z_OBJ_HT_P(arg)->get_properties(arg);
-	} else if (check_null && EXPECTED(Z_TYPE_P(arg) == IS_NULL)) {
+	} else if (check_null && EXPECTED(Z_IS_NULL_P(arg))) {
 		*dest = NULL;
 	} else {
 		return 0;
@@ -1262,10 +1262,10 @@ static zend_always_inline int zend_parse_arg_array_ht(zval *arg, HashTable **des
 
 static zend_always_inline int zend_parse_arg_object(zval *arg, zval **dest, zend_class_entry *ce, int check_null)
 {
-	if (EXPECTED(Z_TYPE_P(arg) == IS_OBJECT) &&
+	if (EXPECTED(Z_IS_OBJECT_P(arg)) &&
 	    (!ce || EXPECTED(instanceof_function(Z_OBJCE_P(arg), ce) != 0))) {
 		*dest = arg;
-	} else if (check_null && EXPECTED(Z_TYPE_P(arg) == IS_NULL)) {
+	} else if (check_null && EXPECTED(Z_IS_NULL_P(arg))) {
 		*dest = NULL;
 	} else {
 		return 0;
@@ -1275,9 +1275,9 @@ static zend_always_inline int zend_parse_arg_object(zval *arg, zval **dest, zend
 
 static zend_always_inline int zend_parse_arg_resource(zval *arg, zval **dest, int check_null)
 {
-	if (EXPECTED(Z_TYPE_P(arg) == IS_RESOURCE)) {
+	if (EXPECTED(Z_IS_RESOURCE_P(arg))) {
 		*dest = arg;
-	} else if (check_null && EXPECTED(Z_TYPE_P(arg) == IS_NULL)) {
+	} else if (check_null && EXPECTED(Z_IS_NULL_P(arg))) {
 		*dest = NULL;
 	} else {
 		return 0;
@@ -1287,7 +1287,7 @@ static zend_always_inline int zend_parse_arg_resource(zval *arg, zval **dest, in
 
 static zend_always_inline int zend_parse_arg_func(zval *arg, zend_fcall_info *dest_fci, zend_fcall_info_cache *dest_fcc, int check_null, char **error)
 {
-	if (check_null && UNEXPECTED(Z_TYPE_P(arg) == IS_NULL)) {
+	if (check_null && UNEXPECTED(Z_IS_NULL_P(arg))) {
 		dest_fci->size = 0;
 		dest_fcc->function_handler = NULL;
 		*error = NULL;
@@ -1300,14 +1300,14 @@ static zend_always_inline int zend_parse_arg_func(zval *arg, zend_fcall_info *de
 static zend_always_inline void zend_parse_arg_zval(zval *arg, zval **dest, int check_null)
 {
 	*dest = (check_null &&
-	    (UNEXPECTED(Z_TYPE_P(arg) == IS_NULL) ||
+	    (UNEXPECTED(Z_IS_NULL_P(arg)) ||
 	     (UNEXPECTED(Z_ISREF_P(arg)) &&
-	      UNEXPECTED(Z_TYPE_P(Z_REFVAL_P(arg)) == IS_NULL)))) ? NULL : arg;
+	      UNEXPECTED(Z_IS_NULL_P(Z_REFVAL_P(arg)))))) ? NULL : arg;
 }
 
 static zend_always_inline void zend_parse_arg_zval_deref(zval *arg, zval **dest, int check_null)
 {
-	*dest = (check_null && UNEXPECTED(Z_TYPE_P(arg) == IS_NULL)) ? NULL : arg;
+	*dest = (check_null && UNEXPECTED(Z_IS_NULL_P(arg))) ? NULL : arg;
 }
 
 END_EXTERN_C()

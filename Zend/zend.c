@@ -336,7 +336,7 @@ static void print_flat_hash(HashTable *ht) /* {{{ */
 
 ZEND_API int zend_make_printable_zval(zval *expr, zval *expr_copy) /* {{{ */
 {
-	if (Z_TYPE_P(expr) == IS_STRING) {
+	if (Z_IS_STRING_P(expr)) {
 		return 0;
 	} else {
 		ZVAL_STR(expr_copy, zval_get_string_func(expr));
@@ -1263,7 +1263,7 @@ static ZEND_COLD void zend_error_va_list(int type, const char *format, va_list a
 #endif
 
 	/* if we don't have a user defined error handler */
-	if (Z_TYPE(EG(user_error_handler)) == IS_UNDEF
+	if (Z_IS_UNDEF(EG(user_error_handler))
 		|| !(EG(user_error_handler_error_reporting) & type)
 		|| EG(error_handling) != EH_NORMAL) {
 		zend_error_cb(type, error_filename, error_lineno, format, args);
@@ -1320,8 +1320,8 @@ static ZEND_COLD void zend_error_va_list(int type, const char *format, va_list a
 			}
 
 			if (call_user_function_ex(CG(function_table), NULL, &orig_user_error_handler, &retval, 5, params, 1, NULL) == SUCCESS) {
-				if (Z_TYPE(retval) != IS_UNDEF) {
-					if (Z_TYPE(retval) == IS_FALSE) {
+				if (!Z_IS_UNDEF(retval)) {
+					if (Z_IS_FALSE(retval)) {
 						zend_error_cb(type, error_filename, error_lineno, format, args);
 					}
 					zval_ptr_dtor(&retval);
@@ -1344,7 +1344,7 @@ static ZEND_COLD void zend_error_va_list(int type, const char *format, va_list a
 			zval_ptr_dtor(&params[1]);
 			zval_ptr_dtor(&params[0]);
 
-			if (Z_TYPE(EG(user_error_handler)) == IS_UNDEF) {
+			if (Z_IS_UNDEF(EG(user_error_handler))) {
 				ZVAL_COPY_VALUE(&EG(user_error_handler), &orig_user_error_handler);
 			} else {
 				zval_ptr_dtor(&orig_user_error_handler);
@@ -1498,7 +1498,7 @@ ZEND_API ZEND_COLD void zend_output_debug_string(zend_bool trigger_break, const 
 ZEND_API void zend_try_exception_handler() /* {{{ */
 {
 	if (EG(exception)) {
-		if (Z_TYPE(EG(user_exception_handler)) != IS_UNDEF) {
+		if (!Z_IS_UNDEF(EG(user_exception_handler))) {
 			zval orig_user_exception_handler;
 			zval params[1], retval2;
 			zend_object *old_exception;

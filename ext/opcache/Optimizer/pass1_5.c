@@ -204,7 +204,7 @@ void zend_optimizer_pass1(zend_op_array *op_array, zend_optimizer_ctx *ctx)
 
 		case ZEND_FETCH_CONSTANT:
 			if (opline->op2_type == IS_CONST &&
-				Z_TYPE(ZEND_OP2_LITERAL(opline)) == IS_STRING &&
+				Z_IS_STRING(ZEND_OP2_LITERAL(opline)) &&
 				Z_STRLEN(ZEND_OP2_LITERAL(opline)) == sizeof("__COMPILER_HALT_OFFSET__") - 1 &&
 				memcmp(Z_STRVAL(ZEND_OP2_LITERAL(opline)), "__COMPILER_HALT_OFFSET__", sizeof("__COMPILER_HALT_OFFSET__") - 1) == 0) {
 				/* substitute __COMPILER_HALT_OFFSET__ constant */
@@ -232,7 +232,7 @@ void zend_optimizer_pass1(zend_op_array *op_array, zend_optimizer_ctx *ctx)
 			}
 
 			if (opline->op2_type == IS_CONST &&
-				Z_TYPE(ZEND_OP2_LITERAL(opline)) == IS_STRING) {
+				Z_IS_STRING(ZEND_OP2_LITERAL(opline))) {
 				/* substitute persistent constants */
 				zval c;
 
@@ -258,12 +258,12 @@ void zend_optimizer_pass1(zend_op_array *op_array, zend_optimizer_ctx *ctx)
 
 		case ZEND_FETCH_CLASS_CONSTANT:
 			if (opline->op2_type == IS_CONST &&
-				Z_TYPE(ZEND_OP2_LITERAL(opline)) == IS_STRING) {
+				Z_IS_STRING(ZEND_OP2_LITERAL(opline))) {
 
 				zend_class_entry *ce = NULL;
 
 				if (opline->op1_type == IS_CONST &&
-			        Z_TYPE(ZEND_OP1_LITERAL(opline)) == IS_STRING) {
+			        Z_IS_STRING(ZEND_OP1_LITERAL(opline))) {
 					/* for A::B */
 					if (op_array->scope &&
 						!strncasecmp(Z_STRVAL(ZEND_OP1_LITERAL(opline)),
@@ -366,7 +366,7 @@ void zend_optimizer_pass1(zend_op_array *op_array, zend_optimizer_ctx *ctx)
 			}
 			if (init_opline->opcode != ZEND_INIT_FCALL ||
 			    init_opline->op2_type != IS_CONST ||
-			    Z_TYPE(ZEND_OP2_LITERAL(init_opline)) != IS_STRING) {
+			    !Z_IS_STRING(ZEND_OP2_LITERAL(init_opline))) {
 				/* don't colllect constants after unknown function call */
 				collect_constants = 0;
 				break;
@@ -376,7 +376,7 @@ void zend_optimizer_pass1(zend_op_array *op_array, zend_optimizer_ctx *ctx)
 			if (Z_STRLEN(ZEND_OP2_LITERAL(init_opline)) == sizeof("define")-1 &&
 			    zend_binary_strcasecmp(Z_STRVAL(ZEND_OP2_LITERAL(init_opline)), Z_STRLEN(ZEND_OP2_LITERAL(init_opline)), "define", sizeof("define")-1) == 0) {
 
-				if (Z_TYPE(ZEND_OP1_LITERAL(send1_opline)) == IS_STRING &&
+				if (Z_IS_STRING(ZEND_OP1_LITERAL(send1_opline)) &&
 				    send2_opline &&
 				    Z_TYPE(ZEND_OP1_LITERAL(send2_opline)) <= IS_STRING) {
 
@@ -411,7 +411,7 @@ void zend_optimizer_pass1(zend_op_array *op_array, zend_optimizer_ctx *ctx)
 			   extension_loaded(x)
 			*/
 			if (!send2_opline &&
-			    Z_TYPE(ZEND_OP1_LITERAL(send1_opline)) == IS_STRING) {
+			    Z_IS_STRING(ZEND_OP1_LITERAL(send1_opline))) {
 				if ((Z_STRLEN(ZEND_OP2_LITERAL(init_opline)) == sizeof("function_exists")-1 &&
 					!memcmp(Z_STRVAL(ZEND_OP2_LITERAL(init_opline)),
 						"function_exists", sizeof("function_exists")-1) &&
@@ -583,7 +583,7 @@ void zend_optimizer_pass1(zend_op_array *op_array, zend_optimizer_ctx *ctx)
 			break;
 		case ZEND_DECLARE_CONST:
 			if (collect_constants &&
-			    Z_TYPE(ZEND_OP1_LITERAL(opline)) == IS_STRING &&
+			    Z_IS_STRING(ZEND_OP1_LITERAL(opline)) &&
 			    Z_TYPE(ZEND_OP2_LITERAL(opline)) <= IS_STRING) {
 				zend_optimizer_collect_constant(ctx, &ZEND_OP1_LITERAL(opline), &ZEND_OP2_LITERAL(opline));
 			}

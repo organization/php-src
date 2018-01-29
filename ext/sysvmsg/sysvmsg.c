@@ -450,7 +450,7 @@ PHP_FUNCTION(msg_send)
 		messagebuffer = safe_emalloc(message_len, 1, sizeof(struct php_msgbuf));
 		memcpy(messagebuffer->mtext, p, message_len + 1);
 
-		if (Z_TYPE_P(message) != IS_STRING) {
+		if (!Z_IS_STRING_P(message)) {
 			efree(p);
 		}
 	}

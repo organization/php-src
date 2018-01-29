@@ -57,7 +57,7 @@ static void phar_mung_server_vars(char *fname, char *entry, int entry_len, char 
 	zval temp;
 
 	/* "tweak" $_SERVER variables requested in earlier call to Phar::mungServer() */
-	if (Z_TYPE(PG(http_globals)[TRACK_VARS_SERVER]) == IS_UNDEF) {
+	if (Z_IS_UNDEF(PG(http_globals)[TRACK_VARS_SERVER])) {
 		return;
 	}
 
@@ -604,7 +604,7 @@ PHP_METHOD(Phar, webPhar)
 		|| (sapi_mod_name_len == sizeof("fpm-fcgi") - 1 && !strncmp(sapi_module.name, "fpm-fcgi", sizeof("fpm-fcgi") - 1))
 		|| (sapi_mod_name_len == sizeof("cgi") - 1 && !strncmp(sapi_module.name, "cgi", sizeof("cgi") - 1))) {
 
-		if (Z_TYPE(PG(http_globals)[TRACK_VARS_SERVER]) != IS_UNDEF) {
+		if (!Z_IS_UNDEF(PG(http_globals)[TRACK_VARS_SERVER])) {
 			HashTable *_server = Z_ARRVAL(PG(http_globals)[TRACK_VARS_SERVER]);
 			zval *z_script_name, *z_path_info;
 
@@ -708,7 +708,7 @@ PHP_METHOD(Phar, webPhar)
 			return;
 		}
 
-		if (Z_TYPE_P(fci.retval) == IS_UNDEF || Z_TYPE(retval) == IS_UNDEF) {
+		if (Z_IS_UNDEF_P(fci.retval) || Z_IS_UNDEF(retval)) {
 			if (free_pathinfo) {
 				efree(path_info);
 			}
@@ -905,7 +905,7 @@ PHP_METHOD(Phar, mungServer)
 
 	ZEND_HASH_FOREACH_VAL(Z_ARRVAL_P(mungvalues), data) {
 
-		if (Z_TYPE_P(data) != IS_STRING) {
+		if (!Z_IS_STRING_P(data)) {
 			zend_throw_exception_ex(phar_ce_PharException, 0, "Non-string value passed to Phar::mungServer(), expecting an array of any of these strings: PHP_SELF, REQUEST_URI, SCRIPT_FILENAME, SCRIPT_NAME");
 			return;
 		}
@@ -1473,7 +1473,7 @@ static int phar_build(zend_object_iterator *iter, void *puser) /* {{{ */
 					return ZEND_HASH_APPLY_STOP;
 				}
 
-				if (Z_TYPE(key) != IS_STRING) {
+				if (!Z_IS_STRING(key)) {
 					zval_dtor(&key);
 					zend_throw_exception_ex(spl_ce_UnexpectedValueException, 0, "Iterator %s returned an invalid key (must return a string)", ZSTR_VAL(ce->name));
 					return ZEND_HASH_APPLY_STOP;
@@ -1515,7 +1515,7 @@ static int phar_build(zend_object_iterator *iter, void *puser) /* {{{ */
 						fname_len = spprintf(&fname, 0, "%s%c%s", test, DEFAULT_SLASH, intern->u.dir.entry.d_name);
 						php_stat(fname, fname_len, FS_IS_DIR, &dummy);
 
-						if (Z_TYPE(dummy) == IS_TRUE) {
+						if (Z_IS_TRUE(dummy)) {
 							/* ignore directories */
 							efree(fname);
 							return ZEND_HASH_APPLY_KEEP;
@@ -1607,7 +1607,7 @@ phar_spl_fileinfo:
 				return ZEND_HASH_APPLY_STOP;
 			}
 
-			if (Z_TYPE(key) != IS_STRING) {
+			if (!Z_IS_STRING(key)) {
 				zval_dtor(&key);
 				zend_throw_exception_ex(spl_ce_UnexpectedValueException, 0, "Iterator %s returned an invalid key (must return a string)", ZSTR_VAL(ce->name));
 				return ZEND_HASH_APPLY_STOP;
@@ -2328,7 +2328,7 @@ static zend_object *phar_convert_to_other(phar_archive_data *source, int convert
 	phar->is_temporary_alias = source->is_temporary_alias;
 	phar->alias = source->alias;
 
-	if (Z_TYPE(source->metadata) != IS_UNDEF) {
+	if (!Z_IS_UNDEF(source->metadata)) {
 		ZVAL_DUP(&phar->metadata, &source->metadata);
 		phar->metadata_len = 0;
 	}
@@ -2360,7 +2360,7 @@ static zend_object *phar_convert_to_other(phar_archive_data *source, int convert
 no_copy:
 		newentry.filename = estrndup(newentry.filename, newentry.filename_len);
 
-		if (Z_TYPE(newentry.metadata) != IS_UNDEF) {
+		if (!Z_IS_UNDEF(newentry.metadata)) {
 			zval_copy_ctor(&newentry.metadata);
 			newentry.metadata_str.s = NULL;
 		}
@@ -3555,7 +3555,7 @@ PHP_METHOD(Phar, copy)
 
 	memcpy((void *) &newentry, oldentry, sizeof(phar_entry_info));
 
-	if (Z_TYPE(newentry.metadata) != IS_UNDEF) {
+	if (!Z_IS_UNDEF(newentry.metadata)) {
 		zval_copy_ctor(&newentry.metadata);
 		newentry.metadata_str.s = NULL;
 	}
@@ -4064,7 +4064,7 @@ PHP_METHOD(Phar, hasMetadata)
 {
 	PHAR_ARCHIVE_OBJECT();
 
-	RETURN_BOOL(Z_TYPE(phar_obj->archive->metadata) != IS_UNDEF);
+	RETURN_BOOL(!Z_IS_UNDEF(phar_obj->archive->metadata));
 }
 /* }}} */
 
@@ -4079,7 +4079,7 @@ PHP_METHOD(Phar, getMetadata)
 		return;
 	}
 
-	if (Z_TYPE(phar_obj->archive->metadata) != IS_UNDEF) {
+	if (!Z_IS_UNDEF(phar_obj->archive->metadata)) {
 		if (phar_obj->archive->is_persistent) {
 			char *buf = estrndup((char *) Z_PTR(phar_obj->archive->metadata), phar_obj->archive->metadata_len);
 			/* assume success, we would have failed before */
@@ -4115,7 +4115,7 @@ PHP_METHOD(Phar, setMetadata)
 		zend_throw_exception_ex(phar_ce_PharException, 0, "phar \"%s\" is persistent, unable to copy on write", phar_obj->archive->fname);
 		return;
 	}
-	if (Z_TYPE(phar_obj->archive->metadata) != IS_UNDEF) {
+	if (!Z_IS_UNDEF(phar_obj->archive->metadata)) {
 		zval_ptr_dtor(&phar_obj->archive->metadata);
 		ZVAL_UNDEF(&phar_obj->archive->metadata);
 	}
@@ -4145,7 +4145,7 @@ PHP_METHOD(Phar, delMetadata)
 		return;
 	}
 
-	if (Z_TYPE(phar_obj->archive->metadata) != IS_UNDEF) {
+	if (!Z_IS_UNDEF(phar_obj->archive->metadata)) {
 		zval_ptr_dtor(&phar_obj->archive->metadata);
 		ZVAL_UNDEF(&phar_obj->archive->metadata);
 		phar_obj->archive->is_modified = 1;
@@ -4761,7 +4761,7 @@ PHP_METHOD(PharFileInfo, hasMetadata)
 		return;
 	}
 
-	RETURN_BOOL(Z_TYPE(entry_obj->entry->metadata) != IS_UNDEF);
+	RETURN_BOOL(!Z_IS_UNDEF(entry_obj->entry->metadata));
 }
 /* }}} */
 
@@ -4776,7 +4776,7 @@ PHP_METHOD(PharFileInfo, getMetadata)
 		return;
 	}
 
-	if (Z_TYPE(entry_obj->entry->metadata) != IS_UNDEF) {
+	if (!Z_IS_UNDEF(entry_obj->entry->metadata)) {
 		if (entry_obj->entry->is_persistent) {
 			char *buf = estrndup((char *) Z_PTR(entry_obj->entry->metadata), entry_obj->entry->metadata_len);
 			/* assume success, we would have failed before */
@@ -4824,7 +4824,7 @@ PHP_METHOD(PharFileInfo, setMetadata)
 		/* re-populate after copy-on-write */
 		entry_obj->entry = zend_hash_str_find_ptr(&phar->manifest, entry_obj->entry->filename, entry_obj->entry->filename_len);
 	}
-	if (Z_TYPE(entry_obj->entry->metadata) != IS_UNDEF) {
+	if (!Z_IS_UNDEF(entry_obj->entry->metadata)) {
 		zval_ptr_dtor(&entry_obj->entry->metadata);
 		ZVAL_UNDEF(&entry_obj->entry->metadata);
 	}
@@ -4866,7 +4866,7 @@ PHP_METHOD(PharFileInfo, delMetadata)
 		return;
 	}
 
-	if (Z_TYPE(entry_obj->entry->metadata) != IS_UNDEF) {
+	if (!Z_IS_UNDEF(entry_obj->entry->metadata)) {
 		if (entry_obj->entry->is_persistent) {
 			phar_archive_data *phar = entry_obj->entry->phar;
 

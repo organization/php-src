@@ -151,7 +151,7 @@ static char **php_xsl_xslt_make_params(HashTable *parht, int xpath_params)
 			efree(params);
 			return NULL;
 		} else {
-			if (Z_TYPE_P(value) != IS_STRING) {
+			if (!Z_IS_STRING_P(value)) {
 				convert_to_string(value);
 			}
 
@@ -334,14 +334,14 @@ static void xsl_ext_function_php(xmlXPathParserContextPtr ctxt, int nargs, int t
 	} else {
 		result = zend_call_function(&fci, NULL);
 		if (result == FAILURE) {
-			if (Z_TYPE(handler) == IS_STRING) {
+			if (Z_IS_STRING(handler)) {
 				php_error_docref(NULL, E_WARNING, "Unable to call handler %s()", Z_STRVAL(handler));
 				valuePush(ctxt, xmlXPathNewString((const xmlChar *) ""));
 			}
 		/* retval is == NULL, when an exception occurred, don't report anything, because PHP itself will handle that */
 		} else if (Z_ISUNDEF(retval)) {
 		} else {
-			if (Z_TYPE(retval) == IS_OBJECT && instanceof_function(Z_OBJCE(retval), dom_node_class_entry)) {
+			if (Z_IS_OBJECT(retval) && instanceof_function(Z_OBJCE(retval), dom_node_class_entry)) {
 				xmlNode *nodep;
 				dom_object *obj;
 				if (intern->node_list == NULL) {
@@ -352,9 +352,9 @@ static void xsl_ext_function_php(xmlXPathParserContextPtr ctxt, int nargs, int t
 				obj = Z_DOMOBJ_P(&retval);
 				nodep = dom_object_get_node(obj);
 				valuePush(ctxt, xmlXPathNewNodeSet(nodep));
-			} else if (Z_TYPE(retval) == IS_TRUE || Z_TYPE(retval) == IS_FALSE) {
-				valuePush(ctxt, xmlXPathNewBoolean(Z_TYPE(retval) == IS_TRUE));
-			} else if (Z_TYPE(retval) == IS_OBJECT) {
+			} else if (Z_IS_TRUE(retval) || Z_IS_FALSE(retval)) {
+				valuePush(ctxt, xmlXPathNewBoolean(Z_IS_TRUE(retval)));
+			} else if (Z_IS_OBJECT(retval)) {
 				php_error_docref(NULL, E_WARNING, "A PHP Object cannot be converted to a XPath-string");
 				valuePush(ctxt, xmlXPathNewString((const xmlChar *) ""));
 			} else {
@@ -438,7 +438,7 @@ PHP_FUNCTION(xsl_xsltprocessor_import_stylesheet)
 	std_hnd = zend_get_std_object_handlers();
 	ZVAL_STRING(&member, "cloneDocument");
 	cloneDocu = std_hnd->read_property(id, &member, BP_VAR_IS, NULL, &rv);
-	if (Z_TYPE_P(cloneDocu) != IS_NULL) {
+	if (!Z_IS_NULL_P(cloneDocu)) {
 		convert_to_long(cloneDocu);
 		clone_docu = Z_LVAL_P(cloneDocu);
 	}
@@ -537,7 +537,7 @@ static xmlDocPtr php_xsl_apply_stylesheet(zval *id, xsl_object *intern, xsltStyl
 
 	ZVAL_STRING(&member, "doXInclude");
 	doXInclude = std_hnd->read_property(id, &member, BP_VAR_IS, NULL, &rv);
-	if (Z_TYPE_P(doXInclude) != IS_NULL) {
+	if (!Z_IS_NULL_P(doXInclude)) {
 		convert_to_long(doXInclude);
 		ctxt->xinclude = Z_LVAL_P(doXInclude);
 	}

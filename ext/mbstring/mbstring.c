@@ -831,7 +831,7 @@ php_mb_parse_encoding_array(zval *array, const mbfl_encoding ***return_list, siz
 	size_t size;
 
 	list = NULL;
-	if (Z_TYPE_P(array) == IS_ARRAY) {
+	if (Z_IS_ARRAY_P(array)) {
 		target_hash = Z_ARRVAL_P(array);
 		i = zend_hash_num_elements(target_hash);
 		size = i + MBSTRG(default_detect_order_list_size);
@@ -2402,7 +2402,7 @@ PHP_FUNCTION(mb_strrpos)
 	}
 
 	if (zoffset) {
-		if (Z_TYPE_P(zoffset) == IS_STRING) {
+		if (Z_IS_STRING_P(zoffset)) {
 			enc_name2     = Z_STRVAL_P(zoffset);
 			enc_name_len2 = Z_STRLEN_P(zoffset);
 			str_flg       = 1;
@@ -3191,7 +3191,7 @@ PHP_FUNCTION(mb_convert_encoding)
 		return;
 	}
 
-	if (Z_TYPE_P(input) != IS_STRING && Z_TYPE_P(input) != IS_ARRAY) {
+	if (!Z_IS_STRING_P(input) && !Z_IS_ARRAY_P(input)) {
 		convert_to_string(input);
 	}
 
@@ -3229,7 +3229,7 @@ PHP_FUNCTION(mb_convert_encoding)
 			}
 	}
 
-	if (Z_TYPE_P(input) == IS_STRING) {
+	if (Z_IS_STRING_P(input)) {
 		/* new encoding */
 		ret = php_mb_convert_encoding(Z_STRVAL_P(input), Z_STRLEN_P(input), arg_new, _from_encodings, &size);
 		if (ret != NULL) {
@@ -3676,13 +3676,13 @@ static int mb_recursive_encoder_detector_feed(mbfl_encoding_detector *identd, zv
 	zval *entry;
 
 	ZVAL_DEREF(var);
-	if (Z_TYPE_P(var) == IS_STRING) {
+	if (Z_IS_STRING_P(var)) {
 		string.val = (unsigned char *)Z_STRVAL_P(var);
 		string.len = Z_STRLEN_P(var);
 		if (mbfl_encoding_detector_feed(identd, &string)) {
 			return 1; /* complete detecting */
 		}
-	} else if (Z_TYPE_P(var) == IS_ARRAY || Z_TYPE_P(var) == IS_OBJECT) {
+	} else if (Z_IS_ARRAY_P(var) || Z_IS_OBJECT_P(var)) {
 		if (Z_REFCOUNTED_P(var)) {
 			if (Z_IS_RECURSIVE_P(var)) {
 				*recursion_error = 1;
@@ -3723,7 +3723,7 @@ static int mb_recursive_convert_variable(mbfl_buffer_converter *convd, zval *var
 
 	orig_var = var;
 	ZVAL_DEREF(var);
-	if (Z_TYPE_P(var) == IS_STRING) {
+	if (Z_IS_STRING_P(var)) {
 		string.val = (unsigned char *)Z_STRVAL_P(var);
 		string.len = Z_STRLEN_P(var);
 		ret = mbfl_buffer_converter_feed_result(convd, &string, &result);
@@ -3733,8 +3733,8 @@ static int mb_recursive_convert_variable(mbfl_buffer_converter *convd, zval *var
 			ZVAL_STRINGL(orig_var, (char *)ret->val, ret->len);
 			efree(ret->val);
 		}
-	} else if (Z_TYPE_P(var) == IS_ARRAY || Z_TYPE_P(var) == IS_OBJECT) {
-		if (Z_TYPE_P(var) == IS_ARRAY) {
+	} else if (Z_IS_ARRAY_P(var) || Z_IS_OBJECT_P(var)) {
+		if (Z_IS_ARRAY_P(var)) {
 			SEPARATE_ARRAY(var);
 		}
 		if (Z_REFCOUNTED_P(var)) {
@@ -3926,7 +3926,7 @@ php_mb_numericentity_exec(INTERNAL_FUNCTION_PARAMETERS, int type)
 
 	/* conversion map */
 	convmap = NULL;
-	if (Z_TYPE_P(zconvmap) == IS_ARRAY) {
+	if (Z_IS_ARRAY_P(zconvmap)) {
 		target_hash = Z_ARRVAL_P(zconvmap);
 		i = zend_hash_num_elements(target_hash);
 		if (i > 0) {
@@ -4248,7 +4248,7 @@ PHP_FUNCTION(mb_send_mail)
 		char *param_name;
 		char *charset = NULL;
 
-		ZEND_ASSERT(Z_TYPE_P(s) == IS_STRING);
+		ZEND_ASSERT(Z_IS_STRING_P(s));
 		p = strchr(Z_STRVAL_P(s), ';');
 
 		if (p != NULL) {
@@ -4282,7 +4282,7 @@ PHP_FUNCTION(mb_send_mail)
 	if ((s = zend_hash_str_find(&ht_headers, "CONTENT-TRANSFER-ENCODING", sizeof("CONTENT-TRANSFER-ENCODING") - 1))) {
 		const mbfl_encoding *_body_enc;
 
-		ZEND_ASSERT(Z_TYPE_P(s) == IS_STRING);
+		ZEND_ASSERT(Z_IS_STRING_P(s));
 		_body_enc = mbfl_name2encoding(Z_STRVAL_P(s));
 		switch (_body_enc ? _body_enc->no_encoding : mbfl_no_encoding_invalid) {
 			case mbfl_no_encoding_base64:

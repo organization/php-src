@@ -458,7 +458,7 @@ static int firebird_bind_blob(pdo_stmt_t *stmt, ISC_QUAD *blob_id, zval *param)
 		return 0;
 	}
 
-	if (Z_TYPE_P(param) != IS_STRING) {
+	if (!Z_IS_STRING_P(param)) {
 		ZVAL_STR(&data, zval_get_string_func(param));
 	} else {
 		ZVAL_COPY_VALUE(&data, param);
@@ -474,7 +474,7 @@ static int firebird_bind_blob(pdo_stmt_t *stmt, ISC_QUAD *blob_id, zval *param)
 		put_cnt += chunk_size;
 	}
 
-	if (Z_TYPE_P(param) != IS_STRING) {
+	if (!Z_IS_STRING_P(param)) {
 		zval_dtor(&data);
 	}
 
@@ -561,7 +561,7 @@ static int firebird_stmt_param_hook(pdo_stmt_t *stmt, struct pdo_bound_param_dat
 				parameter = &param->parameter;
 			}
 
-			if (Z_TYPE_P(parameter) == IS_RESOURCE) {
+			if (Z_IS_RESOURCE_P(parameter)) {
 				php_stream *stm = NULL;
 
 				php_stream_from_zval_no_verify(stm, parameter);
@@ -582,7 +582,7 @@ static int firebird_stmt_param_hook(pdo_stmt_t *stmt, struct pdo_bound_param_dat
 					return 0;
 
 				case SQL_BLOB: {
-					if (Z_TYPE_P(parameter) == IS_NULL) {
+					if (Z_IS_NULL_P(parameter)) {
 						/* Check if field allow NULL values */
 						if (~var->sqltype & 1) {
 							strcpy(stmt->error_code, "HY105");

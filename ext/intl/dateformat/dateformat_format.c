@@ -72,7 +72,7 @@ static int32_t internal_get_arr_ele(IntlDateFormatter_object *dfo,
 	}
 
 	if ((ele_value = zend_hash_str_find(hash_arr, key_name, strlen(key_name))) != NULL) {
-		if(Z_TYPE_P(ele_value) != IS_LONG) {
+		if(!Z_IS_LONG_P(ele_value)) {
 			spprintf(&message, 0, "datefmt_format: parameter array contains "
 					"a non-integer element for key '%s'", key_name);
 			intl_errors_set(err, U_ILLEGAL_ARGUMENT_ERROR, message, 1);
@@ -168,7 +168,7 @@ PHP_FUNCTION(datefmt_format)
 
 	DATE_FORMAT_METHOD_FETCH_OBJECT;
 
-	if (Z_TYPE_P(zarg) == IS_ARRAY) {
+	if (Z_IS_ARRAY_P(zarg)) {
 		hash_arr = Z_ARRVAL_P(zarg);
 		if (!hash_arr || zend_hash_num_elements(hash_arr) == 0) {
 			RETURN_FALSE;

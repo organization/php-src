@@ -45,7 +45,7 @@ static void collator_convert_hash_item_from_utf8_to_utf16(
 	zval        znew_val;
 
 	/* Process string values only. */
-	if( Z_TYPE_P( hashData ) != IS_STRING )
+	if( !Z_IS_STRING_P( hashData ) )
 		return;
 
 	old_val     = Z_STRVAL_P( hashData );
@@ -85,7 +85,7 @@ static void collator_convert_hash_item_from_utf16_to_utf8(
 	zval        znew_val;
 
 	/* Process string values only. */
-	if( Z_TYPE_P( hashData ) != IS_STRING )
+	if( !Z_IS_STRING_P( hashData ) )
 		return;
 
 	old_val     = Z_STRVAL_P( hashData );
@@ -220,7 +220,7 @@ zval* collator_convert_object_to_string( zval* obj, zval *rv )
 	int32_t ustr_len  = 0;
 
 	/* Bail out if it's not an object. */
-	if( Z_TYPE_P( obj ) != IS_OBJECT )
+	if( !Z_IS_OBJECT_P( obj ) )
 	{
 		COLLATOR_CONVERT_RETURN_FAILED( obj );
 	}
@@ -325,7 +325,7 @@ zval* collator_convert_string_to_number( zval* str, zval *rv )
 zval* collator_convert_string_to_double( zval* str, zval *rv )
 {
 	zval* num = collator_convert_string_to_number( str, rv );
-	if( Z_TYPE_P(num) == IS_LONG )
+	if( Z_IS_LONG_P(num) )
 	{
 		ZVAL_DOUBLE( num, Z_LVAL_P( num ) );
 	}
@@ -349,7 +349,7 @@ zval* collator_convert_string_to_number_if_possible( zval* str, zval *rv )
 	zend_long lval      = 0;
 	double dval    = 0;
 
-	if( Z_TYPE_P( str ) != IS_STRING )
+	if( !Z_IS_STRING_P( str ) )
 	{
 		COLLATOR_CONVERT_RETURN_FAILED( str );
 	}
@@ -385,7 +385,7 @@ zval* collator_make_printable_zval( zval* arg, zval *rv)
 	int use_copy = 0;
 	zval* str    = NULL;
 
-	if( Z_TYPE_P(arg) != IS_STRING )
+	if( !Z_IS_STRING_P(arg) )
 	{
 
 		use_copy = zend_make_printable_zval(arg, &arg_copy);
@@ -422,7 +422,7 @@ zval* collator_normalize_sort_argument( zval* arg, zval *rv )
 {
 	zval* n_arg = NULL;
 
-	if( Z_TYPE_P( arg ) != IS_STRING )
+	if( !Z_IS_STRING_P( arg ) )
 	{
 		/* If its not a string then nothing to do.
 		 * Return original arg.

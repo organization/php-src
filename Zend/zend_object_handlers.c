@@ -74,7 +74,7 @@ ZEND_API void rebuild_object_properties(zend_object *zobj) /* {{{ */
 				if (/*prop_info->ce == ce &&*/
 				    (prop_info->flags & ZEND_ACC_STATIC) == 0) {
 
-					if (UNEXPECTED(Z_TYPE_P(OBJ_PROP(zobj, prop_info->offset)) == IS_UNDEF)) {
+					if (UNEXPECTED(Z_IS_UNDEF_P(OBJ_PROP(zobj, prop_info->offset)))) {
 						HT_FLAGS(zobj->properties) |= HASH_FLAG_HAS_EMPTY_IND;
 					}
 
@@ -90,7 +90,7 @@ ZEND_API void rebuild_object_properties(zend_object *zobj) /* {{{ */
 					    (prop_info->flags & ZEND_ACC_PRIVATE) != 0) {
 						zval zv;
 
-						if (UNEXPECTED(Z_TYPE_P(OBJ_PROP(zobj, prop_info->offset)) == IS_UNDEF)) {
+						if (UNEXPECTED(Z_IS_UNDEF_P(OBJ_PROP(zobj, prop_info->offset)))) {
 							HT_FLAGS(zobj->properties) |= HASH_FLAG_HAS_EMPTY_IND;
 						}
 
@@ -151,7 +151,7 @@ ZEND_API HashTable *zend_std_get_debug_info(zval *object, int *is_temp) /* {{{ *
 	}
 
 	zend_call_method_with_0_params(object, ce, &ce->__debugInfo, ZEND_DEBUGINFO_FUNC_NAME, &retval);
-	if (Z_TYPE(retval) == IS_ARRAY) {
+	if (Z_IS_ARRAY(retval)) {
 		if (!Z_REFCOUNTED(retval)) {
 			*is_temp = 1;
 			return zend_array_dup(Z_ARRVAL(retval));
@@ -164,7 +164,7 @@ ZEND_API HashTable *zend_std_get_debug_info(zval *object, int *is_temp) /* {{{ *
 			zval_ptr_dtor(&retval);
 			return Z_ARRVAL(retval);
 		}
-	} else if (Z_TYPE(retval) == IS_NULL) {
+	} else if (Z_IS_NULL(retval)) {
 		*is_temp = 1;
 		ht = zend_new_array(0);
 		return ht;
@@ -497,7 +497,7 @@ ZEND_API uint32_t *zend_get_property_guard(zend_object *zobj, zend_string *membe
 
 	ZEND_ASSERT(OBJ_FLAGS(zobj) & IS_OBJ_USE_GUARDS);
 	zv = zobj->properties_table + zobj->ce->default_properties_count;
-	if (EXPECTED(Z_TYPE_P(zv) == IS_STRING)) {
+	if (EXPECTED(Z_IS_STRING_P(zv))) {
 		zend_string *str = Z_STR_P(zv);
 		if (EXPECTED(str == member) ||
 		     /* hash values are always pred-calculated here */
@@ -517,7 +517,7 @@ ZEND_API uint32_t *zend_get_property_guard(zend_object *zobj, zend_string *membe
 			zend_string_release(Z_STR_P(zv));
 			ZVAL_ARR(zv, guards);
 		}
-	} else if (EXPECTED(Z_TYPE_P(zv) == IS_ARRAY)) {
+	} else if (EXPECTED(Z_IS_ARRAY_P(zv))) {
 		guards = Z_ARRVAL_P(zv);
 		ZEND_ASSERT(guards != NULL);
 		zv = zend_hash_find(guards, member);
@@ -525,7 +525,7 @@ ZEND_API uint32_t *zend_get_property_guard(zend_object *zobj, zend_string *membe
 			return (uint32_t*)(((zend_uintptr_t)Z_PTR_P(zv)) & ~1);
 		}
 	} else {
-		ZEND_ASSERT(Z_TYPE_P(zv) == IS_UNDEF);
+		ZEND_ASSERT(Z_IS_UNDEF_P(zv));
 		OBJ_FLAGS(zobj) |= IS_OBJ_HAS_GUARDS;
 		ZVAL_STR_COPY(zv, member);
 		Z_PROPERTY_GUARD_P(zv) = 0;
@@ -549,7 +549,7 @@ zval *zend_std_read_property(zval *object, zval *member, int type, void **cache_
 	zobj = Z_OBJ_P(object);
 
 	ZVAL_UNDEF(&tmp_member);
-	if (UNEXPECTED(Z_TYPE_P(member) != IS_STRING)) {
+	if (UNEXPECTED(!Z_IS_STRING_P(member))) {
 		ZVAL_STR(&tmp_member, zval_get_string_func(member));
 		member = &tmp_member;
 		cache_slot = NULL;
@@ -564,7 +564,7 @@ zval *zend_std_read_property(zval *object, zval *member, int type, void **cache_
 
 	if (EXPECTED(IS_VALID_PROPERTY_OFFSET(property_offset))) {
 		retval = OBJ_PROP(zobj, property_offset);
-		if (EXPECTED(Z_TYPE_P(retval) != IS_UNDEF)) {
+		if (EXPECTED(!Z_IS_UNDEF_P(retval))) {
 			goto exit;
 		}
 	} else if (EXPECTED(IS_DYNAMIC_PROPERTY_OFFSET(property_offset))) {
@@ -575,7 +575,7 @@ zval *zend_std_read_property(zval *object, zval *member, int type, void **cache_
 				if (EXPECTED(idx < zobj->properties->nNumUsed * sizeof(Bucket))) {
 					Bucket *p = (Bucket*)((char*)zobj->properties->arData + idx);
 
-					if (EXPECTED(Z_TYPE(p->val) != IS_UNDEF) &&
+					if (EXPECTED(!Z_IS_UNDEF(p->val)) &&
 				        (EXPECTED(p->key == Z_STR_P(member)) ||
 				         (EXPECTED(p->h == ZSTR_H(Z_STR_P(member))) &&
 				          EXPECTED(p->key != NULL) &&
@@ -608,7 +608,7 @@ zval *zend_std_read_property(zval *object, zval *member, int type, void **cache_
 		guard = zend_get_property_guard(zobj, Z_STR_P(member));
 
 		if (!((*guard) & IN_ISSET)) {
-			if (Z_TYPE(tmp_member) == IS_UNDEF) {
+			if (Z_IS_UNDEF(tmp_member)) {
 				ZVAL_COPY(&tmp_member, member);
 				member = &tmp_member;
 			}
@@ -637,18 +637,18 @@ zval *zend_std_read_property(zval *object, zval *member, int type, void **cache_
 		}
 		if (!((*guard) & IN_GET)) {
 			/* have getter - try with it! */
-			if (Z_TYPE(tmp_object) == IS_UNDEF) {
+			if (Z_IS_UNDEF(tmp_object)) {
 				ZVAL_COPY(&tmp_object, object);
 			}
 			*guard |= IN_GET; /* prevent circular getting */
 			zend_std_call_getter(&tmp_object, member, rv);
 			*guard &= ~IN_GET;
 
-			if (Z_TYPE_P(rv) != IS_UNDEF) {
+			if (!Z_IS_UNDEF_P(rv)) {
 				retval = rv;
 				if (!Z_ISREF_P(rv) &&
 				    (type == BP_VAR_W || type == BP_VAR_RW  || type == BP_VAR_UNSET)) {
-					if (UNEXPECTED(Z_TYPE_P(rv) != IS_OBJECT)) {
+					if (UNEXPECTED(!Z_IS_OBJECT_P(rv))) {
 						zend_error(E_NOTICE, "Indirect modification of overloaded property %s::$%s has no effect", ZSTR_VAL(zobj->ce->name), Z_STRVAL_P(member));
 					}
 				}
@@ -691,7 +691,7 @@ ZEND_API void zend_std_write_property(zval *object, zval *member, zval *value, v
 	zobj = Z_OBJ_P(object);
 
 	ZVAL_UNDEF(&tmp_member);
- 	if (UNEXPECTED(Z_TYPE_P(member) != IS_STRING)) {
+ 	if (UNEXPECTED(!Z_IS_STRING_P(member))) {
 		ZVAL_STR(&tmp_member, zval_get_string_func(member));
 		member = &tmp_member;
 		cache_slot = NULL;
@@ -701,7 +701,7 @@ ZEND_API void zend_std_write_property(zval *object, zval *member, zval *value, v
 
 	if (EXPECTED(IS_VALID_PROPERTY_OFFSET(property_offset))) {
 		variable_ptr = OBJ_PROP(zobj, property_offset);
-		if (Z_TYPE_P(variable_ptr) != IS_UNDEF) {
+		if (!Z_IS_UNDEF_P(variable_ptr)) {
 			goto found;
 		}
 	} else if (EXPECTED(IS_DYNAMIC_PROPERTY_OFFSET(property_offset))) {
@@ -808,7 +808,7 @@ zval *zend_std_read_dimension(zval *object, zval *offset, int type, zval *rv) /*
 		zval_ptr_dtor(&tmp_object);
 		zval_ptr_dtor(&tmp_offset);
 
-		if (UNEXPECTED(Z_TYPE_P(rv) == IS_UNDEF)) {
+		if (UNEXPECTED(Z_IS_UNDEF_P(rv))) {
 			if (UNEXPECTED(!EG(exception))) {
 				zend_throw_error(NULL, "Undefined offset for object of type %s used as array", ZSTR_VAL(ce->name));
 			}
@@ -855,12 +855,12 @@ static int zend_std_has_dimension(zval *object, zval *offset, int check_empty) /
 		ZVAL_COPY(&tmp_offset, offset);
 		ZVAL_COPY(&tmp_object, object);
 		zend_call_method_with_1_params(&tmp_object, ce, NULL, "offsetexists", &retval, &tmp_offset);
-		if (EXPECTED(Z_TYPE(retval) != IS_UNDEF)) {
+		if (EXPECTED(!Z_IS_UNDEF(retval))) {
 			result = i_zend_is_true(&retval);
 			zval_ptr_dtor(&retval);
 			if (check_empty && result && EXPECTED(!EG(exception))) {
 				zend_call_method_with_1_params(&tmp_object, ce, NULL, "offsetget", &retval, &tmp_offset);
-				if (EXPECTED(Z_TYPE(retval) != IS_UNDEF)) {
+				if (EXPECTED(!Z_IS_UNDEF(retval))) {
 					result = i_zend_is_true(&retval);
 					zval_ptr_dtor(&retval);
 				}
@@ -896,7 +896,7 @@ static zval *zend_std_get_property_ptr_ptr(zval *object, zval *member, int type,
 
 	if (EXPECTED(IS_VALID_PROPERTY_OFFSET(property_offset))) {
 		retval = OBJ_PROP(zobj, property_offset);
-		if (UNEXPECTED(Z_TYPE_P(retval) == IS_UNDEF)) {
+		if (UNEXPECTED(Z_IS_UNDEF_P(retval))) {
 			if (EXPECTED(!zobj->ce->__get) ||
 			    UNEXPECTED((*zend_get_property_guard(zobj, name)) & IN_GET)) {
 				ZVAL_NULL(retval);
@@ -951,7 +951,7 @@ static void zend_std_unset_property(zval *object, zval *member, void **cache_slo
 	zobj = Z_OBJ_P(object);
 
 	ZVAL_UNDEF(&tmp_member);
- 	if (UNEXPECTED(Z_TYPE_P(member) != IS_STRING)) {
+ 	if (UNEXPECTED(!Z_IS_STRING_P(member))) {
 		ZVAL_STR(&tmp_member, zval_get_string_func(member));
 		member = &tmp_member;
 		cache_slot = NULL;
@@ -962,7 +962,7 @@ static void zend_std_unset_property(zval *object, zval *member, void **cache_slo
 	if (EXPECTED(IS_VALID_PROPERTY_OFFSET(property_offset))) {
 		zval *slot = OBJ_PROP(zobj, property_offset);
 
-		if (Z_TYPE_P(slot) != IS_UNDEF) {
+		if (!Z_IS_UNDEF_P(slot)) {
 			zval_ptr_dtor(slot);
 			ZVAL_UNDEF(slot);
 			if (zobj->properties) {
@@ -1485,8 +1485,8 @@ static int zend_std_compare_objects(zval *o1, zval *o2) /* {{{ */
 		}
 		Z_PROTECT_RECURSION_P(o1);
 		do {
-			if (Z_TYPE_P(p1) != IS_UNDEF) {
-				if (Z_TYPE_P(p2) != IS_UNDEF) {
+			if (!Z_IS_UNDEF_P(p1)) {
+				if (!Z_IS_UNDEF_P(p2)) {
 					zval result;
 
 					if (compare_function(&result, p1, p2)==FAILURE) {
@@ -1502,7 +1502,7 @@ static int zend_std_compare_objects(zval *o1, zval *o2) /* {{{ */
 					return 1;
 				}
 			} else {
-				if (Z_TYPE_P(p2) != IS_UNDEF) {
+				if (!Z_IS_UNDEF_P(p2)) {
 					Z_UNPROTECT_RECURSION_P(o1);
 					return 1;
 				}
@@ -1535,7 +1535,7 @@ static int zend_std_has_property(zval *object, zval *member, int has_set_exists,
 	zobj = Z_OBJ_P(object);
 
 	ZVAL_UNDEF(&tmp_member);
-	if (UNEXPECTED(Z_TYPE_P(member) != IS_STRING)) {
+	if (UNEXPECTED(!Z_IS_STRING_P(member))) {
 		ZVAL_STR(&tmp_member, zval_get_string_func(member));
 		member = &tmp_member;
 		cache_slot = NULL;
@@ -1545,7 +1545,7 @@ static int zend_std_has_property(zval *object, zval *member, int has_set_exists,
 
 	if (EXPECTED(IS_VALID_PROPERTY_OFFSET(property_offset))) {
 		value = OBJ_PROP(zobj, property_offset);
-		if (Z_TYPE_P(value) != IS_UNDEF) {
+		if (!Z_IS_UNDEF_P(value)) {
 			goto found;
 		}
 	} else if (EXPECTED(IS_DYNAMIC_PROPERTY_OFFSET(property_offset))) {
@@ -1556,7 +1556,7 @@ static int zend_std_has_property(zval *object, zval *member, int has_set_exists,
 				if (EXPECTED(idx < zobj->properties->nNumUsed * sizeof(Bucket))) {
 					Bucket *p = (Bucket*)((char*)zobj->properties->arData + idx);
 
-					if (EXPECTED(Z_TYPE(p->val) != IS_UNDEF) &&
+					if (EXPECTED(!Z_IS_UNDEF(p->val)) &&
 				        (EXPECTED(p->key == Z_STR_P(member)) ||
 				         (EXPECTED(p->h == ZSTR_H(Z_STR_P(member))) &&
 				          EXPECTED(p->key != NULL) &&
@@ -1577,7 +1577,7 @@ found:
 				switch (has_set_exists) {
 					case 0:
 						ZVAL_DEREF(value);
-						result = (Z_TYPE_P(value) != IS_NULL);
+						result = (!Z_IS_NULL_P(value));
 						break;
 					default:
 						result = zend_is_true(value);
@@ -1603,14 +1603,14 @@ found:
 			zval tmp_object;
 
 			/* have issetter - try with it! */
-			if (Z_TYPE(tmp_member) == IS_UNDEF) {
+			if (Z_IS_UNDEF(tmp_member)) {
 				ZVAL_COPY(&tmp_member, member);
 				member = &tmp_member;
 			}
 			ZVAL_COPY(&tmp_object, object);
 			(*guard) |= IN_ISSET; /* prevent circular getting */
 			zend_std_call_issetter(&tmp_object, member, &rv);
-			if (Z_TYPE(rv) != IS_UNDEF) {
+			if (!Z_IS_UNDEF(rv)) {
 				result = zend_is_true(&rv);
 				zval_ptr_dtor(&rv);
 				if (has_set_exists && result) {
@@ -1618,7 +1618,7 @@ found:
 						(*guard) |= IN_GET;
 						zend_std_call_getter(&tmp_object, member, &rv);
 						(*guard) &= ~IN_GET;
-						if (Z_TYPE(rv) != IS_UNDEF) {
+						if (!Z_IS_UNDEF(rv)) {
 							result = i_zend_is_true(&rv);
 							zval_ptr_dtor(&rv);
 						} else {
@@ -1664,7 +1664,7 @@ ZEND_API int zend_std_cast_object_tostring(zval *readobj, zval *writeobj, int ty
 					ZVAL_OBJ(&ex, EG(exception));
 					EG(exception) = NULL;
 					msg = zend_read_property(Z_OBJCE(ex), &ex, "message", sizeof("message") - 1, 1, &rv);
-					if (UNEXPECTED(Z_TYPE_P(msg) != IS_STRING)) {
+					if (UNEXPECTED(!Z_IS_STRING_P(msg))) {
 						ZVAL_EMPTY_STRING(&rv);
 						msg = &rv;
 					}
@@ -1673,7 +1673,7 @@ ZEND_API int zend_std_cast_object_tostring(zval *readobj, zval *writeobj, int ty
 							ZSTR_VAL(ce->name), ZSTR_VAL(Z_OBJCE(ex)->name), Z_STRVAL_P(msg));
 					return FAILURE;
 				}
-				if (EXPECTED(Z_TYPE(retval) == IS_STRING)) {
+				if (EXPECTED(Z_IS_STRING(retval))) {
 					ZVAL_COPY_VALUE(writeobj, &retval);
 					return SUCCESS;
 				} else {

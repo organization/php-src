@@ -245,9 +245,9 @@ static void php_converter_to_u_callback(const void *context,
 		zval_ptr_dtor(&retval);
 	}
 
-	if (Z_TYPE(zargs[3]) == IS_LONG) {
+	if (Z_IS_LONG(zargs[3])) {
 		*pErrorCode = Z_LVAL(zargs[3]);
-	} else if (Z_ISREF(zargs[3]) && Z_TYPE_P(Z_REFVAL(zargs[3])) == IS_LONG) {
+	} else if (Z_ISREF(zargs[3]) && Z_IS_LONG_P(Z_REFVAL(zargs[3]))) {
 		*pErrorCode = Z_LVAL_P(Z_REFVAL(zargs[3]));
 	}
 
@@ -327,9 +327,9 @@ static void php_converter_from_u_callback(const void *context,
 		zval_ptr_dtor(&retval);
 	}
 
-	if (Z_TYPE(zargs[3]) == IS_LONG) {
+	if (Z_IS_LONG(zargs[3])) {
 		*pErrorCode = Z_LVAL(zargs[3]);
-	} else if (Z_ISREF(zargs[3]) && Z_TYPE_P(Z_REFVAL(zargs[3])) == IS_LONG) {
+	} else if (Z_ISREF(zargs[3]) && Z_IS_LONG_P(Z_REFVAL(zargs[3]))) {
 		*pErrorCode = Z_LVAL_P(Z_REFVAL(zargs[3]));
 	}
 
@@ -803,13 +803,13 @@ static PHP_METHOD(UConverter, transcode) {
 
 			if (U_SUCCESS(error) &&
 				(tmpzval = zend_hash_str_find(Z_ARRVAL_P(options), "from_subst", sizeof("from_subst") - 1)) != NULL &&
-				Z_TYPE_P(tmpzval) == IS_STRING) {
+				Z_IS_STRING_P(tmpzval)) {
 				error = U_ZERO_ERROR;
 				ucnv_setSubstChars(src_cnv, Z_STRVAL_P(tmpzval), Z_STRLEN_P(tmpzval) & 0x7F, &error);
 			}
 			if (U_SUCCESS(error) &&
 				(tmpzval = zend_hash_str_find(Z_ARRVAL_P(options), "to_subst", sizeof("to_subst") - 1)) != NULL &&
-				Z_TYPE_P(tmpzval) == IS_STRING) {
+				Z_IS_STRING_P(tmpzval)) {
 				error = U_ZERO_ERROR;
 				ucnv_setSubstChars(dest_cnv, Z_STRVAL_P(tmpzval), Z_STRLEN_P(tmpzval) & 0x7F, &error);
 			}

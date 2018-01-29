@@ -208,7 +208,7 @@ PHP_COM_DOTNET_API int php_com_import_typelib(ITypeLib *TL, int mode, int codepa
 
 				/* register the constant */
 				php_com_zval_from_variant(&value, pVarDesc->lpvarValue, codepage);
-				if (Z_TYPE(value) == IS_LONG) {
+				if (Z_IS_LONG(value)) {
 					c.flags = mode;
 					ZVAL_LONG(&c.value, Z_LVAL(value));
 					c.module_number = 0;

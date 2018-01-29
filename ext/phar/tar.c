@@ -916,7 +916,7 @@ static int phar_tar_setupmetadata(zval *zv, void *argument) /* {{{ */
 	/* now we are dealing with regular files, so look for metadata */
 	lookfor_len = spprintf(&lookfor, 0, ".phar/.metadata/%s/.metadata.bin", entry->filename);
 
-	if (Z_TYPE(entry->metadata) == IS_UNDEF) {
+	if (Z_IS_UNDEF(entry->metadata)) {
 		zend_hash_str_del(&(entry->phar->manifest), lookfor, lookfor_len);
 		efree(lookfor);
 		return ZEND_HASH_APPLY_KEEP;
@@ -1168,7 +1168,7 @@ nostub:
 	pass.free_fp = 1;
 	pass.free_ufp = 1;
 
-	if (Z_TYPE(phar->metadata) != IS_UNDEF) {
+	if (!Z_IS_UNDEF(phar->metadata)) {
 		phar_entry_info *mentry;
 		if (NULL != (mentry = zend_hash_str_find_ptr(&(phar->manifest), ".phar/.metadata.bin", sizeof(".phar/.metadata.bin")-1))) {
 			if (ZEND_HASH_APPLY_KEEP != phar_tar_setmetadata(&phar->metadata, mentry, error)) {

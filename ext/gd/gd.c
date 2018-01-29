@@ -4608,7 +4608,7 @@ PHP_FUNCTION(imageconvolution)
 	}
 
 	for (i=0; i<3; i++) {
-		if ((var = zend_hash_index_find(Z_ARRVAL_P(hash_matrix), (i))) != NULL && Z_TYPE_P(var) == IS_ARRAY) {
+		if ((var = zend_hash_index_find(Z_ARRVAL_P(hash_matrix), (i))) != NULL && Z_IS_ARRAY_P(var)) {
 			if (zend_hash_num_elements(Z_ARRVAL_P(var)) != 3 ) {
 				php_error_docref(NULL, E_WARNING, "You must have 3x3 array");
 				RETURN_FALSE;
@@ -4968,7 +4968,7 @@ PHP_FUNCTION(imageaffinematrixget)
 		case GD_AFFINE_TRANSLATE:
 		case GD_AFFINE_SCALE: {
 			double x, y;
-			if (!options || Z_TYPE_P(options) != IS_ARRAY) {
+			if (!options || !Z_IS_ARRAY_P(options)) {
 				php_error_docref(NULL, E_WARNING, "Array expected as options");
 				RETURN_FALSE;
 			}

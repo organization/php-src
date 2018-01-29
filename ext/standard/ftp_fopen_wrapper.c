@@ -529,7 +529,7 @@ php_stream * php_stream_url_wrap_ftp(php_stream_wrapper *wrapper, const char *pa
 		/* set resume position if applicable */
 		if (context &&
 			(tmpzval = php_stream_context_get_option(context, "ftp", "resume_pos")) != NULL &&
-			Z_TYPE_P(tmpzval) == IS_LONG &&
+			Z_IS_LONG_P(tmpzval) &&
 			Z_LVAL_P(tmpzval) > 0) {
 			php_stream_printf(stream, "REST " ZEND_LONG_FMT "\r\n", Z_LVAL_P(tmpzval));
 			result = GET_FTP_RESULT(stream);

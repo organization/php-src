@@ -347,10 +347,10 @@ static void php_do_chgrp(INTERNAL_FUNCTION_PARAMETERS, int do_lchgrp) /* {{{ */
 		if(wrapper && wrapper->wops->stream_metadata) {
 			int option;
 			void *value;
-			if (Z_TYPE_P(group) == IS_LONG) {
+			if (Z_IS_LONG_P(group)) {
 				option = PHP_STREAM_META_GROUP;
 				value = &Z_LVAL_P(group);
-			} else if (Z_TYPE_P(group) == IS_STRING) {
+			} else if (Z_IS_STRING_P(group)) {
 				option = PHP_STREAM_META_GROUP_NAME;
 				value = Z_STRVAL_P(group);
 			} else {
@@ -375,9 +375,9 @@ static void php_do_chgrp(INTERNAL_FUNCTION_PARAMETERS, int do_lchgrp) /* {{{ */
 	/* We have no native chgrp on Windows, nothing left to do if stream doesn't have own implementation */
 	RETURN_FALSE;
 #else
-	if (Z_TYPE_P(group) == IS_LONG) {
+	if (Z_IS_LONG_P(group)) {
 		gid = (gid_t)Z_LVAL_P(group);
-	} else if (Z_TYPE_P(group) == IS_STRING) {
+	} else if (Z_IS_STRING_P(group)) {
 		if(php_get_gid_by_name(Z_STRVAL_P(group), &gid) != SUCCESS) {
 			php_error_docref(NULL, E_WARNING, "Unable to find gid for %s", Z_STRVAL_P(group));
 			RETURN_FALSE;
@@ -483,10 +483,10 @@ static void php_do_chown(INTERNAL_FUNCTION_PARAMETERS, int do_lchown) /* {{{ */
 		if(wrapper && wrapper->wops->stream_metadata) {
 			int option;
 			void *value;
-			if (Z_TYPE_P(user) == IS_LONG) {
+			if (Z_IS_LONG_P(user)) {
 				option = PHP_STREAM_META_OWNER;
 				value = &Z_LVAL_P(user);
-			} else if (Z_TYPE_P(user) == IS_STRING) {
+			} else if (Z_IS_STRING_P(user)) {
 				option = PHP_STREAM_META_OWNER_NAME;
 				value = Z_STRVAL_P(user);
 			} else {
@@ -512,9 +512,9 @@ static void php_do_chown(INTERNAL_FUNCTION_PARAMETERS, int do_lchown) /* {{{ */
 	RETURN_FALSE;
 #else
 
-	if (Z_TYPE_P(user) == IS_LONG) {
+	if (Z_IS_LONG_P(user)) {
 		uid = (uid_t)Z_LVAL_P(user);
-	} else if (Z_TYPE_P(user) == IS_STRING) {
+	} else if (Z_IS_STRING_P(user)) {
 		if(php_get_uid_by_name(Z_STRVAL_P(user), &uid) != SUCCESS) {
 			php_error_docref(NULL, E_WARNING, "Unable to find uid for %s", Z_STRVAL_P(user));
 			RETURN_FALSE;

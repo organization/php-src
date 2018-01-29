@@ -122,7 +122,7 @@ php_file_globals file_globals;
 /* }}} */
 
 #define PHP_STREAM_TO_ZVAL(stream, arg) \
-	ZEND_ASSERT(Z_TYPE_P(arg) == IS_RESOURCE); \
+	ZEND_ASSERT(Z_IS_RESOURCE_P(arg)); \
 	php_stream_from_res(stream, Z_RES_P(arg));
 
 /* {{{ ZTS-stuff / Globals / Prototypes */
@@ -141,7 +141,7 @@ PHPAPI int php_le_stream_context(void)
 static ZEND_RSRC_DTOR_FUNC(file_context_dtor)
 {
 	php_stream_context *context = (php_stream_context*)res->ptr;
-	if (Z_TYPE(context->options) != IS_UNDEF) {
+	if (!Z_IS_UNDEF(context->options)) {
 		zval_ptr_dtor(&context->options);
 		ZVAL_UNDEF(&context->options);
 	}
@@ -598,7 +598,7 @@ PHP_FUNCTION(file_put_contents)
 		Z_PARAM_RESOURCE_EX(zcontext, 1, 0)
 	ZEND_PARSE_PARAMETERS_END();
 
-	if (Z_TYPE_P(data) == IS_RESOURCE) {
+	if (Z_IS_RESOURCE_P(data)) {
 		php_stream_from_zval(srcstream, data);
 	}
 
@@ -2057,7 +2057,7 @@ PHP_FUNCTION(fgetcsv)
 			escape = escape_str[0];
 		}
 
-		if (len_zv != NULL && Z_TYPE_P(len_zv) != IS_NULL) {
+		if (len_zv != NULL && !Z_IS_NULL_P(len_zv)) {
 			len = zval_get_long(len_zv);
 			if (len < 0) {
 				php_error_docref(NULL, E_WARNING, "Length parameter may not be negative");

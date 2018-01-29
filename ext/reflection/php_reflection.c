@@ -79,7 +79,7 @@ PHPAPI zend_class_entry *reflection_zend_extension_ptr;
 /* Method macros */
 
 #define METHOD_NOTSTATIC(ce)                                                                                \
-	if ((Z_TYPE(EX(This)) != IS_OBJECT) || !instanceof_function(Z_OBJCE(EX(This)), ce)) {           \
+	if ((!Z_IS_OBJECT(EX(This))) || !instanceof_function(Z_OBJCE(EX(This)), ce)) {           \
 		php_error_docref(NULL, E_ERROR, "%s() cannot be called statically", get_active_function_name());        \
 		return;                                                                                             \
 	}                                                                                                       \
@@ -308,7 +308,7 @@ static void _class_string(smart_str *str, zend_class_entry *ce, zval *obj, char 
 		smart_str_appendc(str, '\n');
 	}
 
-	if (obj && Z_TYPE_P(obj) == IS_OBJECT) {
+	if (obj && Z_IS_OBJECT_P(obj)) {
 		smart_str_append_printf(str, "%sObject of class [ ", indent);
 	} else {
 		char *kind = "Class";
@@ -457,7 +457,7 @@ static void _class_string(smart_str *str, zend_class_entry *ce, zval *obj, char 
 	}
 	smart_str_append_printf(str, "%s  }\n", indent);
 
-	if (obj && Z_TYPE_P(obj) == IS_OBJECT && Z_OBJ_HT_P(obj)->get_properties) {
+	if (obj && Z_IS_OBJECT_P(obj) && Z_OBJ_HT_P(obj)->get_properties) {
 		HashTable    *properties = Z_OBJ_HT_P(obj)->get_properties(obj);
 		zend_string  *prop_name;
 		smart_str prop_str = {0};
@@ -539,10 +539,10 @@ static void _const_string(smart_str *str, char *name, zval *value, char *indent)
 {
 	char *type = zend_zval_type_name(value);
 
-	if (Z_TYPE_P(value) == IS_ARRAY) {
+	if (Z_IS_ARRAY_P(value)) {
 		smart_str_append_printf(str, "%s    Constant [ %s %s ] { Array }\n",
 						indent, type, name);
-	} else if (Z_TYPE_P(value) == IS_STRING) {
+	} else if (Z_IS_STRING_P(value)) {
 		smart_str_append_printf(str, "%s    Constant [ %s %s ] { %s }\n",
 						indent, type, name, Z_STRVAL_P(value));
 	} else {
@@ -564,7 +564,7 @@ static void _class_const_string(smart_str *str, char *name, zend_class_constant 
 	zval_update_constant_ex(&c->value, c->ce);
 	type = zend_zval_type_name(&c->value);
 
-	if (Z_TYPE(c->value) == IS_ARRAY) {
+	if (Z_IS_ARRAY(c->value)) {
 		smart_str_append_printf(str, "%sConstant [ %s %s %s ] { Array }\n",
 						indent, visibility, type, name);
 	} else {
@@ -645,20 +645,20 @@ static void _parameter_string(smart_str *str, zend_function *fptr, struct _zend_
 				zval_ptr_dtor(&zv);
 				return;
 			}
-			if (Z_TYPE(zv) == IS_TRUE) {
+			if (Z_IS_TRUE(zv)) {
 				smart_str_appends(str, "true");
-			} else if (Z_TYPE(zv) == IS_FALSE) {
+			} else if (Z_IS_FALSE(zv)) {
 				smart_str_appends(str, "false");
-			} else if (Z_TYPE(zv) == IS_NULL) {
+			} else if (Z_IS_NULL(zv)) {
 				smart_str_appends(str, "NULL");
-			} else if (Z_TYPE(zv) == IS_STRING) {
+			} else if (Z_IS_STRING(zv)) {
 				smart_str_appendc(str, '\'');
 				smart_str_appendl(str, Z_STRVAL(zv), MIN(Z_STRLEN(zv), 15));
 				if (Z_STRLEN(zv) > 15) {
 					smart_str_appends(str, "...");
 				}
 				smart_str_appendc(str, '\'');
-			} else if (Z_TYPE(zv) == IS_ARRAY) {
+			} else if (Z_IS_ARRAY(zv)) {
 				smart_str_appends(str, "Array");
 			} else {
 				zend_string *tmp_zv_str;
@@ -1481,7 +1481,7 @@ ZEND_METHOD(reflection, export)
 		/* Returns from this function */
 	}
 
-	if (Z_TYPE(retval) == IS_UNDEF) {
+	if (Z_IS_UNDEF(retval)) {
 		php_error_docref(NULL, E_WARNING, "%s::__toString() did not return anything", ZSTR_VAL(Z_OBJCE_P(object)->name));
 		RETURN_FALSE;
 	}
@@ -1894,7 +1894,7 @@ ZEND_METHOD(reflection_function, invoke)
 		return;
 	}
 
-	if (Z_TYPE(retval) != IS_UNDEF) {
+	if (!Z_IS_UNDEF(retval)) {
 		if (Z_ISREF(retval)) {
 			zend_unwrap_reference(&retval);
 		}
@@ -1959,7 +1959,7 @@ ZEND_METHOD(reflection_function, invokeArgs)
 		return;
 	}
 
-	if (Z_TYPE(retval) != IS_UNDEF) {
+	if (!Z_IS_UNDEF(retval)) {
 		if (Z_ISREF(retval)) {
 			zend_unwrap_reference(&retval);
 		}
@@ -2242,7 +2242,7 @@ ZEND_METHOD(reflection_generator, getThis)
 
 	REFLECTION_CHECK_VALID_GENERATOR(ex)
 
-	if (Z_TYPE(ex->This) == IS_OBJECT) {
+	if (Z_IS_OBJECT(ex->This)) {
 		ZVAL_COPY(return_value, &ex->This);
 	} else {
 		ZVAL_NULL(return_value);
@@ -2333,7 +2333,7 @@ ZEND_METHOD(reflection_parameter, __construct)
 					/* returns out of this function */
 				}
 
-				if (Z_TYPE_P(classref) == IS_OBJECT) {
+				if (Z_IS_OBJECT_P(classref)) {
 					ce = Z_OBJCE_P(classref);
 				} else {
 					convert_to_string_ex(classref);
@@ -2347,7 +2347,7 @@ ZEND_METHOD(reflection_parameter, __construct)
 				convert_to_string_ex(method);
 				lcname_len = Z_STRLEN_P(method);
 				lcname = zend_str_tolower_dup(Z_STRVAL_P(method), lcname_len);
-				if (ce == zend_ce_closure && Z_TYPE_P(classref) == IS_OBJECT
+				if (ce == zend_ce_closure && Z_IS_OBJECT_P(classref)
 					&& (lcname_len == sizeof(ZEND_INVOKE_FUNC_NAME)-1)
 					&& memcmp(lcname, ZEND_INVOKE_FUNC_NAME, sizeof(ZEND_INVOKE_FUNC_NAME)-1) == 0
 					&& (fptr = zend_get_closure_invoke_method(Z_OBJ_P(classref))) != NULL)
@@ -2391,7 +2391,7 @@ ZEND_METHOD(reflection_parameter, __construct)
 	if (fptr->common.fn_flags & ZEND_ACC_VARIADIC) {
 		num_args++;
 	}
-	if (Z_TYPE_P(parameter) == IS_LONG) {
+	if (Z_IS_LONG_P(parameter)) {
 		position= (int)Z_LVAL_P(parameter);
 		if (position < 0 || (uint32_t)position >= num_args) {
 			if (fptr->common.fn_flags & ZEND_ACC_CALL_VIA_TRAMPOLINE) {
@@ -3001,7 +3001,7 @@ ZEND_METHOD(reflection_method, __construct)
 		name_len = name_len - (tmp_len + 2);
 		name_str = tmp + 2;
 		orig_obj = NULL;
-	} else if (Z_TYPE_P(classname) == IS_OBJECT) {
+	} else if (Z_IS_OBJECT_P(classname)) {
 		orig_obj = classname;
 	} else {
 		orig_obj = NULL;
@@ -3236,7 +3236,7 @@ static void reflection_method_invoke(INTERNAL_FUNCTION_PARAMETERS, int variadic)
 		return;
 	}
 
-	if (Z_TYPE(retval) != IS_UNDEF) {
+	if (!Z_IS_UNDEF(retval)) {
 		if (Z_ISREF(retval)) {
 			zend_unwrap_reference(&retval);
 		}
@@ -3346,7 +3346,7 @@ ZEND_METHOD(reflection_function, inNamespace)
 	if ((name = _default_load_name(getThis())) == NULL) {
 		RETURN_FALSE;
 	}
-	if (Z_TYPE_P(name) == IS_STRING
+	if (Z_IS_STRING_P(name)
 		&& (backslash = zend_memrchr(Z_STRVAL_P(name), '\\', Z_STRLEN_P(name)))
 		&& backslash > Z_STRVAL_P(name))
 	{
@@ -3369,7 +3369,7 @@ ZEND_METHOD(reflection_function, getNamespaceName)
 	if ((name = _default_load_name(getThis())) == NULL) {
 		RETURN_FALSE;
 	}
-	if (Z_TYPE_P(name) == IS_STRING
+	if (Z_IS_STRING_P(name)
 		&& (backslash = zend_memrchr(Z_STRVAL_P(name), '\\', Z_STRLEN_P(name)))
 		&& backslash > Z_STRVAL_P(name))
 	{
@@ -3392,7 +3392,7 @@ ZEND_METHOD(reflection_function, getShortName)
 	if ((name = _default_load_name(getThis())) == NULL) {
 		RETURN_FALSE;
 	}
-	if (Z_TYPE_P(name) == IS_STRING
+	if (Z_IS_STRING_P(name)
 		&& (backslash = zend_memrchr(Z_STRVAL_P(name), '\\', Z_STRLEN_P(name)))
 		&& backslash > Z_STRVAL_P(name))
 	{
@@ -3771,7 +3771,7 @@ static void reflection_class_object_ctor(INTERNAL_FUNCTION_PARAMETERS, int is_ob
 	object = getThis();
 	intern = Z_REFLECTION_P(object);
 
-	if (Z_TYPE_P(argument) == IS_OBJECT) {
+	if (Z_IS_OBJECT_P(argument)) {
 		ZVAL_STR_COPY(&classname, Z_OBJCE_P(argument)->name);
 		reflection_update_property_name(object, &classname);
 		intern->ptr = Z_OBJCE_P(argument);
@@ -4254,7 +4254,7 @@ ZEND_METHOD(reflection_class, getMethods)
 
 	array_init(return_value);
 	zend_hash_apply_with_arguments(&ce->function_table, (apply_func_args_t) _addmethod_va, 4, &ce, return_value, filter, intern->obj);
-	if (Z_TYPE(intern->obj) != IS_UNDEF && instanceof_function(ce, zend_ce_closure)) {
+	if (!Z_IS_UNDEF(intern->obj) && instanceof_function(ce, zend_ce_closure)) {
 		zend_function *closure = zend_get_closure_invoke_method(Z_OBJ(intern->obj));
 		if (closure) {
 			_fix_closure_prototype(closure);
@@ -4287,7 +4287,7 @@ ZEND_METHOD(reflection_class, hasProperty)
 		}
 		RETURN_TRUE;
 	} else {
-		if (Z_TYPE(intern->obj) != IS_UNDEF && Z_OBJ_HANDLER(intern->obj, has_property)) {
+		if (!Z_IS_UNDEF(intern->obj) && Z_OBJ_HANDLER(intern->obj, has_property)) {
 			ZVAL_STR_COPY(&property, name);
 			if (Z_OBJ_HANDLER(intern->obj, has_property)(&intern->obj, &property, 2, NULL)) {
 				zval_ptr_dtor(&property);
@@ -4322,7 +4322,7 @@ ZEND_METHOD(reflection_class, getProperty)
 			reflection_property_factory(ce, property_info, return_value);
 			return;
 		}
-	} else if (Z_TYPE(intern->obj) != IS_UNDEF) {
+	} else if (!Z_IS_UNDEF(intern->obj)) {
 		/* Check for dynamic properties */
 		if (zend_hash_exists(Z_OBJ_HT(intern->obj)->get_properties(&intern->obj), name)) {
 			zend_property_info property_info_tmp;
@@ -4451,7 +4451,7 @@ ZEND_METHOD(reflection_class, getProperties)
 	array_init(return_value);
 	zend_hash_apply_with_arguments(&ce->properties_info, (apply_func_args_t) _addproperty, 3, &ce, return_value, filter);
 
-	if (Z_TYPE(intern->obj) != IS_UNDEF && (filter & ZEND_ACC_PUBLIC) != 0 && Z_OBJ_HT(intern->obj)->get_properties) {
+	if (!Z_IS_UNDEF(intern->obj) && (filter & ZEND_ACC_PUBLIC) != 0 && Z_OBJ_HT(intern->obj)->get_properties) {
 		HashTable *properties = Z_OBJ_HT(intern->obj)->get_properties(&intern->obj);
 		zend_hash_apply_with_arguments(properties, (apply_func_args_t) _adddynproperty, 2, &ce, return_value);
 	}
@@ -5228,7 +5228,7 @@ ZEND_METHOD(reflection_class, inNamespace)
 	if ((name = _default_load_name(getThis())) == NULL) {
 		RETURN_FALSE;
 	}
-	if (Z_TYPE_P(name) == IS_STRING
+	if (Z_IS_STRING_P(name)
 		&& (backslash = zend_memrchr(Z_STRVAL_P(name), '\\', Z_STRLEN_P(name)))
 		&& backslash > Z_STRVAL_P(name))
 	{
@@ -5251,7 +5251,7 @@ ZEND_METHOD(reflection_class, getNamespaceName)
 	if ((name = _default_load_name(getThis())) == NULL) {
 		RETURN_FALSE;
 	}
-	if (Z_TYPE_P(name) == IS_STRING
+	if (Z_IS_STRING_P(name)
 		&& (backslash = zend_memrchr(Z_STRVAL_P(name), '\\', Z_STRLEN_P(name)))
 		&& backslash > Z_STRVAL_P(name))
 	{
@@ -5274,7 +5274,7 @@ ZEND_METHOD(reflection_class, getShortName)
 	if ((name = _default_load_name(getThis())) == NULL) {
 		RETURN_FALSE;
 	}
-	if (Z_TYPE_P(name) == IS_STRING
+	if (Z_IS_STRING_P(name)
 		&& (backslash = zend_memrchr(Z_STRVAL_P(name), '\\', Z_STRLEN_P(name)))
 		&& backslash > Z_STRVAL_P(name))
 	{
@@ -5359,7 +5359,7 @@ ZEND_METHOD(reflection_property, __construct)
 
 	if ((property_info = zend_hash_str_find_ptr(&ce->properties_info, name_str, name_len)) == NULL || (property_info->flags & ZEND_ACC_SHADOW)) {
 		/* Check for dynamic properties */
-		if (property_info == NULL && Z_TYPE_P(classname) == IS_OBJECT && Z_OBJ_HT_P(classname)->get_properties) {
+		if (property_info == NULL && Z_IS_OBJECT_P(classname) && Z_OBJ_HT_P(classname)->get_properties) {
 			if (zend_hash_str_exists(Z_OBJ_HT_P(classname)->get_properties(classname), name_str, name_len)) {
 				dynam_prop = 1;
 			}
@@ -5533,7 +5533,7 @@ ZEND_METHOD(reflection_property, getValue)
 		if (UNEXPECTED(zend_update_class_constants(intern->ce) != SUCCESS)) {
 			return;
 		}
-		if (Z_TYPE(CE_STATIC_MEMBERS(intern->ce)[ref->prop.offset]) == IS_UNDEF) {
+		if (Z_IS_UNDEF(CE_STATIC_MEMBERS(intern->ce)[ref->prop.offset])) {
 			zend_throw_error(NULL, "Internal error: Could not find the property %s::%s", ZSTR_VAL(intern->ce->name), ZSTR_VAL(ref->prop.name));
 			return;
 		}
@@ -5600,7 +5600,7 @@ ZEND_METHOD(reflection_property, setValue)
 			return;
 		}
 
-		if (Z_TYPE(CE_STATIC_MEMBERS(intern->ce)[ref->prop.offset]) == IS_UNDEF) {
+		if (Z_IS_UNDEF(CE_STATIC_MEMBERS(intern->ce)[ref->prop.offset])) {
 			zend_throw_error(NULL, "Internal error: Could not find the property %s::%s", ZSTR_VAL(intern->ce->name), ZSTR_VAL(ref->prop.name));
 			return;
 		}
@@ -6710,7 +6710,7 @@ static zend_object_handlers *zend_std_obj_handlers;
 /* {{{ _reflection_write_property */
 static void _reflection_write_property(zval *object, zval *member, zval *value, void **cache_slot)
 {
-	if ((Z_TYPE_P(member) == IS_STRING)
+	if ((Z_IS_STRING_P(member))
 		&& zend_hash_exists(&Z_OBJCE_P(object)->properties_info, Z_STR_P(member))
 		&& ((Z_STRLEN_P(member) == sizeof("name") - 1  && !memcmp(Z_STRVAL_P(member), "name",  sizeof("name")))
 			|| (Z_STRLEN_P(member) == sizeof("class") - 1 && !memcmp(Z_STRVAL_P(member), "class", sizeof("class")))))

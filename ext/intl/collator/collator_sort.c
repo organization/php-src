@@ -68,7 +68,7 @@ static int collator_regular_compare_function(zval *result, zval *op1, zval *op2)
 
 	/* If both args are strings AND either of args is not numeric string
 	 * then use ICU-compare. Otherwise PHP-compare. */
-	if( Z_TYPE_P(str1_p) == IS_STRING && Z_TYPE_P(str2_p) == IS_STRING &&
+	if( Z_IS_STRING_P(str1_p) && Z_IS_STRING_P(str2_p) &&
 		( str1_p == ( num1_p = collator_convert_string_to_number_if_possible( str1_p, &num1 ) ) ||
 		  str2_p == ( num2_p = collator_convert_string_to_number_if_possible( str2_p, &num2 ) ) ) )
 	{
@@ -154,13 +154,13 @@ static int collator_numeric_compare_function(zval *result, zval *op1, zval *op2)
 	zval *num1_p = NULL;
 	zval *num2_p = NULL;
 
-	if( Z_TYPE_P(op1) == IS_STRING )
+	if( Z_IS_STRING_P(op1) )
 	{
 		num1_p = collator_convert_string_to_double( op1, &num1 );
 		op1 = num1_p;
 	}
 
-	if( Z_TYPE_P(op2) == IS_STRING )
+	if( Z_IS_STRING_P(op2) )
 	{
 		num2_p = collator_convert_string_to_double( op2, &num2 );
 		op2 = num2_p;
@@ -227,7 +227,7 @@ static int collator_compare_func( const void* a, const void* b )
 	if( INTL_G(compare_func)( &result, first, second) == FAILURE )
 		return 0;
 
-	if( Z_TYPE(result) == IS_DOUBLE )
+	if( Z_IS_DOUBLE(result) )
 	{
 		if( Z_DVAL(result) < 0 )
 			return -1;
@@ -435,7 +435,7 @@ PHP_FUNCTION( collator_sort_with_sort_keys )
 		utf16_len = utf16_buf_size;
 
 		/* Process string values only. */
-		if( Z_TYPE_P( hashData ) == IS_STRING )
+		if( Z_IS_STRING_P( hashData ) )
 		{
 			intl_convert_utf8_to_utf16( &utf16_buf, &utf16_len, Z_STRVAL_P( hashData ), Z_STRLEN_P( hashData ), COLLATOR_ERROR_CODE_P( co ) );
 

@@ -854,12 +854,12 @@ PHP_FUNCTION(hash_equals)
 	}
 
 	/* We only allow comparing string to prevent unexpected results. */
-	if (Z_TYPE_P(known_zval) != IS_STRING) {
+	if (!Z_IS_STRING_P(known_zval)) {
 		php_error_docref(NULL, E_WARNING, "Expected known_string to be a string, %s given", zend_zval_type_name(known_zval));
 		RETURN_FALSE;
 	}
 
-	if (Z_TYPE_P(user_zval) != IS_STRING) {
+	if (!Z_IS_STRING_P(user_zval)) {
 		php_error_docref(NULL, E_WARNING, "Expected user_string to be a string, %s given", zend_zval_type_name(user_zval));
 		RETURN_FALSE;
 	}

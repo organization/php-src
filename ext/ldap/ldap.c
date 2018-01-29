@@ -292,7 +292,7 @@ static int _php_ldap_control_from_array(LDAP *ld, LDAPControl** ctrl, zval* arra
 
 	if ((val = zend_hash_str_find(Z_ARRVAL_P(array), "iscritical", sizeof("iscritical") - 1)) != NULL) {
 		convert_to_boolean_ex(val);
-		control_iscritical = (Z_TYPE_P(val) == IS_TRUE);
+		control_iscritical = (Z_IS_TRUE_P(val));
 	} else {
 		control_iscritical = 0;
 	}
@@ -300,7 +300,7 @@ static int _php_ldap_control_from_array(LDAP *ld, LDAPControl** ctrl, zval* arra
 	struct berval *control_value = NULL;
 
 	if ((val = zend_hash_str_find(Z_ARRVAL_P(array), "value", sizeof("value") - 1)) != NULL) {
-		if (Z_TYPE_P(val) != IS_ARRAY) {
+		if (!Z_IS_ARRAY_P(val)) {
 			convert_to_string_ex(val);
 			control_value = ber_memalloc(sizeof * control_value);
 			if (control_value == NULL) {
@@ -459,7 +459,7 @@ static int _php_ldap_control_from_array(LDAP *ld, LDAPControl** ctrl, zval* arra
 
 				if ((tmp = zend_hash_str_find(Z_ARRVAL_P(sortkey), "reverse", sizeof("reverse") - 1)) != NULL) {
 					convert_to_boolean_ex(tmp);
-					sort_keys[i]->reverseOrder = (Z_TYPE_P(tmp) == IS_TRUE);
+					sort_keys[i]->reverseOrder = (Z_IS_TRUE_P(tmp));
 				} else {
 					sort_keys[i]->reverseOrder = 0;
 				}
@@ -604,7 +604,7 @@ static LDAPControl** _php_ldap_controls_from_array(LDAP *ld, zval* array)
 	*ctrls = NULL;
 	ctrlp = ctrls;
 	ZEND_HASH_FOREACH_VAL(Z_ARRVAL_P(array), ctrlarray) {
-		if (Z_TYPE_P(ctrlarray) != IS_ARRAY) {
+		if (!Z_IS_ARRAY_P(ctrlarray)) {
 			php_error_docref(NULL, E_WARNING, "The array value must contain only arrays, where each array is a control");
 			error = 1;
 			break;
@@ -1464,7 +1464,7 @@ static void php_ldap_do_search(INTERNAL_FUNCTION_PARAMETERS, int scope)
 	}
 
 	/* parallel search? */
-	if (Z_TYPE_P(link) == IS_ARRAY) {
+	if (Z_IS_ARRAY_P(link)) {
 		int i, nlinks, nbases, nfilters, *rcs;
 		ldap_linkdata **lds;
 		zval *entry, resource;
@@ -1476,7 +1476,7 @@ static void php_ldap_do_search(INTERNAL_FUNCTION_PARAMETERS, int scope)
 			goto cleanup;
 		}
 
-		if (Z_TYPE_P(base_dn) == IS_ARRAY) {
+		if (Z_IS_ARRAY_P(base_dn)) {
 			nbases = zend_hash_num_elements(Z_ARRVAL_P(base_dn));
 			if (nbases != nlinks) {
 				php_error_docref(NULL, E_WARNING, "Base must either be a string, or an array with the same number of elements as the links array");
@@ -1487,14 +1487,14 @@ static void php_ldap_do_search(INTERNAL_FUNCTION_PARAMETERS, int scope)
 		} else {
 			nbases = 0; /* this means string, not array */
 			/* If anything else than string is passed, ldap_base_dn = NULL */
-			if (Z_TYPE_P(base_dn) == IS_STRING) {
+			if (Z_IS_STRING_P(base_dn)) {
 				ldap_base_dn = Z_STRVAL_P(base_dn);
 			} else {
 				ldap_base_dn = NULL;
 			}
 		}
 
-		if (Z_TYPE_P(filter) == IS_ARRAY) {
+		if (Z_IS_ARRAY_P(filter)) {
 			nfilters = zend_hash_num_elements(Z_ARRVAL_P(filter));
 			if (nfilters != nlinks) {
 				php_error_docref(NULL, E_WARNING, "Filter must either be a string, or an array with the same number of elements as the links array");
@@ -1525,7 +1525,7 @@ static void php_ldap_do_search(INTERNAL_FUNCTION_PARAMETERS, int scope)
 				zend_hash_move_forward(Z_ARRVAL_P(base_dn));
 
 				/* If anything else than string is passed, ldap_base_dn = NULL */
-				if (Z_TYPE_P(entry) == IS_STRING) {
+				if (Z_IS_STRING_P(entry)) {
 					ldap_base_dn = Z_STRVAL_P(entry);
 				} else {
 					ldap_base_dn = NULL;
@@ -1579,7 +1579,7 @@ cleanup_parallel:
 		ldap_filter = Z_STRVAL_P(filter);
 
 		/* If anything else than string is passed, ldap_base_dn = NULL */
-		if (Z_TYPE_P(base_dn) == IS_STRING) {
+		if (Z_IS_STRING_P(base_dn)) {
 			ldap_base_dn = Z_STRVAL_P(base_dn);
 		}
 
@@ -2210,7 +2210,7 @@ static void php_ldap_do_modify(INTERNAL_FUNCTION_PARAMETERS, int oper, int ext)
 		value = zend_hash_get_current_data(Z_ARRVAL_P(entry));
 
 		ZVAL_DEREF(value);
-		if (Z_TYPE_P(value) != IS_ARRAY) {
+		if (!Z_IS_ARRAY_P(value)) {
 			num_values = 1;
 		} else {
 			SEPARATE_ARRAY(value);
@@ -2221,7 +2221,7 @@ static void php_ldap_do_modify(INTERNAL_FUNCTION_PARAMETERS, int oper, int ext)
 		ldap_mods[i]->mod_bvalues = safe_emalloc((num_values + 1), sizeof(struct berval *), 0);
 
 /* allow for arrays with one element, no allowance for arrays with none but probably not required, gerrit thomson. */
-		if ((num_values == 1) && (Z_TYPE_P(value) != IS_ARRAY)) {
+		if ((num_values == 1) && (!Z_IS_ARRAY_P(value))) {
 			convert_to_string_ex(value);
 			ldap_mods[i]->mod_bvalues[0] = (struct berval *) emalloc (sizeof(struct berval));
 			ldap_mods[i]->mod_bvalues[0]->bv_len = Z_STRLEN_P(value);
@@ -2585,7 +2585,7 @@ PHP_FUNCTION(ldap_modify_batch)
 			mod = fetched;
 
 			/* is it an array? */
-			if (Z_TYPE_P(mod) != IS_ARRAY) {
+			if (!Z_IS_ARRAY_P(mod)) {
 				php_error_docref(NULL, E_WARNING, "Each entry of modifications array must be an array itself");
 				RETURN_FALSE;
 			}
@@ -2617,7 +2617,7 @@ PHP_FUNCTION(ldap_modify_batch)
 
 				/* does the value type match the key? */
 				if (_ldap_str_equal_to_const(ZSTR_VAL(modkey), ZSTR_LEN(modkey), LDAP_MODIFY_BATCH_ATTRIB)) {
-					if (Z_TYPE_P(modinfo) != IS_STRING) {
+					if (!Z_IS_STRING_P(modinfo)) {
 						php_error_docref(NULL, E_WARNING, "A '" LDAP_MODIFY_BATCH_ATTRIB "' value must be a string");
 						RETURN_FALSE;
 					}
@@ -2628,7 +2628,7 @@ PHP_FUNCTION(ldap_modify_batch)
 					}
 				}
 				else if (_ldap_str_equal_to_const(ZSTR_VAL(modkey), ZSTR_LEN(modkey), LDAP_MODIFY_BATCH_MODTYPE)) {
-					if (Z_TYPE_P(modinfo) != IS_LONG) {
+					if (!Z_IS_LONG_P(modinfo)) {
 						php_error_docref(NULL, E_WARNING, "A '" LDAP_MODIFY_BATCH_MODTYPE "' value must be a long");
 						RETURN_FALSE;
 					}
@@ -2660,7 +2660,7 @@ PHP_FUNCTION(ldap_modify_batch)
 					}
 				}
 				else if (_ldap_str_equal_to_const(ZSTR_VAL(modkey), ZSTR_LEN(modkey), LDAP_MODIFY_BATCH_VALUES)) {
-					if (Z_TYPE_P(modinfo) != IS_ARRAY) {
+					if (!Z_IS_ARRAY_P(modinfo)) {
 						php_error_docref(NULL, E_WARNING, "A '" LDAP_MODIFY_BATCH_VALUES "' value must be an array");
 						RETURN_FALSE;
 					}
@@ -2689,7 +2689,7 @@ PHP_FUNCTION(ldap_modify_batch)
 						modval = fetched;
 
 						/* is the data element a string? */
-						if (Z_TYPE_P(modval) != IS_STRING) {
+						if (!Z_IS_STRING_P(modval)) {
 							php_error_docref(NULL, E_WARNING, "Each element of a '" LDAP_MODIFY_BATCH_VALUES "' array must be a string");
 							RETURN_FALSE;
 						}
@@ -3153,7 +3153,7 @@ PHP_FUNCTION(ldap_set_option)
 		return;
 	}
 
-	if (Z_TYPE_P(link) == IS_NULL) {
+	if (Z_IS_NULL_P(link)) {
 		ldap = NULL;
 	} else {
 		if ((ld = (ldap_linkdata *)zend_fetch_resource_ex(link, "ldap link", le_link)) == NULL) {
@@ -3283,7 +3283,7 @@ PHP_FUNCTION(ldap_set_option)
 		{
 			void *val;
 			convert_to_boolean_ex(newval);
-			val = Z_TYPE_P(newval) == IS_TRUE
+			val = Z_IS_TRUE_P(newval)
 				? LDAP_OPT_ON : LDAP_OPT_OFF;
 			if (ldap_set_option(ldap, option, val)) {
 				RETURN_FALSE;
@@ -3296,7 +3296,7 @@ PHP_FUNCTION(ldap_set_option)
 			LDAPControl **ctrls;
 			int rc;
 
-			if (Z_TYPE_P(newval) != IS_ARRAY) {
+			if (!Z_IS_ARRAY_P(newval)) {
 				php_error_docref(NULL, E_WARNING, "Expected array value for this option");
 				RETURN_FALSE;
 			}
@@ -3741,7 +3741,7 @@ PHP_FUNCTION(ldap_set_rebind_proc)
 		RETURN_FALSE;
 	}
 
-	if (Z_TYPE_P(callback) == IS_STRING && Z_STRLEN_P(callback) == 0) {
+	if (Z_IS_STRING_P(callback) && Z_STRLEN_P(callback) == 0) {
 		/* unregister rebind procedure */
 		if (!Z_ISUNDEF(ld->rebindproc)) {
 			zval_ptr_dtor(&ld->rebindproc);
@@ -3927,7 +3927,7 @@ PHP_FUNCTION(ldap_control_paged_result)
 		return;
 	}
 
-	if (Z_TYPE_P(link) == IS_NULL) {
+	if (Z_IS_NULL_P(link)) {
 		ldap = NULL;
 	} else {
 		if ((ld = (ldap_linkdata *)zend_fetch_resource_ex(link, "ldap link", le_link)) == NULL) {

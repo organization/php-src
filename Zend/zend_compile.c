@@ -359,7 +359,7 @@ ZEND_API zend_string *zend_set_compiled_filename(zend_string *new_compiled_filen
 	zval *p, rv;
 
 	if ((p = zend_hash_find(&CG(filenames_table), new_compiled_filename))) {
-		ZEND_ASSERT(Z_TYPE_P(p) == IS_STRING);
+		ZEND_ASSERT(Z_IS_STRING_P(p));
 		CG(compiled_filename) = Z_STR_P(p);
 		return Z_STR_P(p);
 	}
@@ -440,7 +440,7 @@ void zend_del_literal(zend_op_array *op_array, int n) /* {{{ */
 
 static inline zend_string *zval_make_interned_string(zval *zv) /* {{{ */
 {
-	ZEND_ASSERT(Z_TYPE_P(zv) == IS_STRING);
+	ZEND_ASSERT(Z_IS_STRING_P(zv));
 	Z_STR_P(zv) = zend_new_interned_string(Z_STR_P(zv));
 	if (ZSTR_IS_INTERNED(Z_STR_P(zv))) {
 		Z_SET_TYPE_INFO_P(zv, IS_STRING);
@@ -451,7 +451,7 @@ static inline zend_string *zval_make_interned_string(zval *zv) /* {{{ */
 /* Common part of zend_add_literal and zend_append_individual_literal */
 static inline void zend_insert_literal(zend_op_array *op_array, zval *zv, int literal_position) /* {{{ */
 {
-	if (Z_TYPE_P(zv) == IS_STRING) {
+	if (Z_IS_STRING_P(zv)) {
 		zval_make_interned_string(zv);
 	}
 	ZVAL_COPY_VALUE(CT_CONSTANT_EX(op_array, literal_position), zv);
@@ -997,7 +997,7 @@ zend_string *zend_resolve_class_name(zend_string *name, uint32_t type) /* {{{ */
 zend_string *zend_resolve_class_name_ast(zend_ast *ast) /* {{{ */
 {
 	zval *class_name = zend_ast_get_zval(ast);
-	if (Z_TYPE_P(class_name) != IS_STRING) {
+	if (!Z_IS_STRING_P(class_name)) {
 		zend_error_noreturn(E_COMPILE_ERROR, "Illegal class name");
 	}
 	return zend_resolve_class_name(Z_STR_P(class_name), ast->attr);
@@ -1745,7 +1745,7 @@ again:
 			retval = T_ECHO;
 			break;
 	}
-	if (Z_TYPE(zv) != IS_UNDEF) {
+	if (!Z_IS_UNDEF(zv)) {
 		elem->ast = zend_ast_create_zval_with_lineno(&zv, 0, start_lineno);
 	}
 
@@ -1858,14 +1858,14 @@ zend_ast *zend_ast_append_str(zend_ast *left_ast, zend_ast *right_ast) /* {{{ */
 zend_ast *zend_negate_num_string(zend_ast *ast) /* {{{ */
 {
 	zval *zv = zend_ast_get_zval(ast);
-	if (Z_TYPE_P(zv) == IS_LONG) {
+	if (Z_IS_LONG_P(zv)) {
 		if (Z_LVAL_P(zv) == 0) {
 			ZVAL_NEW_STR(zv, zend_string_init("-0", sizeof("-0")-1, 0));
 		} else {
 			ZEND_ASSERT(Z_LVAL_P(zv) > 0);
 			Z_LVAL_P(zv) *= -1;
 		}
-	} else if (Z_TYPE_P(zv) == IS_STRING) {
+	} else if (Z_IS_STRING_P(zv)) {
 		size_t orig_len = Z_STRLEN_P(zv);
 		Z_STR_P(zv) = zend_string_extend(Z_STR_P(zv), orig_len + 1, 0);
 		memmove(Z_STRVAL_P(zv) + 1, Z_STRVAL_P(zv), orig_len + 1);
@@ -2339,7 +2339,7 @@ static void zend_emit_return_type_check(
 		/* `return ...;` is illegal in a void function (but `return;` isn't) */
 		if (ZEND_TYPE_CODE(return_info->type) == IS_VOID) {
 			if (expr) {
-				if (expr->op_type == IS_CONST && Z_TYPE(expr->u.constant) == IS_NULL) {
+				if (expr->op_type == IS_CONST && Z_IS_NULL(expr->u.constant)) {
 					zend_error_noreturn(E_COMPILE_ERROR,
 						"A void function must not return a value "
 						"(did you mean \"return;\" instead of \"return null;\"?)");
@@ -2365,10 +2365,10 @@ static void zend_emit_return_type_check(
 		if (expr && expr->op_type == IS_CONST) {
 			if ((ZEND_TYPE_CODE(return_info->type) == Z_TYPE(expr->u.constant))
 			 ||((ZEND_TYPE_CODE(return_info->type) == _IS_BOOL)
-			  && (Z_TYPE(expr->u.constant) == IS_FALSE
-			   || Z_TYPE(expr->u.constant) == IS_TRUE))
+			  && (Z_IS_FALSE(expr->u.constant)
+			   || Z_IS_TRUE(expr->u.constant)))
 			 || (ZEND_TYPE_ALLOW_NULL(return_info->type)
-			  && Z_TYPE(expr->u.constant) == IS_NULL)) {
+			  && Z_IS_NULL(expr->u.constant))) {
 				/* we don't need run-time check */
 				return;
 			}
@@ -2459,7 +2459,7 @@ static inline zend_bool zend_is_const_default_class_ref(zend_ast *name_ast) /* {
 
 static inline void zend_handle_numeric_op(znode *node) /* {{{ */
 {
-	if (node->op_type == IS_CONST && Z_TYPE(node->u.constant) == IS_STRING) {
+	if (node->op_type == IS_CONST && Z_IS_STRING(node->u.constant)) {
 		zend_ulong index;
 
 		if (ZEND_HANDLE_NUMERIC(Z_STR(node->u.constant), index)) {
@@ -2493,7 +2493,7 @@ static zend_op *zend_compile_class_ref(znode *result, zend_ast *name_ast, int th
 		zend_string *name;
 		uint32_t fetch_type;
 
-		if (Z_TYPE(name_node.u.constant) != IS_STRING) {
+		if (!Z_IS_STRING(name_node.u.constant)) {
 			zend_error_noreturn(E_COMPILE_ERROR, "Illegal class name");
 		}
 
@@ -2535,7 +2535,7 @@ static void zend_compile_class_ref_ex(znode *result, zend_ast *name_ast, uint32_
 		if (name_node.op_type == IS_CONST) {
 			zend_string *name;
 
-			if (Z_TYPE(name_node.u.constant) != IS_STRING) {
+			if (!Z_IS_STRING(name_node.u.constant)) {
 				zend_error_noreturn(E_COMPILE_ERROR, "Illegal class name");
 			}
 
@@ -2585,7 +2585,7 @@ static int zend_try_compile_cv(znode *result, zend_ast *ast) /* {{{ */
 		zval *zv = zend_ast_get_zval(name_ast);
 		zend_string *name;
 
-		if (EXPECTED(Z_TYPE_P(zv) == IS_STRING)) {
+		if (EXPECTED(Z_IS_STRING_P(zv))) {
 			name = zval_make_interned_string(zv);
 		} else {
 			name = zend_new_interned_string(zval_get_string_func(zv));
@@ -2598,7 +2598,7 @@ static int zend_try_compile_cv(znode *result, zend_ast *ast) /* {{{ */
 		result->op_type = IS_CV;
 		result->u.op.var = lookup_cv(CG(active_op_array), name);
 
-		if (UNEXPECTED(Z_TYPE_P(zv) != IS_STRING)) {
+		if (UNEXPECTED(!Z_IS_STRING_P(zv))) {
 			zend_string_release(name);
 		}
 
@@ -2643,7 +2643,7 @@ static zend_bool is_this_fetch(zend_ast *ast) /* {{{ */
 {
 	if (ast->kind == ZEND_AST_VAR && ast->child[0]->kind == ZEND_AST_ZVAL) {
 		zval *name = zend_ast_get_zval(ast->child[0]);
-		return Z_TYPE_P(name) == IS_STRING && zend_string_equals_literal(Z_STR_P(name), "this");
+		return Z_IS_STRING_P(name) && zend_string_equals_literal(Z_STR_P(name), "this");
 	}
 
 	return 0;
@@ -2844,7 +2844,7 @@ static void zend_compile_list_assign(
 	zend_bool is_keyed =
 		list->children > 0 && list->child[0] != NULL && list->child[0]->child[1] != NULL;
 
-	if (list->children && expr_node->op_type == IS_CONST && Z_TYPE(expr_node->u.constant) == IS_STRING) {
+	if (list->children && expr_node->op_type == IS_CONST && Z_IS_STRING(expr_node->u.constant)) {
 		zval_make_interned_string(&expr_node->u.constant);
 	}
 
@@ -3384,7 +3384,7 @@ void zend_compile_ns_call(znode *result, znode *name_node, zend_ast *args_ast) /
 
 void zend_compile_dynamic_call(znode *result, znode *name_node, zend_ast *args_ast) /* {{{ */
 {
-	if (name_node->op_type == IS_CONST && Z_TYPE(name_node->u.constant) == IS_STRING) {
+	if (name_node->op_type == IS_CONST && Z_IS_STRING(name_node->u.constant)) {
 		const char *colon;
 		zend_string *str = Z_STR(name_node->u.constant);
 		if ((colon = zend_memrchr(ZSTR_VAL(str), ':', ZSTR_LEN(str))) != NULL && colon > ZSTR_VAL(str) && *(colon - 1) == ':') {
@@ -3440,7 +3440,7 @@ int zend_compile_func_strlen(znode *result, zend_ast_list *args) /* {{{ */
 	}
 
 	zend_compile_expr(&arg_node, args->child[0]);
-	if (arg_node.op_type == IS_CONST && Z_TYPE(arg_node.u.constant) == IS_STRING) {
+	if (arg_node.op_type == IS_CONST && Z_IS_STRING(arg_node.u.constant)) {
 		result->op_type = IS_CONST;
 		ZVAL_LONG(&result->u.constant, Z_STRLEN(arg_node.u.constant));
 		zval_dtor(&arg_node.u.constant);
@@ -3531,7 +3531,7 @@ int zend_compile_func_chr(znode *result, zend_ast_list *args) /* {{{ */
 
 	if (args->children == 1 &&
 	    args->child[0]->kind == ZEND_AST_ZVAL &&
-	    Z_TYPE_P(zend_ast_get_zval(args->child[0])) == IS_LONG) {
+	    Z_IS_LONG_P(zend_ast_get_zval(args->child[0]))) {
 
 		zend_long c = Z_LVAL_P(zend_ast_get_zval(args->child[0])) & 0xff;
 
@@ -3548,7 +3548,7 @@ int zend_compile_func_ord(znode *result, zend_ast_list *args) /* {{{ */
 {
 	if (args->children == 1 &&
 	    args->child[0]->kind == ZEND_AST_ZVAL &&
-	    Z_TYPE_P(zend_ast_get_zval(args->child[0])) == IS_STRING) {
+	    Z_IS_STRING_P(zend_ast_get_zval(args->child[0]))) {
 
 		result->op_type = IS_CONST;
 		ZVAL_LONG(&result->u.constant, (unsigned char)Z_STRVAL_P(zend_ast_get_zval(args->child[0]))[0]);
@@ -3566,7 +3566,7 @@ static int zend_try_compile_ct_bound_init_user_func(zend_ast *name_ast, uint32_t
 	zend_function *fbc;
 	zend_op *opline;
 
-	if (name_ast->kind != ZEND_AST_ZVAL || Z_TYPE_P(zend_ast_get_zval(name_ast)) != IS_STRING) {
+	if (name_ast->kind != ZEND_AST_ZVAL || !Z_IS_STRING_P(zend_ast_get_zval(name_ast))) {
 		return FAILURE;
 	}
 
@@ -3623,7 +3623,7 @@ int zend_compile_func_cufa(znode *result, zend_ast_list *args, zend_string *lcna
 	zend_compile_init_user_func(args->child[0], 0, lcname);
 	if (args->child[1]->kind == ZEND_AST_CALL
 	 && args->child[1]->child[0]->kind == ZEND_AST_ZVAL
-	 && Z_TYPE_P(zend_ast_get_zval(args->child[1]->child[0])) == IS_STRING
+	 && Z_IS_STRING_P(zend_ast_get_zval(args->child[1]->child[0]))
 	 && args->child[1]->child[1]->kind == ZEND_AST_ARG_LIST) {
 		zend_string *orig_name = zend_ast_get_str(args->child[1]->child[0]);
 		zend_ast_list *list = zend_ast_get_list(args->child[1]->child[1]);
@@ -3635,7 +3635,7 @@ int zend_compile_func_cufa(znode *result, zend_ast_list *args, zend_string *lcna
 		 && list->child[1]->kind == ZEND_AST_ZVAL) {
 			zval *zv = zend_ast_get_zval(list->child[1]);
 
-			if (Z_TYPE_P(zv) == IS_LONG
+			if (Z_IS_LONG_P(zv)
 			 && Z_LVAL_P(zv) >= 0
 			 && Z_LVAL_P(zv) <= 0x7fffffff) {
 				zend_op *opline;
@@ -3711,7 +3711,7 @@ static int zend_compile_assert(znode *result, zend_ast_list *args, zend_string *
 
 		if (args->children == 1 &&
 		    (args->child[0]->kind != ZEND_AST_ZVAL ||
-		     Z_TYPE_P(zend_ast_get_zval(args->child[0])) != IS_STRING)) {
+		     !Z_IS_STRING_P(zend_ast_get_zval(args->child[0])))) {
 			/* add "assert(condition) as assertion message */
 			zend_ast_list_add((zend_ast*)args,
 				zend_ast_create_zval_from_str(
@@ -3781,9 +3781,9 @@ static int zend_compile_func_in_array(znode *result, zend_ast_list *args) /* {{{
 
 		if (strict) {
 			ZEND_HASH_FOREACH_VAL(src, val) {
-				if (Z_TYPE_P(val) == IS_STRING) {
+				if (Z_IS_STRING_P(val)) {
 					zend_hash_add(dst, Z_STR_P(val), &tmp);
-				} else if (Z_TYPE_P(val) == IS_LONG) {
+				} else if (Z_IS_LONG_P(val)) {
 					zend_hash_index_add(dst, Z_LVAL_P(val), &tmp);
 				} else {
 					zend_array_destroy(dst);
@@ -3793,7 +3793,7 @@ static int zend_compile_func_in_array(znode *result, zend_ast_list *args) /* {{{
 			} ZEND_HASH_FOREACH_END();
 		} else {
 			ZEND_HASH_FOREACH_VAL(src, val) {
-				if (Z_TYPE_P(val) != IS_STRING
+				if (!Z_IS_STRING_P(val)
 				 || is_numeric_string(Z_STRVAL_P(val), Z_STRLEN_P(val), NULL, NULL, 0)) {
 					zend_array_destroy(dst);
 					ok = 0;
@@ -3905,7 +3905,7 @@ int zend_compile_func_array_slice(znode *result, zend_ast_list *args) /* {{{ */
 	 && args->children == 2
 	 && args->child[0]->kind == ZEND_AST_CALL
 	 && args->child[0]->child[0]->kind == ZEND_AST_ZVAL
-	 && Z_TYPE_P(zend_ast_get_zval(args->child[0]->child[0])) == IS_STRING
+	 && Z_IS_STRING_P(zend_ast_get_zval(args->child[0]->child[0]))
 	 && args->child[0]->child[1]->kind == ZEND_AST_ARG_LIST
 	 && args->child[1]->kind == ZEND_AST_ZVAL) {
 
@@ -3918,7 +3918,7 @@ int zend_compile_func_array_slice(znode *result, zend_ast_list *args) /* {{{ */
 
 		if (zend_string_equals_literal_ci(name, "func_get_args")
 		 && list->children == 0
-		 && Z_TYPE_P(zv) == IS_LONG
+		 && Z_IS_LONG_P(zv)
 		 && Z_LVAL_P(zv) >= 0) {
 			first.op_type = IS_CONST;
 			ZVAL_LONG(&first.u.constant, Z_LVAL_P(zv));
@@ -4019,7 +4019,7 @@ void zend_compile_call(znode *result, zend_ast *ast, uint32_t type) /* {{{ */
 
 	znode name_node;
 
-	if (name_ast->kind != ZEND_AST_ZVAL || Z_TYPE_P(zend_ast_get_zval(name_ast)) != IS_STRING) {
+	if (name_ast->kind != ZEND_AST_ZVAL || !Z_IS_STRING_P(zend_ast_get_zval(name_ast))) {
 		zend_compile_expr(&name_node, name_ast);
 		zend_compile_dynamic_call(result, &name_node, args_ast);
 		return;
@@ -4094,7 +4094,7 @@ void zend_compile_method_call(znode *result, zend_ast *ast, uint32_t type) /* {{
 	opline = zend_emit_op(NULL, ZEND_INIT_METHOD_CALL, &obj_node, NULL);
 
 	if (method_node.op_type == IS_CONST) {
-		if (Z_TYPE(method_node.u.constant) != IS_STRING) {
+		if (!Z_IS_STRING(method_node.u.constant)) {
 			zend_error_noreturn(E_COMPILE_ERROR, "Method name must be a string");
 		}
 
@@ -4144,7 +4144,7 @@ void zend_compile_static_call(znode *result, zend_ast *ast, uint32_t type) /* {{
 	zend_compile_expr(&method_node, method_ast);
 	if (method_node.op_type == IS_CONST) {
 		zval *name = &method_node.u.constant;
-		if (Z_TYPE_P(name) != IS_STRING) {
+		if (!Z_IS_STRING_P(name)) {
 			zend_error_noreturn(E_COMPILE_ERROR, "Method name must be a string");
 		}
 		if (zend_is_constructor(Z_STR_P(name))) {
@@ -4572,7 +4572,7 @@ void zend_compile_break_continue(zend_ast *ast) /* {{{ */
 		}
 
 		depth_zv = zend_ast_get_zval(depth_ast);
-		if (Z_TYPE_P(depth_zv) != IS_LONG || Z_LVAL_P(depth_zv) < 1) {
+		if (!Z_IS_LONG_P(depth_zv) || Z_LVAL_P(depth_zv) < 1) {
 			zend_error_noreturn(E_COMPILE_ERROR, "'%s' operator accepts only positive numbers",
 				ast->kind == ZEND_AST_BREAK ? "break" : "continue");
 		}
@@ -4950,7 +4950,7 @@ static zend_uchar determine_switch_jumptable_type(zend_ast_list *cases) {
 		}
 
 		cond_zv = zend_ast_get_zval(case_ast->child[0]);
-		if (Z_TYPE_P(cond_zv) != IS_LONG && Z_TYPE_P(cond_zv) != IS_STRING) {
+		if (!Z_IS_LONG_P(cond_zv) && !Z_IS_STRING_P(cond_zv)) {
 			/* We only optimize switched on integers and strings */
 			return IS_UNDEF;
 		}
@@ -4962,7 +4962,7 @@ static zend_uchar determine_switch_jumptable_type(zend_ast_list *cases) {
 			return IS_UNDEF;
 		}
 
-		if (Z_TYPE_P(cond_zv) == IS_STRING
+		if (Z_IS_STRING_P(cond_zv)
 				&& is_numeric_string(Z_STRVAL_P(cond_zv), Z_STRLEN_P(cond_zv), NULL, NULL, 0)) {
 			/* Numeric strings cannot be compared with a simple hash lookup */
 			return IS_UNDEF;
@@ -5041,10 +5041,10 @@ void zend_compile_switch(zend_ast *ast) /* {{{ */
 		zend_compile_expr(&cond_node, cond_ast);
 
 		if (expr_node.op_type == IS_CONST
-			&& Z_TYPE(expr_node.u.constant) == IS_FALSE) {
+			&& Z_IS_FALSE(expr_node.u.constant)) {
 			jmpnz_opnums[i] = zend_emit_cond_jump(ZEND_JMPZ, &cond_node, 0);
 		} else if (expr_node.op_type == IS_CONST
-			&& Z_TYPE(expr_node.u.constant) == IS_TRUE) {
+			&& Z_IS_TRUE(expr_node.u.constant)) {
 			jmpnz_opnums[i] = zend_emit_cond_jump(ZEND_JMPNZ, &cond_node, 0);
 		} else {
 			opline = zend_emit_op(NULL,
@@ -5075,10 +5075,10 @@ void zend_compile_switch(zend_ast *ast) /* {{{ */
 				ZVAL_LONG(&jmp_target, get_next_op_number(CG(active_op_array)));
 
 				ZEND_ASSERT(Z_TYPE_P(cond_zv) == jumptable_type);
-				if (Z_TYPE_P(cond_zv) == IS_LONG) {
+				if (Z_IS_LONG_P(cond_zv)) {
 					zend_hash_index_add(jumptable, Z_LVAL_P(cond_zv), &jmp_target);
 				} else {
-					ZEND_ASSERT(Z_TYPE_P(cond_zv) == IS_STRING);
+					ZEND_ASSERT(Z_IS_STRING_P(cond_zv));
 					zend_hash_add(jumptable, Z_STR_P(cond_zv), &jmp_target);
 				}
 			}
@@ -5408,7 +5408,7 @@ void zend_compile_declare(zend_ast *ast) /* {{{ */
 
 			zend_const_expr_to_zval(&value_zv, value_ast);
 
-			if (Z_TYPE(value_zv) != IS_LONG || (Z_LVAL(value_zv) != 0 && Z_LVAL(value_zv) != 1)) {
+			if (!Z_IS_LONG(value_zv) || (Z_LVAL(value_zv) != 0 && Z_LVAL(value_zv) != 1)) {
 				zend_error_noreturn(E_COMPILE_ERROR, "strict_types declaration must have 0 or 1 as its value");
 			}
 
@@ -5602,7 +5602,7 @@ void zend_compile_params(zend_ast *ast, zend_ast *return_type_ast) /* {{{ */
 		if (type_ast) {
 			zend_bool allow_null;
 			zend_bool has_null_default = default_ast
-				&& (Z_TYPE(default_node.u.constant) == IS_NULL
+				&& (Z_IS_NULL(default_node.u.constant)
 					|| (Z_TYPE(default_node.u.constant) == IS_CONSTANT_AST
 						&& Z_ASTVAL(default_node.u.constant)->kind == ZEND_AST_CONSTANT
 						&& strcasecmp(ZSTR_VAL(zend_ast_get_constant_name(Z_ASTVAL(default_node.u.constant))), "NULL") == 0));
@@ -5621,7 +5621,7 @@ void zend_compile_params(zend_ast *ast, zend_ast *return_type_ast) /* {{{ */
 			if (type_ast->kind == ZEND_AST_TYPE) {
 				if (ZEND_TYPE_CODE(arg_info->type) == IS_ARRAY) {
 					if (default_ast && !has_null_default
-						&& Z_TYPE(default_node.u.constant) != IS_ARRAY
+						&& !Z_IS_ARRAY(default_node.u.constant)
 						&& Z_TYPE(default_node.u.constant) != IS_CONSTANT_AST
 					) {
 						zend_error_noreturn(E_COMPILE_ERROR, "Default value for parameters "
@@ -5640,14 +5640,14 @@ void zend_compile_params(zend_ast *ast, zend_ast *return_type_ast) /* {{{ */
 							"with a class type can only be NULL");
 					} else switch (ZEND_TYPE_CODE(arg_info->type)) {
 						case IS_DOUBLE:
-							if (Z_TYPE(default_node.u.constant) != IS_DOUBLE && Z_TYPE(default_node.u.constant) != IS_LONG) {
+							if (!Z_IS_DOUBLE(default_node.u.constant) && !Z_IS_LONG(default_node.u.constant)) {
 								zend_error_noreturn(E_COMPILE_ERROR, "Default value for parameters "
 									"with a float type can only be float, integer, or NULL");
 							}
 							break;
 
 						case IS_ITERABLE:
-							if (Z_TYPE(default_node.u.constant) != IS_ARRAY) {
+							if (!Z_IS_ARRAY(default_node.u.constant)) {
 								zend_error_noreturn(E_COMPILE_ERROR, "Default value for parameters "
 									"with iterable type can only be an array or NULL");
 							}
@@ -6921,16 +6921,16 @@ ZEND_API zend_bool zend_binary_op_produces_numeric_string_error(uint32_t opcode,
 	/* While basic arithmetic operators always produce numeric string errors,
 	 * bitwise operators don't produce errors if both operands are strings */
 	if ((opcode == ZEND_BW_OR || opcode == ZEND_BW_AND || opcode == ZEND_BW_XOR)
-		&& Z_TYPE_P(op1) == IS_STRING && Z_TYPE_P(op2) == IS_STRING) {
+		&& Z_IS_STRING_P(op1) && Z_IS_STRING_P(op2)) {
 		return 0;
 	}
 
-	if (Z_TYPE_P(op1) == IS_STRING
+	if (Z_IS_STRING_P(op1)
 		&& !is_numeric_string(Z_STRVAL_P(op1), Z_STRLEN_P(op1), NULL, NULL, 0)) {
 		return 1;
 	}
 
-	if (Z_TYPE_P(op2) == IS_STRING
+	if (Z_IS_STRING_P(op2)
 		&& !is_numeric_string(Z_STRVAL_P(op2), Z_STRLEN_P(op2), NULL, NULL, 0)) {
 		return 1;
 	}
@@ -7094,21 +7094,21 @@ void zend_compile_binary_op(znode *result, zend_ast *ast) /* {{{ */
 	do {
 		if (opcode == ZEND_IS_EQUAL || opcode == ZEND_IS_NOT_EQUAL) {
 			if (left_node.op_type == IS_CONST) {
-				if (Z_TYPE(left_node.u.constant) == IS_FALSE) {
+				if (Z_IS_FALSE(left_node.u.constant)) {
 					opcode = (opcode == ZEND_IS_NOT_EQUAL) ? ZEND_BOOL : ZEND_BOOL_NOT;
 					zend_emit_op_tmp(result, opcode, &right_node, NULL);
 					break;
-				} else if (Z_TYPE(left_node.u.constant) == IS_TRUE) {
+				} else if (Z_IS_TRUE(left_node.u.constant)) {
 					opcode = (opcode == ZEND_IS_EQUAL) ? ZEND_BOOL : ZEND_BOOL_NOT;
 					zend_emit_op_tmp(result, opcode, &right_node, NULL);
 					break;
 				}
 			} else if (right_node.op_type == IS_CONST) {
-				if (Z_TYPE(right_node.u.constant) == IS_FALSE) {
+				if (Z_IS_FALSE(right_node.u.constant)) {
 					opcode = (opcode == ZEND_IS_NOT_EQUAL) ? ZEND_BOOL : ZEND_BOOL_NOT;
 					zend_emit_op_tmp(result, opcode, &left_node, NULL);
 					break;
-				} else if (Z_TYPE(right_node.u.constant) == IS_TRUE) {
+				} else if (Z_IS_TRUE(right_node.u.constant)) {
 					opcode = (opcode == ZEND_IS_EQUAL) ? ZEND_BOOL : ZEND_BOOL_NOT;
 					zend_emit_op_tmp(result, opcode, &left_node, NULL);
 					break;
@@ -7683,7 +7683,7 @@ void zend_compile_array(znode *result, zend_ast *ast) /* {{{ */
 		}
 		opline->extended_value |= by_ref;
 
-		if (key_ast && key_node.op_type == IS_CONST && Z_TYPE(key_node.u.constant) == IS_STRING) {
+		if (key_ast && key_node.op_type == IS_CONST && Z_IS_STRING(key_node.u.constant)) {
 			packed = 0;
 		}
 	}
@@ -7758,7 +7758,7 @@ void zend_compile_class_const(znode *result, zend_ast *ast) /* {{{ */
 	zend_op *opline;
 
 	if (zend_try_compile_const_expr_resolve_class_name(&result->u.constant, class_ast, const_ast, 0)) {
-		if (Z_TYPE(result->u.constant) == IS_NULL) {
+		if (Z_IS_NULL(result->u.constant)) {
 			zend_op *opline = zend_emit_op_tmp(result, ZEND_FETCH_CLASS_NAME, NULL, NULL);
 			opline->extended_value = zend_get_class_fetch_type(zend_ast_get_str(class_ast));
 		} else {
@@ -8547,7 +8547,7 @@ void zend_eval_const_expr(zend_ast **ast_ptr) /* {{{ */
 				return;
 			}
 
-			if (Z_TYPE_P(zend_ast_get_zval(ast->child[0])) == IS_NULL) {
+			if (Z_IS_NULL_P(zend_ast_get_zval(ast->child[0]))) {
 				zend_eval_const_expr(&ast->child[1]);
 				*ast_ptr = ast->child[1];
 				ast->child[1] = NULL;
@@ -8605,16 +8605,16 @@ void zend_eval_const_expr(zend_ast **ast_ptr) /* {{{ */
 			container = zend_ast_get_zval(ast->child[0]);
 			dim = zend_ast_get_zval(ast->child[1]);
 
-			if (Z_TYPE_P(container) == IS_ARRAY) {
+			if (Z_IS_ARRAY_P(container)) {
 				zval *el;
-				if (Z_TYPE_P(dim) == IS_LONG) {
+				if (Z_IS_LONG_P(dim)) {
 					el = zend_hash_index_find(Z_ARR_P(container), Z_LVAL_P(dim));
 					if (el) {
 						ZVAL_COPY(&result, el);
 					} else {
 						return;
 					}
-				} else if (Z_TYPE_P(dim) == IS_STRING) {
+				} else if (Z_IS_STRING_P(dim)) {
 					el = zend_symtable_find(Z_ARR_P(container), Z_STR_P(dim));
 					if (el) {
 						ZVAL_COPY(&result, el);
@@ -8624,12 +8624,12 @@ void zend_eval_const_expr(zend_ast **ast_ptr) /* {{{ */
 				} else {
 					return; /* warning... handle at runtime */
 				}
-			} else if (Z_TYPE_P(container) == IS_STRING) {
+			} else if (Z_IS_STRING_P(container)) {
 				zend_long offset;
 				zend_uchar c;
-				if (Z_TYPE_P(dim) == IS_LONG) {
+				if (Z_IS_LONG_P(dim)) {
 					offset = Z_LVAL_P(dim);
-				} else if (Z_TYPE_P(dim) != IS_STRING || is_numeric_string(Z_STRVAL_P(dim), Z_STRLEN_P(dim), &offset, NULL, 1) != IS_LONG) {
+				} else if (!Z_IS_STRING_P(dim) || is_numeric_string(Z_STRVAL_P(dim), Z_STRLEN_P(dim), &offset, NULL, 1) != IS_LONG) {
 					return;
 				}
 				if (offset < 0 || (size_t)offset >= Z_STRLEN_P(container)) {
@@ -8676,7 +8676,7 @@ void zend_eval_const_expr(zend_ast **ast_ptr) /* {{{ */
 			zend_string *resolved_name;
 
 			if (zend_try_compile_const_expr_resolve_class_name(&result, class_ast, name_ast, 0)) {
-				if (Z_TYPE(result) == IS_NULL) {
+				if (Z_IS_NULL(result)) {
 					if (zend_get_class_fetch_type(zend_ast_get_str(class_ast)) == ZEND_FETCH_CLASS_SELF) {
 						zend_ast_destroy(ast);
 						*ast_ptr = zend_ast_create_ex(ZEND_AST_MAGIC_CONST, T_CLASS_C);

@@ -209,7 +209,7 @@ static zend_always_inline zval *zend_hash_find_ex(const HashTable *ht, zend_stri
 		if (EXPECTED(HT_FLAGS(_ht) & HASH_FLAG_PACKED)) { \
 			if (EXPECTED((zend_ulong)(_h) < (zend_ulong)(_ht)->nNumUsed)) { \
 				_ret = &_ht->arData[_h].val; \
-				if (UNEXPECTED(Z_TYPE_P(_ret) == IS_UNDEF)) { \
+				if (UNEXPECTED(Z_IS_UNDEF_P(_ret))) { \
 					goto _not_found; \
 				} \
 			} else { \
@@ -351,8 +351,8 @@ static zend_always_inline zval *zend_hash_find_ind(const HashTable *ht, zend_str
 	zval *zv;
 
 	zv = zend_hash_find(ht, key);
-	return (zv && Z_TYPE_P(zv) == IS_INDIRECT) ?
-		((Z_TYPE_P(Z_INDIRECT_P(zv)) != IS_UNDEF) ? Z_INDIRECT_P(zv) : NULL) : zv;
+	return (zv && Z_IS_INDIRECT_P(zv)) ?
+		((!Z_IS_UNDEF_P(Z_INDIRECT_P(zv))) ? Z_INDIRECT_P(zv) : NULL) : zv;
 }
 
 
@@ -361,8 +361,8 @@ static zend_always_inline zval *zend_hash_find_ex_ind(const HashTable *ht, zend_
 	zval *zv;
 
 	zv = zend_hash_find_ex(ht, key, known_hash);
-	return (zv && Z_TYPE_P(zv) == IS_INDIRECT) ?
-		((Z_TYPE_P(Z_INDIRECT_P(zv)) != IS_UNDEF) ? Z_INDIRECT_P(zv) : NULL) : zv;
+	return (zv && Z_IS_INDIRECT_P(zv)) ?
+		((!Z_IS_UNDEF_P(Z_INDIRECT_P(zv))) ? Z_INDIRECT_P(zv) : NULL) : zv;
 }
 
 
@@ -371,8 +371,8 @@ static zend_always_inline int zend_hash_exists_ind(const HashTable *ht, zend_str
 	zval *zv;
 
 	zv = zend_hash_find(ht, key);
-	return zv && (Z_TYPE_P(zv) != IS_INDIRECT ||
-			Z_TYPE_P(Z_INDIRECT_P(zv)) != IS_UNDEF);
+	return zv && (!Z_IS_INDIRECT_P(zv) ||
+			!Z_IS_UNDEF_P(Z_INDIRECT_P(zv)));
 }
 
 
@@ -381,8 +381,8 @@ static zend_always_inline zval *zend_hash_str_find_ind(const HashTable *ht, cons
 	zval *zv;
 
 	zv = zend_hash_str_find(ht, str, len);
-	return (zv && Z_TYPE_P(zv) == IS_INDIRECT) ?
-		((Z_TYPE_P(Z_INDIRECT_P(zv)) != IS_UNDEF) ? Z_INDIRECT_P(zv) : NULL) : zv;
+	return (zv && Z_IS_INDIRECT_P(zv)) ?
+		((!Z_IS_UNDEF_P(Z_INDIRECT_P(zv))) ? Z_INDIRECT_P(zv) : NULL) : zv;
 }
 
 
@@ -391,8 +391,8 @@ static zend_always_inline int zend_hash_str_exists_ind(const HashTable *ht, cons
 	zval *zv;
 
 	zv = zend_hash_str_find(ht, str, len);
-	return zv && (Z_TYPE_P(zv) != IS_INDIRECT ||
-			Z_TYPE_P(Z_INDIRECT_P(zv)) != IS_UNDEF);
+	return zv && (!Z_IS_INDIRECT_P(zv) ||
+			!Z_IS_UNDEF_P(Z_INDIRECT_P(zv)));
 }
 
 static zend_always_inline zval *zend_symtable_add_new(HashTable *ht, zend_string *key, zval *pData)
@@ -920,10 +920,10 @@ static zend_always_inline void *zend_hash_get_current_data_ptr_ex(HashTable *ht,
 		Bucket *_end = _p + __ht->nNumUsed; \
 		for (; _p != _end; _p++) { \
 			zval *_z = &_p->val; \
-			if (indirect && Z_TYPE_P(_z) == IS_INDIRECT) { \
+			if (indirect && Z_IS_INDIRECT_P(_z)) { \
 				_z = Z_INDIRECT_P(_z); \
 			} \
-			if (UNEXPECTED(Z_TYPE_P(_z) == IS_UNDEF)) continue;
+			if (UNEXPECTED(Z_IS_UNDEF_P(_z))) continue;
 
 #define ZEND_HASH_REVERSE_FOREACH(_ht, indirect) do { \
 		HashTable *__ht = (_ht); \
@@ -933,10 +933,10 @@ static zend_always_inline void *zend_hash_get_current_data_ptr_ex(HashTable *ht,
 		for (_idx = __ht->nNumUsed; _idx > 0; _idx--) { \
 			_p--; \
 			_z = &_p->val; \
-			if (indirect && Z_TYPE_P(_z) == IS_INDIRECT) { \
+			if (indirect && Z_IS_INDIRECT_P(_z)) { \
 				_z = Z_INDIRECT_P(_z); \
 			} \
-			if (UNEXPECTED(Z_TYPE_P(_z) == IS_UNDEF)) continue;
+			if (UNEXPECTED(Z_IS_UNDEF_P(_z))) continue;
 
 #define ZEND_HASH_FOREACH_END() \
 		} \

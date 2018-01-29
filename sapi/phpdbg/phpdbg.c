@@ -570,7 +570,7 @@ static PHP_FUNCTION(phpdbg_get_executable)
 
 	if (options && (option_buffer = zend_hash_str_find(options, ZEND_STRL("files")))) {
 		ZVAL_DEREF(option_buffer);
-		if (Z_TYPE_P(option_buffer) == IS_ARRAY && zend_hash_num_elements(Z_ARR_P(option_buffer)) > 0) {
+		if (Z_IS_ARRAY_P(option_buffer) && zend_hash_num_elements(Z_ARR_P(option_buffer)) > 0) {
 			zval *filename;
 
 			files = &files_tmp;

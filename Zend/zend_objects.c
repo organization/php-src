@@ -60,12 +60,12 @@ ZEND_API void zend_object_std_dtor(zend_object *object)
 		} while (p != end);
 	}
 	if (UNEXPECTED(OBJ_FLAGS(object) & IS_OBJ_HAS_GUARDS)) {
-		if (EXPECTED(Z_TYPE_P(p) == IS_STRING)) {
+		if (EXPECTED(Z_IS_STRING_P(p))) {
 			zend_string_release(Z_STR_P(p));
 		} else {
 			HashTable *guards;
 
-			ZEND_ASSERT(Z_TYPE_P(p) == IS_ARRAY);
+			ZEND_ASSERT(Z_IS_ARRAY_P(p));
 			guards = Z_ARRVAL_P(p);
 			ZEND_ASSERT(guards != NULL);
 			zend_hash_destroy(guards);
@@ -207,7 +207,7 @@ ZEND_API void ZEND_FASTCALL zend_objects_clone_members(zend_object *new_object, 
 			HT_FLAGS(old_object->properties) & HASH_FLAG_HAS_EMPTY_IND;
 
 		ZEND_HASH_FOREACH_KEY_VAL(old_object->properties, num_key, key, prop) {
-			if (Z_TYPE_P(prop) == IS_INDIRECT) {
+			if (Z_IS_INDIRECT_P(prop)) {
 				ZVAL_INDIRECT(&new_prop, new_object->properties_table + (Z_INDIRECT_P(prop) - old_object->properties_table));
 			} else {
 				ZVAL_COPY_VALUE(&new_prop, prop);

@@ -1160,7 +1160,7 @@ PHP_FUNCTION(ibase_trans)
 		   specifies modifiers for the link ids that follow it */
 		for (i = 0; i < argn; ++i) {
 
-			if (Z_TYPE(args[i]) == IS_RESOURCE) {
+			if (Z_IS_RESOURCE(args[i])) {
 
 				if ((ib_link[link_cnt] = (ibase_db_link *)zend_fetch_resource2_ex(&args[i], LE_LINK, le_link, le_plink)) == NULL) {
 					efree(teb);

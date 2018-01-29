@@ -478,7 +478,7 @@ U_CFUNC void umsg_format_helper(MessageFormatter_object *mfo,
 				{
 					int32_t tInt32 = 0;
 
-					if (Z_TYPE_P(elem) == IS_DOUBLE) {
+					if (Z_IS_DOUBLE_P(elem)) {
 						if (Z_DVAL_P(elem) > (double)INT32_MAX ||
 								Z_DVAL_P(elem) < (double)INT32_MIN) {
 							intl_errors_set(&err, U_ILLEGAL_ARGUMENT_ERROR,
@@ -487,7 +487,7 @@ U_CFUNC void umsg_format_helper(MessageFormatter_object *mfo,
 						} else {
 							tInt32 = (int32_t)Z_DVAL_P(elem);
 						}
-					} else if (Z_TYPE_P(elem) == IS_LONG) {
+					} else if (Z_IS_LONG_P(elem)) {
 						if (Z_LVAL_P(elem) > INT32_MAX ||
 								Z_LVAL_P(elem) < INT32_MIN) {
 							intl_errors_set(&err, U_ILLEGAL_ARGUMENT_ERROR,
@@ -506,7 +506,7 @@ U_CFUNC void umsg_format_helper(MessageFormatter_object *mfo,
 				{
 					int64_t tInt64 = 0;
 
-					if (Z_TYPE_P(elem) == IS_DOUBLE) {
+					if (Z_IS_DOUBLE_P(elem)) {
 						if (Z_DVAL_P(elem) > (double)U_INT64_MAX ||
 								Z_DVAL_P(elem) < (double)U_INT64_MIN) {
 							intl_errors_set(&err, U_ILLEGAL_ARGUMENT_ERROR,
@@ -515,7 +515,7 @@ U_CFUNC void umsg_format_helper(MessageFormatter_object *mfo,
 						} else {
 							tInt64 = (int64_t)Z_DVAL_P(elem);
 						}
-					} else if (Z_TYPE_P(elem) == IS_LONG) {
+					} else if (Z_IS_LONG_P(elem)) {
 						/* assume long is not wider than 64 bits */
 						tInt64 = (int64_t)Z_LVAL_P(elem);
 					} else {

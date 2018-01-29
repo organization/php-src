@@ -174,7 +174,7 @@ static void php_mail_build_headers_elems(smart_str *s, zend_string *key, zval *v
 			php_error_docref(NULL, E_WARNING, "Multiple header key must be numeric index (%s)", ZSTR_VAL(tmp_key));
 			continue;
 		}
-		if (Z_TYPE_P(tmp_val) != IS_STRING) {
+		if (!Z_IS_STRING_P(tmp_val)) {
 			php_error_docref(NULL, E_WARNING, "Multiple header values must be string (%s)", ZSTR_VAL(key));
 			continue;
 		}
@@ -190,7 +190,7 @@ PHPAPI zend_string *php_mail_build_headers(zval *headers)
 	zval *val;
 	smart_str s = {0};
 
-	ZEND_ASSERT(Z_TYPE_P(headers) == IS_ARRAY);
+	ZEND_ASSERT(Z_IS_ARRAY_P(headers));
 
 	ZEND_HASH_FOREACH_KEY_VAL(HASH_OF(headers), idx, key, val) {
 		if (!key) {

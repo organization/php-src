@@ -497,20 +497,20 @@ static ZEND_COLD zend_string *zend_get_function_declaration(const zend_function 
 					if (precv && precv->opcode == ZEND_RECV_INIT && precv->op2_type != IS_UNUSED) {
 						zval *zv = RT_CONSTANT(precv, precv->op2);
 
-						if (Z_TYPE_P(zv) == IS_FALSE) {
+						if (Z_IS_FALSE_P(zv)) {
 							smart_str_appends(&str, "false");
-						} else if (Z_TYPE_P(zv) == IS_TRUE) {
+						} else if (Z_IS_TRUE_P(zv)) {
 							smart_str_appends(&str, "true");
-						} else if (Z_TYPE_P(zv) == IS_NULL) {
+						} else if (Z_IS_NULL_P(zv)) {
 							smart_str_appends(&str, "NULL");
-						} else if (Z_TYPE_P(zv) == IS_STRING) {
+						} else if (Z_IS_STRING_P(zv)) {
 							smart_str_appendc(&str, '\'');
 							smart_str_appendl(&str, Z_STRVAL_P(zv), MIN(Z_STRLEN_P(zv), 10));
 							if (Z_STRLEN_P(zv) > 10) {
 								smart_str_appends(&str, "...");
 							}
 							smart_str_appendc(&str, '\'');
-						} else if (Z_TYPE_P(zv) == IS_ARRAY) {
+						} else if (Z_IS_ARRAY_P(zv)) {
 							smart_str_appends(&str, "Array");
 						} else if (Z_TYPE_P(zv) == IS_CONSTANT_AST) {
 							zend_ast *ast = Z_ASTVAL_P(zv);

@@ -980,7 +980,7 @@ PHP_FUNCTION(dns_get_record)
 				zval retval;
 
 				cp = php_parserr(cp, end, &answer, type_to_fetch, store_results, raw, &retval);
-				if (Z_TYPE(retval) != IS_UNDEF && store_results) {
+				if (!Z_IS_UNDEF(retval) && store_results) {
 					add_next_index_zval(return_value, &retval);
 				}
 			}
@@ -993,7 +993,7 @@ PHP_FUNCTION(dns_get_record)
 					zval retval;
 
 					cp = php_parserr(cp, end, &answer, DNS_T_ANY, authns != NULL, raw, &retval);
-					if (Z_TYPE(retval) != IS_UNDEF) {
+					if (!Z_IS_UNDEF(retval)) {
 						add_next_index_zval(authns, &retval);
 					}
 				}
@@ -1005,7 +1005,7 @@ PHP_FUNCTION(dns_get_record)
 					zval retval;
 
 					cp = php_parserr(cp, end, &answer, DNS_T_ANY, 1, raw, &retval);
-					if (Z_TYPE(retval) != IS_UNDEF) {
+					if (!Z_IS_UNDEF(retval)) {
 						add_next_index_zval(addtl, &retval);
 					}
 				}

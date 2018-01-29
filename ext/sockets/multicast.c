@@ -89,7 +89,7 @@ static int php_get_if_index_from_zval(zval *val, unsigned *out)
 {
 	int ret;
 
-	if (Z_TYPE_P(val) == IS_LONG) {
+	if (Z_IS_LONG_P(val)) {
 		if (Z_LVAL_P(val) < 0 || (zend_ulong)Z_LVAL_P(val) > UINT_MAX) {
 			php_error_docref(NULL, E_WARNING,
 				"the interface index cannot be negative or larger than %u;"
@@ -280,7 +280,7 @@ int php_do_setsockopt_ip_mcast(php_socket *php_sock,
 
 	case IP_MULTICAST_LOOP:
 		convert_to_boolean_ex(arg4);
-		ipv4_mcast_ttl_lback = (unsigned char) (Z_TYPE_P(arg4) == IS_TRUE);
+		ipv4_mcast_ttl_lback = (unsigned char) (Z_IS_TRUE_P(arg4));
 		goto ipv4_loop_ttl;
 
 	case IP_MULTICAST_TTL:
@@ -346,7 +346,7 @@ int php_do_setsockopt_ipv6_mcast(php_socket *php_sock,
 
 	case IPV6_MULTICAST_LOOP:
 		convert_to_boolean_ex(arg4);
-		ov = (int) Z_TYPE_P(arg4) == IS_TRUE;
+		ov = (int) Z_IS_TRUE_P(arg4);
 		goto ipv6_loop_hops;
 	case IPV6_MULTICAST_HOPS:
 		convert_to_long_ex(arg4);

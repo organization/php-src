@@ -412,7 +412,7 @@ static PHP_FUNCTION(bzopen)
 	}
 
 	/* If it's not a resource its a string containing the filename to open */
-	if (Z_TYPE_P(file) == IS_STRING) {
+	if (Z_IS_STRING_P(file)) {
 		if (Z_STRLEN_P(file) == 0) {
 			php_error_docref(NULL, E_WARNING, "filename cannot be empty");
 			RETURN_FALSE;
@@ -423,7 +423,7 @@ static PHP_FUNCTION(bzopen)
 		}
 
 		stream = php_stream_bz2open(NULL, Z_STRVAL_P(file), mode, REPORT_ERRORS, NULL);
-	} else if (Z_TYPE_P(file) == IS_RESOURCE) {
+	} else if (Z_IS_RESOURCE_P(file)) {
 		/* If it is a resource, than its a stream resource */
 		php_socket_t fd;
 		size_t stream_mode_len;

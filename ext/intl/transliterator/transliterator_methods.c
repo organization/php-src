@@ -322,7 +322,7 @@ PHP_FUNCTION( transliterator_transliterate )
 			RETURN_FALSE;
 		}
 
-		if( Z_TYPE_P( arg1 ) == IS_OBJECT &&
+		if( Z_IS_OBJECT_P( arg1 ) &&
 			instanceof_function( Z_OBJCE_P( arg1 ), Transliterator_ce_ptr ) )
 		{
 			object = arg1;
@@ -330,7 +330,7 @@ PHP_FUNCTION( transliterator_transliterate )
 		else
 		{ /* not a transliterator object as first argument */
 			int res;
-			if(Z_TYPE_P( arg1 ) != IS_STRING )
+			if(!Z_IS_STRING_P( arg1 ) )
 			{
 				convert_to_string( arg1 );
 			}

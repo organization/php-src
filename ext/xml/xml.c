@@ -454,7 +454,7 @@ static void xml_set_handler(zval *handler, zval *data)
 	}
 
 	/* IS_ARRAY might indicate that we're using array($obj, 'method') syntax */
-	if (Z_TYPE_P(data) != IS_ARRAY && Z_TYPE_P(data) != IS_OBJECT) {
+	if (!Z_IS_ARRAY_P(data) && !Z_IS_OBJECT_P(data)) {
 		convert_to_string_ex(data);
 		if (Z_STRLEN_P(data) == 0) {
 			ZVAL_UNDEF(handler);
@@ -490,13 +490,13 @@ static void xml_call_handler(xml_parser *parser, zval *handler, zend_function *f
 			zval *method;
 			zval *obj;
 
-			if (Z_TYPE_P(handler) == IS_STRING) {
+			if (Z_IS_STRING_P(handler)) {
 				php_error_docref(NULL, E_WARNING, "Unable to call handler %s()", Z_STRVAL_P(handler));
-			} else if (Z_TYPE_P(handler) == IS_ARRAY &&
+			} else if (Z_IS_ARRAY_P(handler) &&
 					   (obj = zend_hash_index_find(Z_ARRVAL_P(handler), 0)) != NULL &&
 					   (method = zend_hash_index_find(Z_ARRVAL_P(handler), 1)) != NULL &&
-					   Z_TYPE_P(obj) == IS_OBJECT &&
-					   Z_TYPE_P(method) == IS_STRING) {
+					   Z_IS_OBJECT_P(obj) &&
+					   Z_IS_STRING_P(method)) {
 				php_error_docref(NULL, E_WARNING, "Unable to call handler %s::%s()", ZSTR_VAL(Z_OBJCE_P(obj)->name), Z_STRVAL_P(method));
 			} else
 				php_error_docref(NULL, E_WARNING, "Unable to call handler");
@@ -660,7 +660,7 @@ static int _xml_xmlcharlen(const XML_Char *s)
 /* {{{ _xml_zval_strdup() */
 PHP_XML_API char *_xml_zval_strdup(zval *val)
 {
-	if (Z_TYPE_P(val) == IS_STRING) {
+	if (Z_IS_STRING_P(val)) {
 		char *buf = emalloc(Z_STRLEN_P(val) + 1);
 		memcpy(buf, Z_STRVAL_P(val), Z_STRLEN_P(val));
 		buf[Z_STRLEN_P(val)] = '\0';

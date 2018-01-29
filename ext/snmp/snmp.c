@@ -776,7 +776,7 @@ retry:
 					if ( 	vars->type == SNMP_ENDOFMIBVIEW ||
 						vars->type == SNMP_NOSUCHOBJECT ||
 						vars->type == SNMP_NOSUCHINSTANCE ) {
-						if ((st & SNMP_CMD_WALK) && Z_TYPE_P(return_value) == IS_ARRAY) {
+						if ((st & SNMP_CMD_WALK) && Z_IS_ARRAY_P(return_value)) {
 							break;
 						}
 						snprint_objid(buf, sizeof(buf), vars->name, vars->name_length);
@@ -787,7 +787,7 @@ retry:
 
 					if ((st & SNMP_CMD_WALK) &&
 						(vars->name_length < rootlen || memcmp(root, vars->name, rootlen * sizeof(oid)))) { /* not part of this subtree */
-						if (Z_TYPE_P(return_value) == IS_ARRAY) { /* some records are fetched already, shut down further lookup */
+						if (Z_IS_ARRAY_P(return_value)) { /* some records are fetched already, shut down further lookup */
 							keepwalking = 0;
 						} else {
 							/* first fetched OID is out of subtree, fallback to GET query */
@@ -803,7 +803,7 @@ retry:
 					php_snmp_getvalue(vars, &snmpval, objid_query->valueretrieval);
 
 					if (objid_query->array_output) {
-						if (Z_TYPE_P(return_value) == IS_TRUE || Z_TYPE_P(return_value) == IS_FALSE) {
+						if (Z_IS_TRUE_P(return_value) || Z_IS_FALSE_P(return_value)) {
 							array_init(return_value);
 						}
 						if (st & SNMP_NUMERIC_KEYS) {
@@ -868,7 +868,7 @@ retry:
 					keepwalking = 1;
 					continue;
 				}
-				if (!(st & SNMP_CMD_WALK) || response->errstat != SNMP_ERR_NOSUCHNAME || Z_TYPE_P(return_value) == IS_TRUE || Z_TYPE_P(return_value) == IS_FALSE) {
+				if (!(st & SNMP_CMD_WALK) || response->errstat != SNMP_ERR_NOSUCHNAME || Z_IS_TRUE_P(return_value) || Z_IS_FALSE_P(return_value)) {
 					for (count=1, vars = response->variables;
 						vars && count != response->errindex;
 						vars = vars->next_variable, count++);
@@ -939,27 +939,27 @@ static int php_snmp_parse_oid(zval *object, int st, struct objid_query *objid_qu
 	uint32_t idx_type = 0, idx_value = 0;
 	zval *tmp_oid, *tmp_type, *tmp_value;
 
-	if (Z_TYPE_P(oid) != IS_ARRAY) {
+	if (!Z_IS_ARRAY_P(oid)) {
 		convert_to_string_ex(oid);
 	}
 
 	if (st & SNMP_CMD_SET) {
-		if (Z_TYPE_P(type) != IS_ARRAY) {
+		if (!Z_IS_ARRAY_P(type)) {
 			convert_to_string_ex(type);
 		}
 
-		if (Z_TYPE_P(value) != IS_ARRAY) {
+		if (!Z_IS_ARRAY_P(value)) {
 			convert_to_string_ex(value);
 		}
 	}
 
 	objid_query->count = 0;
 	objid_query->array_output = ((st & SNMP_CMD_WALK) ? TRUE : FALSE);
-	if (Z_TYPE_P(oid) == IS_STRING) {
+	if (Z_IS_STRING_P(oid)) {
 		objid_query->vars = (snmpobjarg *)emalloc(sizeof(snmpobjarg));
 		objid_query->vars[objid_query->count].oid = Z_STRVAL_P(oid);
 		if (st & SNMP_CMD_SET) {
-			if (Z_TYPE_P(type) == IS_STRING && Z_TYPE_P(value) == IS_STRING) {
+			if (Z_IS_STRING_P(type) && Z_IS_STRING_P(value)) {
 				if (Z_STRLEN_P(type) != 1) {
 					php_error_docref(NULL, E_WARNING, "Bogus type '%s', should be single char, got %u", Z_STRVAL_P(type), Z_STRLEN_P(type));
 					efree(objid_query->vars);
@@ -975,7 +975,7 @@ static int php_snmp_parse_oid(zval *object, int st, struct objid_query *objid_qu
 			}
 		}
 		objid_query->count++;
-	} else if (Z_TYPE_P(oid) == IS_ARRAY) { /* we got objid array */
+	} else if (Z_IS_ARRAY_P(oid)) { /* we got objid array */
 		if (zend_hash_num_elements(Z_ARRVAL_P(oid)) == 0) {
 			php_error_docref(NULL, E_WARNING, "Got empty OID array");
 			return FALSE;
@@ -986,13 +986,13 @@ static int php_snmp_parse_oid(zval *object, int st, struct objid_query *objid_qu
 			convert_to_string_ex(tmp_oid);
 			objid_query->vars[objid_query->count].oid = Z_STRVAL_P(tmp_oid);
 			if (st & SNMP_CMD_SET) {
-				if (Z_TYPE_P(type) == IS_STRING) {
+				if (Z_IS_STRING_P(type)) {
 					pptr = Z_STRVAL_P(type);
 					objid_query->vars[objid_query->count].type = *pptr;
-				} else if (Z_TYPE_P(type) == IS_ARRAY) {
+				} else if (Z_IS_ARRAY_P(type)) {
 					while (idx_type < Z_ARRVAL_P(type)->nNumUsed) {
 						tmp_type = &Z_ARRVAL_P(type)->arData[idx_type].val;
-						if (Z_TYPE_P(tmp_type) != IS_UNDEF) {
+						if (!Z_IS_UNDEF_P(tmp_type)) {
 							break;
 						}
 						idx_type++;
@@ -1014,12 +1014,12 @@ static int php_snmp_parse_oid(zval *object, int st, struct objid_query *objid_qu
 					}
 				}
 
-				if (Z_TYPE_P(value) == IS_STRING) {
+				if (Z_IS_STRING_P(value)) {
 					objid_query->vars[objid_query->count].value = Z_STRVAL_P(value);
-				} else if (Z_TYPE_P(value) == IS_ARRAY) {
+				} else if (Z_IS_ARRAY_P(value)) {
 					while (idx_value < Z_ARRVAL_P(value)->nNumUsed) {
 						tmp_value = &Z_ARRVAL_P(value)->arData[idx_value].val;
-						if (Z_TYPE_P(tmp_value) != IS_UNDEF) {
+						if (!Z_IS_UNDEF_P(tmp_value)) {
 							break;
 						}
 						idx_value++;
@@ -1923,7 +1923,7 @@ zval *php_snmp_read_property(zval *object, zval *member, int type, void **cache_
 
 	obj = Z_SNMP_P(object);
 
-	if (Z_TYPE_P(member) != IS_STRING) {
+	if (!Z_IS_STRING_P(member)) {
 		ZVAL_STR(&tmp_member, zval_get_string_func(member));
 		member = &tmp_member;
 	}
@@ -1958,7 +1958,7 @@ void php_snmp_write_property(zval *object, zval *member, zval *value, void **cac
 	php_snmp_object *obj;
 	php_snmp_prop_handler *hnd;
 
-	if (Z_TYPE_P(member) != IS_STRING) {
+	if (!Z_IS_STRING_P(member)) {
 		ZVAL_STR(&tmp_member, zval_get_string_func(member));
 		member = &tmp_member;
 	}
@@ -2002,7 +2002,7 @@ static int php_snmp_has_property(zval *object, zval *member, int has_set_exists,
 			case 0: {
 				zval *value = php_snmp_read_property(object, member, BP_VAR_IS, cache_slot, &rv);
 				if (value != &EG(uninitialized_zval)) {
-					ret = Z_TYPE_P(value) != IS_NULL? 1 : 0;
+					ret = !Z_IS_NULL_P(value)? 1 : 0;
 					zval_ptr_dtor(value);
 				}
 				break;
@@ -2011,7 +2011,7 @@ static int php_snmp_has_property(zval *object, zval *member, int has_set_exists,
 				zval *value = php_snmp_read_property(object, member, BP_VAR_IS, cache_slot, &rv);
 				if (value != &EG(uninitialized_zval)) {
 					convert_to_boolean(value);
-					ret = Z_TYPE_P(value) == IS_TRUE? 1:0;
+					ret = Z_IS_TRUE_P(value)? 1:0;
 				}
 				break;
 			}
@@ -2131,7 +2131,7 @@ static int php_snmp_write_max_oids(php_snmp_object *snmp_object, zval *newval)
 	int ret = SUCCESS;
 	zend_long lval;
 
-	if (Z_TYPE_P(newval) == IS_NULL) {
+	if (Z_IS_NULL_P(newval)) {
 		snmp_object->max_oids = 0;
 		return ret;
 	}
@@ -2174,7 +2174,7 @@ static int php_snmp_write_##name(php_snmp_object *snmp_object, zval *newval) \
 	convert_to_boolean(&ztmp); \
 	newval = &ztmp; \
 \
-	snmp_object->name = Z_TYPE_P(newval) == IS_TRUE? 1 : 0; \
+	snmp_object->name = Z_IS_TRUE_P(newval)? 1 : 0; \
 \
 	return SUCCESS; \
 }

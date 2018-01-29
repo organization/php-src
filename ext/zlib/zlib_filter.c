@@ -328,7 +328,7 @@ static php_stream_filter *php_zlib_filter_create(const char *filtername, zval *f
 		if (filterparams) {
 			zval *tmpzval;
 
-			if ((Z_TYPE_P(filterparams) == IS_ARRAY || Z_TYPE_P(filterparams) == IS_OBJECT) &&
+			if ((Z_IS_ARRAY_P(filterparams) || Z_IS_OBJECT_P(filterparams)) &&
 				(tmpzval = zend_hash_str_find(HASH_OF(filterparams), "window", sizeof("window") - 1))) {
 				/* log-2 base of history window (9 - 15) */
 				zend_long tmp = zval_get_long(tmpzval);

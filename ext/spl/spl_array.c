@@ -92,7 +92,7 @@ static inline HashTable **spl_array_get_hash_table_ptr(spl_array_object* intern)
 	} else if (intern->ar_flags & SPL_ARRAY_USE_OTHER) {
 		spl_array_object *other = Z_SPLARRAY_P(&intern->array);
 		return spl_array_get_hash_table_ptr(other);
-	} else if (Z_TYPE(intern->array) == IS_ARRAY) {
+	} else if (Z_IS_ARRAY(intern->array)) {
 		return &Z_ARRVAL(intern->array);
 	} else {
 		zend_object *obj = Z_OBJ(intern->array);
@@ -126,7 +126,7 @@ static inline zend_bool spl_array_is_object(spl_array_object *intern) /* {{{ */
 	while (intern->ar_flags & SPL_ARRAY_USE_OTHER) {
 		intern = Z_SPLARRAY_P(&intern->array);
 	}
-	return (intern->ar_flags & SPL_ARRAY_IS_SELF) || Z_TYPE(intern->array) == IS_OBJECT;
+	return (intern->ar_flags & SPL_ARRAY_IS_SELF) || Z_IS_OBJECT(intern->array);
 }
 /* }}} */
 
@@ -314,9 +314,9 @@ try_again:
 fetch_dim_string:
 		retval = zend_symtable_find(ht, offset_key);
 		if (retval) {
-			if (Z_TYPE_P(retval) == IS_INDIRECT) {
+			if (Z_IS_INDIRECT_P(retval)) {
 				retval = Z_INDIRECT_P(retval);
-				if (Z_TYPE_P(retval) == IS_UNDEF) {
+				if (Z_IS_UNDEF_P(retval)) {
 					switch (type) {
 						case BP_VAR_R:
 							zend_error(E_NOTICE, "Undefined index: %s", ZSTR_VAL(offset_key));
@@ -553,9 +553,9 @@ try_again:
 			zval *data = zend_symtable_find(ht, Z_STR_P(offset));
 
 			if (data) {
-				if (Z_TYPE_P(data) == IS_INDIRECT) {
+				if (Z_IS_INDIRECT_P(data)) {
 					data = Z_INDIRECT_P(data);
-					if (Z_TYPE_P(data) == IS_UNDEF) {
+					if (Z_IS_UNDEF_P(data)) {
 						zend_error(E_NOTICE,"Undefined index: %s", Z_STRVAL_P(offset));
 					} else {
 						zval_ptr_dtor(data);
@@ -686,7 +686,7 @@ num_index:
 	}
 
 	{
-		zend_bool result = check_empty ? zend_is_true(value) : Z_TYPE_P(value) != IS_NULL;
+		zend_bool result = check_empty ? zend_is_true(value) : !Z_IS_NULL_P(value);
 		if (value == &rv) {
 			zval_ptr_dtor(&rv);
 		}
@@ -964,8 +964,8 @@ static int spl_array_skip_protected(spl_array_object *intern, HashTable *aht) /*
 		do {
 			if (zend_hash_get_current_key_ex(aht, &string_key, &num_key, pos_ptr) == HASH_KEY_IS_STRING) {
 				data = zend_hash_get_current_data_ex(aht, pos_ptr);
-				if (data && Z_TYPE_P(data) == IS_INDIRECT &&
-				    Z_TYPE_P(data = Z_INDIRECT_P(data)) == IS_UNDEF) {
+				if (data && Z_IS_INDIRECT_P(data) &&
+				    Z_IS_UNDEF_P(data = Z_INDIRECT_P(data))) {
 					/* skip */
 				} else if (!ZSTR_LEN(string_key) || ZSTR_VAL(string_key)[0]) {
 					return SUCCESS;
@@ -1035,7 +1035,7 @@ static zval *spl_array_it_get_current_data(zend_object_iterator *iter) /* {{{ */
 		return zend_user_it_get_current_data(iter);
 	} else {
 		zval *data = zend_hash_get_current_data_ex(aht, spl_array_get_pos_ptr(aht, object));
-		if (Z_TYPE_P(data) == IS_INDIRECT) {
+		if (Z_IS_INDIRECT_P(data)) {
 			data = Z_INDIRECT_P(data);
 		}
 		return data;
@@ -1112,12 +1112,12 @@ static void spl_array_it_rewind(zend_object_iterator *iter) /* {{{ */
 
 /* {{{ spl_array_set_array */
 static void spl_array_set_array(zval *object, spl_array_object *intern, zval *array, zend_long ar_flags, int just_array) {
-	if (Z_TYPE_P(array) != IS_OBJECT && Z_TYPE_P(array) != IS_ARRAY) {
+	if (!Z_IS_OBJECT_P(array) && !Z_IS_ARRAY_P(array)) {
 		zend_throw_exception(spl_ce_InvalidArgumentException, "Passed variable is not an array or object", 0);
 		return;
 	}
 
-	if (Z_TYPE_P(array) == IS_ARRAY) {
+	if (Z_IS_ARRAY_P(array)) {
 		zval_ptr_dtor(&intern->array);
 		if (Z_REFCOUNT_P(array) == 1) {
 			ZVAL_COPY(&intern->array, array);
@@ -1436,7 +1436,7 @@ int spl_array_object_count_elements(zval *object, zend_long *count) /* {{{ */
 	if (intern->fptr_count) {
 		zval rv;
 		zend_call_method_with_0_params(object, intern->std.ce, &intern->fptr_count, "count", &rv);
-		if (Z_TYPE(rv) != IS_UNDEF) {
+		if (!Z_IS_UNDEF(rv)) {
 			*count = zval_get_long(&rv);
 			zval_ptr_dtor(&rv);
 			return SUCCESS;
@@ -1571,9 +1571,9 @@ SPL_METHOD(Array, current)
 	if ((entry = zend_hash_get_current_data_ex(aht, spl_array_get_pos_ptr(aht, intern))) == NULL) {
 		return;
 	}
-	if (Z_TYPE_P(entry) == IS_INDIRECT) {
+	if (Z_IS_INDIRECT_P(entry)) {
 		entry = Z_INDIRECT_P(entry);
-		if (Z_TYPE_P(entry) == IS_UNDEF) {
+		if (Z_IS_UNDEF_P(entry)) {
 			return;
 		}
 	}
@@ -1666,12 +1666,12 @@ SPL_METHOD(Array, hasChildren)
 		RETURN_FALSE;
 	}
 
-	if (Z_TYPE_P(entry) == IS_INDIRECT) {
+	if (Z_IS_INDIRECT_P(entry)) {
 		entry = Z_INDIRECT_P(entry);
 	}
 
 	ZVAL_DEREF(entry);
-	RETURN_BOOL(Z_TYPE_P(entry) == IS_ARRAY || (Z_TYPE_P(entry) == IS_OBJECT && (intern->ar_flags & SPL_ARRAY_CHILD_ARRAYS_ONLY) == 0));
+	RETURN_BOOL(Z_IS_ARRAY_P(entry) || (Z_IS_OBJECT_P(entry) && (intern->ar_flags & SPL_ARRAY_CHILD_ARRAYS_ONLY) == 0));
 }
 /* }}} */
 
@@ -1695,12 +1695,12 @@ SPL_METHOD(Array, getChildren)
 		return;
 	}
 
-	if (Z_TYPE_P(entry) == IS_INDIRECT) {
+	if (Z_IS_INDIRECT_P(entry)) {
 		entry = Z_INDIRECT_P(entry);
 	}
 
 	ZVAL_DEREF(entry);
-	if (Z_TYPE_P(entry) == IS_OBJECT) {
+	if (Z_IS_OBJECT_P(entry)) {
 		if ((intern->ar_flags & SPL_ARRAY_CHILD_ARRAYS_ONLY) != 0) {
 			return;
 		}
@@ -1807,7 +1807,7 @@ SPL_METHOD(Array, unserialize)
 	++p;
 
 	zflags = var_tmp_var(&var_hash);
-	if (!php_var_unserialize(zflags, &p, s + buf_len, &var_hash) || Z_TYPE_P(zflags) != IS_LONG) {
+	if (!php_var_unserialize(zflags, &p, s + buf_len, &var_hash) || !Z_IS_LONG_P(zflags)) {
 		goto outexcept;
 	}
 
@@ -1836,14 +1836,14 @@ SPL_METHOD(Array, unserialize)
 
 		array = var_tmp_var(&var_hash);
 		if (!php_var_unserialize(array, &p, s + buf_len, &var_hash)
-				|| (Z_TYPE_P(array) != IS_ARRAY && Z_TYPE_P(array) != IS_OBJECT)) {
+				|| (!Z_IS_ARRAY_P(array) && !Z_IS_OBJECT_P(array))) {
 			goto outexcept;
 		}
 
 		intern->ar_flags &= ~SPL_ARRAY_CLONE_MASK;
 		intern->ar_flags |= flags & SPL_ARRAY_CLONE_MASK;
 
-		if (Z_TYPE_P(array) == IS_ARRAY) {
+		if (Z_IS_ARRAY_P(array)) {
 			zval_ptr_dtor(&intern->array);
 			ZVAL_COPY(&intern->array, array);
 		} else {
@@ -1863,7 +1863,7 @@ SPL_METHOD(Array, unserialize)
 	++p;
 
 	members = var_tmp_var(&var_hash);
-	if (!php_var_unserialize(members, &p, s + buf_len, &var_hash) || Z_TYPE_P(members) != IS_ARRAY) {
+	if (!php_var_unserialize(members, &p, s + buf_len, &var_hash) || !Z_IS_ARRAY_P(members)) {
 		goto outexcept;
 	}
 

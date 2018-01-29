@@ -187,14 +187,14 @@ static int find_adjusted_tmp_var(const zend_op_array *op_array, uint32_t build_f
 		} else if (op->opcode == ZEND_ADD) {
 			if (op->op1_type == IS_CV && op->op2_type == IS_CONST) {
 				zv = CRT_CONSTANT_EX(op_array, op, op->op2, (build_flags & ZEND_RT_CONSTANTS));
-				if (Z_TYPE_P(zv) == IS_LONG
+				if (Z_IS_LONG_P(zv)
 				 && Z_LVAL_P(zv) != ZEND_LONG_MIN) {
 					*adjustment = -Z_LVAL_P(zv);
 					return EX_VAR_TO_NUM(op->op1.var);
 				}
 			} else if (op->op2_type == IS_CV && op->op1_type == IS_CONST) {
 				zv = CRT_CONSTANT_EX(op_array, op, op->op1, (build_flags & ZEND_RT_CONSTANTS));
-				if (Z_TYPE_P(zv) == IS_LONG
+				if (Z_IS_LONG_P(zv)
 				 && Z_LVAL_P(zv) != ZEND_LONG_MIN) {
 					*adjustment = -Z_LVAL_P(zv);
 					return EX_VAR_TO_NUM(op->op2.var);
@@ -203,7 +203,7 @@ static int find_adjusted_tmp_var(const zend_op_array *op_array, uint32_t build_f
 		} else if (op->opcode == ZEND_SUB) {
 			if (op->op1_type == IS_CV && op->op2_type == IS_CONST) {
 				zv = CRT_CONSTANT_EX(op_array, op, op->op2, (build_flags & ZEND_RT_CONSTANTS));
-				if (Z_TYPE_P(zv) == IS_LONG) {
+				if (Z_IS_LONG_P(zv)) {
 					*adjustment = Z_LVAL_P(zv);
 					return EX_VAR_TO_NUM(op->op1.var);
 				}
@@ -298,11 +298,11 @@ static void place_essa_pis(
 				if ((opline-1)->op2_type == IS_CONST) {
 					zval *zv = CRT_CONSTANT_EX(op_array, (opline-1), (opline-1)->op2, (build_flags & ZEND_RT_CONSTANTS));
 
-					if (Z_TYPE_P(zv) == IS_LONG) {
+					if (Z_IS_LONG_P(zv)) {
 						add_val2 = Z_LVAL_P(zv);
-					} else if (Z_TYPE_P(zv) == IS_FALSE) {
+					} else if (Z_IS_FALSE_P(zv)) {
 						add_val2 = 0;
-					} else if (Z_TYPE_P(zv) == IS_TRUE) {
+					} else if (Z_IS_TRUE_P(zv)) {
 						add_val2 = 1;
 					} else {
 						var1 = -1;
@@ -319,11 +319,11 @@ static void place_essa_pis(
 				zend_long add_val1 = 0;
 				if ((opline-1)->op1_type == IS_CONST) {
 					zval *zv = CRT_CONSTANT_EX(op_array, (opline-1), (opline-1)->op1, (build_flags & ZEND_RT_CONSTANTS));
-					if (Z_TYPE_P(zv) == IS_LONG) {
+					if (Z_IS_LONG_P(zv)) {
 						add_val1 = Z_LVAL_P(CRT_CONSTANT_EX(op_array, (opline-1), (opline-1)->op1, (build_flags & ZEND_RT_CONSTANTS)));
-					} else if (Z_TYPE_P(zv) == IS_FALSE) {
+					} else if (Z_IS_FALSE_P(zv)) {
 						add_val1 = 0;
-					} else if (Z_TYPE_P(zv) == IS_TRUE) {
+					} else if (Z_IS_TRUE_P(zv)) {
 						add_val1 = 1;
 					} else {
 						var2 = -1;
@@ -476,7 +476,7 @@ static void place_essa_pis(
 
 			/* We're interested in === null/true/false comparisons here, because they eliminate
 			 * a type in the false-branch. Other === VAL comparisons are unlikely to be useful. */
-			if (Z_TYPE_P(val) != IS_NULL && Z_TYPE_P(val) != IS_TRUE && Z_TYPE_P(val) != IS_FALSE) {
+			if (!Z_IS_NULL_P(val) && !Z_IS_TRUE_P(val) && !Z_IS_FALSE_P(val)) {
 				continue;
 			}
 

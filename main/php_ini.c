@@ -192,10 +192,10 @@ PHPAPI void display_ini_entries(zend_module_entry *module)
  */
 PHPAPI void config_zval_dtor(zval *zvalue)
 {
-	if (Z_TYPE_P(zvalue) == IS_ARRAY) {
+	if (Z_IS_ARRAY_P(zvalue)) {
 		zend_hash_destroy(Z_ARRVAL_P(zvalue));
 		free(Z_ARR_P(zvalue));
-	} else if (Z_TYPE_P(zvalue) == IS_STRING) {
+	} else if (Z_IS_STRING_P(zvalue)) {
 		zend_string_release(Z_STR_P(zvalue));
 	}
 }
@@ -256,7 +256,7 @@ static void php_ini_parser_cb(zval *arg1, zval *arg2, zval *arg3, int callback_t
 /* fprintf(stdout, "ZEND_INI_PARSER_POP_ENTRY: %s[%s] = %s\n",Z_STRVAL_P(arg1), Z_STRVAL_P(arg3), Z_STRVAL_P(arg2)); */
 
 				/* If option not found in hash or is not an array -> create array, otherwise add to existing array */
-				if ((find_arr = zend_hash_find(active_hash, Z_STR_P(arg1))) == NULL || Z_TYPE_P(find_arr) != IS_ARRAY) {
+				if ((find_arr = zend_hash_find(active_hash, Z_STR_P(arg1))) == NULL || !Z_IS_ARRAY_P(find_arr)) {
 					ZVAL_NEW_PERSISTENT_ARR(&option_arr);
 					zend_hash_init(Z_ARRVAL(option_arr), 8, NULL, config_zval_dtor, 1);
 					find_arr = zend_hash_update(active_hash, Z_STR_P(arg1), &option_arr);
@@ -328,7 +328,7 @@ static void php_ini_parser_cb(zval *arg1, zval *arg2, zval *arg3, int callback_t
 						zend_hash_init(Z_ARRVAL(section_arr), 8, NULL, (dtor_func_t) config_zval_dtor, 1);
 						entry = zend_hash_str_update(target_hash, key, key_len, &section_arr);
 					}
-					if (Z_TYPE_P(entry) == IS_ARRAY) {
+					if (Z_IS_ARRAY_P(entry)) {
 						active_ini_hash = Z_ARRVAL_P(entry);
 					}
 				}

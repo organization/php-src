@@ -148,7 +148,7 @@ static zend_bool tokenize(zval *return_value, zend_string *source)
 	while ((token_type = lex_scan(&token))) {
 		add_token(return_value, token_type, zendtext, zendleng, token_line);
 
-		if (Z_TYPE(token) != IS_UNDEF) {
+		if (!Z_IS_UNDEF(token)) {
 			zval_dtor(&token);
 			ZVAL_UNDEF(&token);
 		}
@@ -198,7 +198,7 @@ void on_event(zend_php_scanner_event event, int token, int line, void *context)
 		case ON_FEEDBACK:
 			tokens_ht = Z_ARRVAL_P(token_stream);
 			token_zv = zend_hash_index_find(tokens_ht, zend_hash_num_elements(tokens_ht) - 1);
-			if (token_zv && Z_TYPE_P(token_zv) == IS_ARRAY) {
+			if (token_zv && Z_IS_ARRAY_P(token_zv)) {
 				ZVAL_LONG(zend_hash_index_find(Z_ARRVAL_P(token_zv), 0), token);
 			}
 			break;

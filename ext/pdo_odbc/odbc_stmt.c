@@ -188,7 +188,7 @@ static int odbc_stmt_execute(pdo_stmt_t *stmt)
 			} else {
 				parameter = &param->parameter;
 			}
-			if (Z_TYPE_P(parameter) != IS_RESOURCE) {
+			if (!Z_IS_RESOURCE_P(parameter)) {
 				/* they passed in a string */
 				zend_ulong ulen;
 				convert_to_string(parameter);
@@ -402,7 +402,7 @@ static int odbc_stmt_param_hook(pdo_stmt_t *stmt, struct pdo_bound_param_data *p
 				}
 
 				if (PDO_PARAM_TYPE(param->param_type) == PDO_PARAM_LOB) {
-					if (Z_TYPE_P(parameter) == IS_RESOURCE) {
+					if (Z_IS_RESOURCE_P(parameter)) {
 						php_stream *stm;
 						php_stream_statbuf sb;
 
@@ -453,7 +453,7 @@ static int odbc_stmt_param_hook(pdo_stmt_t *stmt, struct pdo_bound_param_data *p
 							P->len = SQL_LEN_DATA_AT_EXEC(Z_STRLEN_P(parameter));
 						}
 					}
-				} else if (Z_TYPE_P(parameter) == IS_NULL || PDO_PARAM_TYPE(param->param_type) == PDO_PARAM_NULL) {
+				} else if (Z_IS_NULL_P(parameter) || PDO_PARAM_TYPE(param->param_type) == PDO_PARAM_NULL) {
 					P->len = SQL_NULL_DATA;
 				} else {
 					convert_to_string(parameter);

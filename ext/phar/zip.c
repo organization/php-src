@@ -963,7 +963,7 @@ not_compressed:
 	PHAR_SET_32(local.crc32, entry->crc32);
 continue_dir:
 	/* set file metadata */
-	if (Z_TYPE(entry->metadata) != IS_UNDEF) {
+	if (!Z_IS_UNDEF(entry->metadata)) {
 		php_serialize_data_t metadata_hash;
 
 		if (entry->metadata_str.s) {
@@ -1437,7 +1437,7 @@ fperror:
 	}
 	zend_hash_apply_with_argument(&phar->manifest, phar_zip_changed_apply, (void *) &pass);
 
-	if (Z_TYPE(phar->metadata) != IS_UNDEF) {
+	if (!Z_IS_UNDEF(phar->metadata)) {
 		/* set phar metadata */
 		PHP_VAR_SERIALIZE_INIT(metadata_hash);
 		php_var_serialize(&main_metadata_str, &phar->metadata, &metadata_hash);
@@ -1451,7 +1451,7 @@ fperror:
 temperror:
 		php_stream_close(pass.centralfp);
 nocentralerror:
-		if (Z_TYPE(phar->metadata) != IS_UNDEF) {
+		if (!Z_IS_UNDEF(phar->metadata)) {
 			smart_str_free(&main_metadata_str);
 		}
 		php_stream_close(pass.filefp);
@@ -1485,7 +1485,7 @@ nocentralerror:
 
 	php_stream_close(pass.centralfp);
 
-	if (Z_TYPE(phar->metadata) != IS_UNDEF) {
+	if (!Z_IS_UNDEF(phar->metadata)) {
 		/* set phar metadata */
 		PHAR_SET_16(eocd.comment_len, ZSTR_LEN(main_metadata_str.s));
 

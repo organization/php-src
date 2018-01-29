@@ -330,7 +330,7 @@ int php_do_setsockopt_ipv6_rfc3542(php_socket *php_sock, int level, int optname,
 #ifdef IPV6_PKTINFO
 	case IPV6_PKTINFO:
 #ifdef PHP_WIN32
-		if (Z_TYPE_P(arg4) == IS_ARRAY) {
+		if (Z_IS_ARRAY_P(arg4)) {
 			php_error_docref0(NULL, E_WARNING, "Windows does not "
 					"support sticky IPV6_PKTINFO");
 			return FAILURE;

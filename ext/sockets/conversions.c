@@ -251,7 +251,7 @@ static void from_zval_write_aggregation(const zval *container,
 	const field_descriptor	*descr;
 	zval					*elem;
 
-	if (Z_TYPE_P(container) != IS_ARRAY) {
+	if (!Z_IS_ARRAY_P(container)) {
 		do_from_zval_err(ctx, "%s", "expected an array here");
 	}
 
@@ -282,7 +282,7 @@ static void to_zval_read_aggregation(const char *structure,
 {
 	const field_descriptor	*descr;
 
-	assert(Z_TYPE_P(zarr) == IS_ARRAY);
+	assert(Z_IS_ARRAY_P(zarr));
 	assert(Z_ARRVAL_P(zarr) != NULL);
 
 	for (descr = descriptors; descr->name != NULL && !ctx->err.has_error; descr++) {
@@ -310,7 +310,7 @@ static zend_long from_zval_integer_common(const zval *arr_value, ser_context *ct
 	zval lzval;
 
 	ZVAL_NULL(&lzval);
-	if (Z_TYPE_P(arr_value) != IS_LONG) {
+	if (!Z_IS_LONG_P(arr_value)) {
 		ZVAL_COPY(&lzval, (zval *)arr_value);
 		arr_value = &lzval;
 	}
@@ -701,7 +701,7 @@ static void from_zval_write_sockaddr_aux(const zval *container,
 	zval	*elem;
 	int		fill_sockaddr;
 
-	if (Z_TYPE_P(container) != IS_ARRAY) {
+	if (!Z_IS_ARRAY_P(container)) {
 		do_from_zval_err(ctx, "%s", "expected an array here");
 		return;
 	}
@@ -709,7 +709,7 @@ static void from_zval_write_sockaddr_aux(const zval *container,
 	fill_sockaddr = param_get_bool(ctx, KEY_FILL_SOCKADDR, 1);
 
 	if ((elem = zend_hash_str_find(Z_ARRVAL_P(container), "family", sizeof("family") - 1)) != NULL
-			&& Z_TYPE_P(elem) != IS_NULL) {
+			&& !Z_IS_NULL_P(elem)) {
 		const char *node = "family";
 		zend_llist_add_element(&ctx->keys, &node);
 		from_zval_write_int(elem, (char*)&family, ctx);
@@ -918,7 +918,7 @@ static void from_zval_write_control_array(const zval *arr, char *msghdr_c, ser_c
 						cur_offset;
 	struct msghdr		*msg = (struct msghdr*)msghdr_c;
 
-	if (Z_TYPE_P(arr) != IS_ARRAY) {
+	if (!Z_IS_ARRAY_P(arr)) {
 		do_from_zval_err(ctx, "%s", "expected an array here");
 		return;
 	}
@@ -1093,7 +1093,7 @@ static void from_zval_write_iov_array(const zval *arr, char *msghdr_c, ser_conte
 	int				num_elem;
 	struct msghdr	*msg = (struct msghdr*)msghdr_c;
 
-	if (Z_TYPE_P(arr) != IS_ARRAY) {
+	if (!Z_IS_ARRAY_P(arr)) {
 		do_from_zval_err(ctx, "%s", "expected an array here");
 		return;
 	}
@@ -1234,7 +1234,7 @@ static void from_zval_write_ifindex(const zval *zv, char *uinteger, ser_context 
 {
 	unsigned ret = 0;
 
-	if (Z_TYPE_P(zv) == IS_LONG) {
+	if (Z_IS_LONG_P(zv)) {
 		if (Z_LVAL_P(zv) < 0 || (zend_ulong)Z_LVAL_P(zv) > UINT_MAX) { /* allow 0 (unspecified interface) */
 			do_from_zval_err(ctx, "the interface index cannot be negative or "
 					"larger than %u; given " ZEND_LONG_FMT, UINT_MAX, Z_LVAL_P(zv));
@@ -1330,7 +1330,7 @@ size_t calculate_scm_rights_space(const zval *arr, ser_context *ctx)
 {
 	int num_elems;
 
-	if (Z_TYPE_P(arr) != IS_ARRAY) {
+	if (!Z_IS_ARRAY_P(arr)) {
 		do_from_zval_err(ctx, "%s", "expected an array here");
 		return (size_t)-1;
 	}
@@ -1347,7 +1347,7 @@ static void from_zval_write_fd_array_aux(zval *elem, unsigned i, void **args, se
 {
 	int *iarr = args[0];
 
-	if (Z_TYPE_P(elem) == IS_RESOURCE) {
+	if (Z_IS_RESOURCE_P(elem)) {
 		php_stream *stream;
 		php_socket *sock;
 
@@ -1374,7 +1374,7 @@ static void from_zval_write_fd_array_aux(zval *elem, unsigned i, void **args, se
 }
 void from_zval_write_fd_array(const zval *arr, char *int_arr, ser_context *ctx)
 {
-	if (Z_TYPE_P(arr) != IS_ARRAY) {
+	if (!Z_IS_ARRAY_P(arr)) {
 		do_from_zval_err(ctx, "%s", "expected an array here");
 		return;
 	}

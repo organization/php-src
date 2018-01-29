@@ -274,7 +274,7 @@ static PHP_METHOD(PDO, dbh_constructor)
 		zval *v;
 
 		if ((v = zend_hash_index_find(Z_ARRVAL_P(options), PDO_ATTR_PERSISTENT)) != NULL) {
-			if (Z_TYPE_P(v) == IS_STRING &&
+			if (Z_IS_STRING_P(v) &&
 				!is_numeric_string(Z_STRVAL_P(v), Z_STRLEN_P(v), NULL, NULL, 0) && Z_STRLEN_P(v) > 0) {
 				/* user specified key */
 				plen = spprintf(&hashkey, 0, "PDO:DBH:DSN=%s:%s:%s:%s", data_source,
@@ -401,7 +401,7 @@ options:
 static zval *pdo_stmt_instantiate(pdo_dbh_t *dbh, zval *object, zend_class_entry *dbstmt_ce, zval *ctor_args) /* {{{ */
 {
 	if (!Z_ISUNDEF_P(ctor_args)) {
-		if (Z_TYPE_P(ctor_args) != IS_ARRAY) {
+		if (!Z_IS_ARRAY_P(ctor_args)) {
 			pdo_raise_impl_error(dbh, NULL, "HY000", "constructor arguments must be passed as an array");
 			return NULL;
 		}
@@ -480,8 +480,8 @@ static PHP_METHOD(PDO, prepare)
 	PDO_CONSTRUCT_CHECK;
 
 	if (ZEND_NUM_ARGS() > 1 && (opt = zend_hash_index_find(Z_ARRVAL_P(options), PDO_ATTR_STATEMENT_CLASS)) != NULL) {
-		if (Z_TYPE_P(opt) != IS_ARRAY || (item = zend_hash_index_find(Z_ARRVAL_P(opt), 0)) == NULL
-			|| Z_TYPE_P(item) != IS_STRING
+		if (!Z_IS_ARRAY_P(opt) || (item = zend_hash_index_find(Z_ARRVAL_P(opt), 0)) == NULL
+			|| !Z_IS_STRING_P(item)
 			|| (pce = zend_lookup_class(Z_STR_P(item))) == NULL
 		) {
 			pdo_raise_impl_error(dbh, NULL, "HY000",
@@ -505,7 +505,7 @@ static PHP_METHOD(PDO, prepare)
 			RETURN_FALSE;
 		}
 		if ((item = zend_hash_index_find(Z_ARRVAL_P(opt), 1)) != NULL) {
-			if (Z_TYPE_P(item) != IS_ARRAY) {
+			if (!Z_IS_ARRAY_P(item)) {
 				pdo_raise_impl_error(dbh, NULL, "HY000",
 					"PDO::ATTR_STATEMENT_CLASS requires format array(classname, ctor_args); "
 					"ctor_args must be an array"
@@ -667,7 +667,7 @@ static int pdo_dbh_attribute_set(pdo_dbh_t *dbh, zend_long attr, zval *value) /*
 	zend_long lval;
 
 #define PDO_LONG_PARAM_CHECK \
-	if (Z_TYPE_P(value) != IS_LONG && Z_TYPE_P(value) != IS_STRING && Z_TYPE_P(value) != IS_FALSE && Z_TYPE_P(value) != IS_TRUE) { \
+	if (!Z_IS_LONG_P(value) && !Z_IS_STRING_P(value) && !Z_IS_FALSE_P(value) && !Z_IS_TRUE_P(value)) { \
 		pdo_raise_impl_error(dbh, NULL, "HY000", "attribute value must be an integer"); \
 		PDO_HANDLE_DBH_ERR(); \
 		return FAILURE; \
@@ -712,9 +712,9 @@ static int pdo_dbh_attribute_set(pdo_dbh_t *dbh, zend_long attr, zval *value) /*
 			return SUCCESS;
 
 		case PDO_ATTR_DEFAULT_FETCH_MODE:
-			if (Z_TYPE_P(value) == IS_ARRAY) {
+			if (Z_IS_ARRAY_P(value)) {
 				zval *tmp;
-				if ((tmp = zend_hash_index_find(Z_ARRVAL_P(value), 0)) != NULL && Z_TYPE_P(tmp) == IS_LONG) {
+				if ((tmp = zend_hash_index_find(Z_ARRVAL_P(value), 0)) != NULL && Z_IS_LONG_P(tmp)) {
 					if (Z_LVAL_P(tmp) == PDO_FETCH_INTO || Z_LVAL_P(tmp) == PDO_FETCH_CLASS) {
 						pdo_raise_impl_error(dbh, NULL, "HY000", "FETCH_INTO and FETCH_CLASS are not yet supported as default fetch modes");
 						return FAILURE;
@@ -748,9 +748,9 @@ static int pdo_dbh_attribute_set(pdo_dbh_t *dbh, zend_long attr, zval *value) /*
 				PDO_HANDLE_DBH_ERR();
 				return FAILURE;
 			}
-			if (Z_TYPE_P(value) != IS_ARRAY
+			if (!Z_IS_ARRAY_P(value)
 				|| (item = zend_hash_index_find(Z_ARRVAL_P(value), 0)) == NULL
-				|| Z_TYPE_P(item) != IS_STRING
+				|| !Z_IS_STRING_P(item)
 				|| (pce = zend_lookup_class(Z_STR_P(item))) == NULL
 			) {
 				pdo_raise_impl_error(dbh, NULL, "HY000",
@@ -778,7 +778,7 @@ static int pdo_dbh_attribute_set(pdo_dbh_t *dbh, zend_long attr, zval *value) /*
 				ZVAL_UNDEF(&dbh->def_stmt_ctor_args);
 			}
 			if ((item = zend_hash_index_find(Z_ARRVAL_P(value), 1)) != NULL) {
-				if (Z_TYPE_P(item) != IS_ARRAY) {
+				if (!Z_IS_ARRAY_P(item)) {
 					pdo_raise_impl_error(dbh, NULL, "HY000",
 						"PDO::ATTR_STATEMENT_CLASS requires format array(classname, array(ctor_args)); "
 						"ctor_args must be an array"

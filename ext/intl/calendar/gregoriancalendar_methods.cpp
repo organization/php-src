@@ -64,7 +64,7 @@ static void _php_intlgregcal_constructor_body(
 		return;
 	}
 	for (variant = ZEND_NUM_ARGS();
-		variant > 0 && Z_TYPE(args[variant - 1]) == IS_NULL;
+		variant > 0 && Z_IS_NULL(args[variant - 1]);
 		variant--) {}
 	if (variant == 4) {
 		intl_error_set(NULL, U_ILLEGAL_ARGUMENT_ERROR,

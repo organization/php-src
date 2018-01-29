@@ -324,7 +324,7 @@ static inline zval *spl_fixedarray_object_read_dimension_helper(spl_fixedarray_o
 		return NULL;
 	}
 
-	if (Z_TYPE_P(offset) != IS_LONG) {
+	if (!Z_IS_LONG_P(offset)) {
 		index = spl_offset_convert_to_long(offset);
 	} else {
 		index = Z_LVAL_P(offset);
@@ -392,7 +392,7 @@ static inline void spl_fixedarray_object_write_dimension_helper(spl_fixedarray_o
 		return;
 	}
 
-	if (Z_TYPE_P(offset) != IS_LONG) {
+	if (!Z_IS_LONG_P(offset)) {
 		index = spl_offset_convert_to_long(offset);
 	} else {
 		index = Z_LVAL_P(offset);
@@ -440,7 +440,7 @@ static inline void spl_fixedarray_object_unset_dimension_helper(spl_fixedarray_o
 {
 	zend_long index;
 
-	if (Z_TYPE_P(offset) != IS_LONG) {
+	if (!Z_IS_LONG_P(offset)) {
 		index = spl_offset_convert_to_long(offset);
 	} else {
 		index = Z_LVAL_P(offset);
@@ -479,7 +479,7 @@ static inline int spl_fixedarray_object_has_dimension_helper(spl_fixedarray_obje
 	zend_long index;
 	int retval;
 
-	if (Z_TYPE_P(offset) != IS_LONG) {
+	if (!Z_IS_LONG_P(offset)) {
 		index = spl_offset_convert_to_long(offset);
 	} else {
 		index = Z_LVAL_P(offset);

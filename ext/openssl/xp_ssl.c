@@ -159,7 +159,7 @@ typedef struct _php_openssl_netstream_data_t {
  * in an error condition arising from a network connection problem */
 static int php_openssl_is_http_stream_talking_to_iis(php_stream *stream) /* {{{ */
 {
-	if (Z_TYPE(stream->wrapperdata) == IS_ARRAY &&
+	if (Z_IS_ARRAY(stream->wrapperdata) &&
 		stream->wrapper &&
 		strcasecmp(stream->wrapper->wops->label, "HTTP") == 0
 	) {
@@ -321,7 +321,7 @@ static int php_openssl_x509_fingerprint_cmp(X509 *peer, const char *method, cons
 
 static zend_bool php_openssl_x509_fingerprint_match(X509 *peer, zval *val)
 {
-	if (Z_TYPE_P(val) == IS_STRING) {
+	if (Z_IS_STRING_P(val)) {
 		const char *method = NULL;
 
 		switch (Z_STRLEN_P(val)) {
@@ -335,7 +335,7 @@ static zend_bool php_openssl_x509_fingerprint_match(X509 *peer, zval *val)
 		}
 
 		return method && php_openssl_x509_fingerprint_cmp(peer, method, Z_STRVAL_P(val)) == 0;
-	} else if (Z_TYPE_P(val) == IS_ARRAY) {
+	} else if (Z_IS_ARRAY_P(val)) {
 		zval *current;
 		zend_string *key;
 
@@ -345,7 +345,7 @@ static zend_bool php_openssl_x509_fingerprint_match(X509 *peer, zval *val)
 		}
 
 		ZEND_HASH_FOREACH_STR_KEY_VAL(Z_ARRVAL_P(val), key, current) {
-			if (key == NULL || Z_TYPE_P(current) != IS_STRING) {
+			if (key == NULL || !Z_IS_STRING_P(current)) {
 				php_error_docref(NULL, E_WARNING, "Invalid peer_fingerprint array; [algo => fingerprint] form required");
 				return 0;
 			}
@@ -529,7 +529,7 @@ static int php_openssl_apply_peer_verification_policy(SSL *ssl, X509 *peer, php_
 
 	/* If a peer_fingerprint match is required this trumps peer and peer_name verification */
 	if (must_verify_fingerprint) {
-		if (Z_TYPE_P(val) == IS_STRING || Z_TYPE_P(val) == IS_ARRAY) {
+		if (Z_IS_STRING_P(val) || Z_IS_ARRAY_P(val)) {
 			if (!php_openssl_x509_fingerprint_match(peer, val)) {
 				php_error_docref(NULL, E_WARNING,
 					"peer_fingerprint match failure"
@@ -1078,7 +1078,7 @@ static void php_openssl_limit_handshake_reneg(const SSL *ssl) /* {{{ */
 			stream->flags ^= PHP_STREAM_FLAG_NO_FCLOSE;
 
 			/* If the reneg_limit_callback returned true don't auto-close */
-			if (Z_TYPE(retval) == IS_TRUE) {
+			if (Z_IS_TRUE(retval)) {
 				sslsock->reneg->should_close = 0;
 			}
 
@@ -1360,7 +1360,7 @@ static int php_openssl_enable_server_sni(php_stream *stream, php_openssl_netstre
 		return SUCCESS;
 	}
 
-	if (Z_TYPE_P(val) != IS_ARRAY) {
+	if (!Z_IS_ARRAY_P(val)) {
 		php_error_docref(NULL, E_WARNING,
 			"SNI_server_certs requires an array mapping host names to cert paths"
 		);
@@ -1390,7 +1390,7 @@ static int php_openssl_enable_server_sni(php_stream *stream, php_openssl_netstre
 			return FAILURE;
 		}
 
-		if (Z_TYPE_P(current) == IS_ARRAY) {
+		if (Z_IS_ARRAY_P(current)) {
 			zval *local_pk, *local_cert;
 			char resolved_cert_path_buff[MAXPATHLEN], resolved_pk_path_buff[MAXPATHLEN];
 

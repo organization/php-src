@@ -2843,7 +2843,7 @@ static int zend_update_type_info(const zend_op_array *op_array,
 				}
 			} else if (opline->op2_type == IS_CONST) {
 				zval *zv = CRT_CONSTANT_EX(op_array, opline, opline->op2, ssa->rt_constants);
-				if (Z_TYPE_P(zv) == IS_STRING) {
+				if (Z_IS_STRING_P(zv)) {
 					ce = get_class_entry(script, Z_STR_P(zv+1));
 					UPDATE_SSA_OBJ_TYPE(ce, 0, ssa_ops[i].result_def);
 				} else {
@@ -3525,7 +3525,7 @@ static zend_bool can_convert_to_double(
 				ZVAL_DOUBLE(&dval_op1, (double) Z_LVAL_P(value));
 			} else if (opline->op1_type == IS_CONST) {
 				zval *zv = CRT_CONSTANT_EX(op_array, opline, opline->op1, ssa->rt_constants);
-				if (Z_TYPE_P(zv) == IS_LONG || Z_TYPE_P(zv) == IS_DOUBLE) {
+				if (Z_IS_LONG_P(zv) || Z_IS_DOUBLE_P(zv)) {
 					ZVAL_COPY_VALUE(&orig_op1, zv);
 					ZVAL_COPY_VALUE(&dval_op1, zv);
 				}
@@ -3538,7 +3538,7 @@ static zend_bool can_convert_to_double(
 				ZVAL_DOUBLE(&dval_op2, (double) Z_LVAL_P(value));
 			} else if (opline->op2_type == IS_CONST) {
 				zval *zv = CRT_CONSTANT_EX(op_array, opline, opline->op2, ssa->rt_constants);
-				if (Z_TYPE_P(zv) == IS_LONG || Z_TYPE_P(zv) == IS_DOUBLE) {
+				if (Z_IS_LONG_P(zv) || Z_IS_DOUBLE_P(zv)) {
 					ZVAL_COPY_VALUE(&orig_op2, zv);
 					ZVAL_COPY_VALUE(&dval_op2, zv);
 				}
@@ -3569,7 +3569,7 @@ static zend_bool can_convert_to_double(
 
 				get_binary_op(opline->opcode)(&orig_result, &orig_op1, &orig_op2);
 				get_binary_op(opline->opcode)(&dval_result, &dval_op1, &dval_op2);
-				ZEND_ASSERT(Z_TYPE(dval_result) == IS_DOUBLE);
+				ZEND_ASSERT(Z_IS_DOUBLE(dval_result));
 				if (zval_get_double(&orig_result) != Z_DVAL(dval_result)) {
 					return 0;
 				}
@@ -3773,7 +3773,7 @@ void zend_func_return_info(const zend_op_array   *op_array,
 				if (opline->op1_type == IS_CONST) {
 					zval *zv = CRT_CONSTANT_EX(op_array, opline, opline->op1, info->ssa.rt_constants);
 
-					if (Z_TYPE_P(zv) == IS_NULL) {
+					if (Z_IS_NULL_P(zv)) {
 						if (tmp_has_range < 0) {
 							tmp_has_range = 1;
 							tmp_range.underflow = 0;
@@ -3788,7 +3788,7 @@ void zend_func_return_info(const zend_op_array   *op_array,
 								tmp_range.max = MAX(tmp_range.max, 0);
 							}
 						}
-					} else if (Z_TYPE_P(zv) == IS_FALSE) {
+					} else if (Z_IS_FALSE_P(zv)) {
 						if (tmp_has_range < 0) {
 							tmp_has_range = 1;
 							tmp_range.underflow = 0;
@@ -3803,7 +3803,7 @@ void zend_func_return_info(const zend_op_array   *op_array,
 								tmp_range.max = MAX(tmp_range.max, 0);
 							}
 						}
-					} else if (Z_TYPE_P(zv) == IS_TRUE) {
+					} else if (Z_IS_TRUE_P(zv)) {
 						if (tmp_has_range < 0) {
 							tmp_has_range = 1;
 							tmp_range.underflow = 0;
@@ -3818,7 +3818,7 @@ void zend_func_return_info(const zend_op_array   *op_array,
 								tmp_range.max = MAX(tmp_range.max, 1);
 							}
 						}
-					} else if (Z_TYPE_P(zv) == IS_LONG) {
+					} else if (Z_IS_LONG_P(zv)) {
 						if (tmp_has_range < 0) {
 							tmp_has_range = 1;
 							tmp_range.underflow = 0;

@@ -649,7 +649,7 @@ zend_op_array *compile_filename(int type, zval *filename)
 	zend_op_array *retval;
 	zend_string *opened_path = NULL;
 
-	if (Z_TYPE_P(filename) != IS_STRING) {
+	if (!Z_IS_STRING_P(filename)) {
 		ZVAL_STR(&tmp, zval_get_string(filename));
 		filename = &tmp;
 	}
@@ -753,7 +753,7 @@ zend_op_array *compile_string(zval *source_string, char *filename)
 	zend_op_array *op_array = NULL;
 	zval tmp;
 
-	if (UNEXPECTED(Z_TYPE_P(source_string) != IS_STRING)) {
+	if (UNEXPECTED(!Z_IS_STRING_P(source_string))) {
 		ZVAL_STR(&tmp, zval_get_string_func(source_string));
 	} else {
 		ZVAL_COPY(&tmp, source_string);
@@ -808,7 +808,7 @@ int highlight_string(zval *str, zend_syntax_highlighter_ini *syntax_highlighter_
 	zend_lex_state original_lex_state;
 	zval tmp;
 
-	if (UNEXPECTED(Z_TYPE_P(str) != IS_STRING)) {
+	if (UNEXPECTED(!Z_IS_STRING_P(str))) {
 		ZVAL_STR(&tmp, zval_get_string_func(str));
 		str = &tmp;
 	}

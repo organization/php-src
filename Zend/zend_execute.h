@@ -77,7 +77,7 @@ static zend_always_inline zval* zend_assign_to_variable(zval *variable_ptr, zval
 					break;
 				}
 			}
-			if (Z_TYPE_P(variable_ptr) == IS_OBJECT &&
+			if (Z_IS_OBJECT_P(variable_ptr) &&
 	    		UNEXPECTED(Z_OBJ_HANDLER_P(variable_ptr, set) != NULL)) {
 				Z_OBJ_HANDLER_P(variable_ptr, set)(variable_ptr, value);
 				return variable_ptr;

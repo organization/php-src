@@ -935,7 +935,7 @@ PHPAPI ZEND_COLD void php_verror(const char *docref, const char *params, int typ
 	}
 
 	if (PG(track_errors) && module_initialized && EG(active) &&
-			(Z_TYPE(EG(user_error_handler)) == IS_UNDEF || !(EG(user_error_handler_error_reporting) & type))) {
+			(Z_IS_UNDEF(EG(user_error_handler)) || !(EG(user_error_handler_error_reporting) & type))) {
 		zval tmp;
 		ZVAL_STRINGL(&tmp, buffer, buffer_len);
 		if (EG(current_execute_data)) {

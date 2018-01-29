@@ -2116,8 +2116,8 @@ static int php_cli_server_dispatch_router(php_cli_server *server, php_cli_server
 
 		ZVAL_UNDEF(&retval);
 		if (SUCCESS == zend_execute_scripts(ZEND_REQUIRE, &retval, 1, &zfd)) {
-			if (Z_TYPE(retval) != IS_UNDEF) {
-				decline = Z_TYPE(retval) == IS_FALSE;
+			if (!Z_IS_UNDEF(retval)) {
+				decline = Z_IS_FALSE(retval);
 				zval_ptr_dtor(&retval);
 			}
 		} else {

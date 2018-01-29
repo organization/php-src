@@ -68,7 +68,7 @@ PHPAPI PHP_FUNCTION(dl)
 	}
 
 	php_dl(filename, MODULE_TEMPORARY, return_value, 0);
-	if (Z_TYPE_P(return_value) == IS_TRUE) {
+	if (Z_IS_TRUE_P(return_value)) {
 		EG(full_tables_cleanup) = 1;
 	}
 }

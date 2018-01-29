@@ -258,7 +258,7 @@ static sb4 oci_bind_output_cb(dvoid *ctx, OCIBind *bindp, ub4 iter, ub4 index, d
 		return OCI_CONTINUE;
 	}
 
-	if (Z_TYPE_P(parameter) == IS_OBJECT || Z_TYPE_P(parameter) == IS_RESOURCE) {
+	if (Z_IS_OBJECT_P(parameter) || Z_IS_RESOURCE_P(parameter)) {
 		return OCI_CONTINUE;
 	}
 
@@ -377,19 +377,19 @@ static int oci_stmt_param_hook(pdo_stmt_t *stmt, struct pdo_bound_param_data *pa
 				if (P->used_for_output) {
 					if (P->indicator == -1) {
 						/* set up a NULL value */
-						if (Z_TYPE_P(parameter) == IS_STRING) {
+						if (Z_IS_STRING_P(parameter)) {
 							/* OCI likes to stick non-terminated strings in things */
 							*Z_STRVAL_P(parameter) = '\0';
 						}
 						zval_dtor(parameter);
 						ZVAL_UNDEF(parameter);
-					} else if (Z_TYPE_P(parameter) == IS_STRING) {
+					} else if (Z_IS_STRING_P(parameter)) {
 						Z_STR_P(parameter) = zend_string_init(Z_STRVAL_P(parameter), P->actual_len, 1);
 					}
 				} else if (PDO_PARAM_TYPE(param->param_type) == PDO_PARAM_LOB && P->thing) {
 					php_stream *stm;
 
-					if (Z_TYPE_P(parameter) == IS_NULL) {
+					if (Z_IS_NULL_P(parameter)) {
 						/* if the param is NULL, then we assume that they
 						 * wanted to bind a lob locator into it from the query
 						 * */
@@ -428,7 +428,7 @@ static int oci_stmt_param_hook(pdo_stmt_t *stmt, struct pdo_bound_param_data *pa
 							} while (1);
 							OCILobClose(S->H->svc, S->err, (OCILobLocator*)P->thing);
 							OCILobFlushBuffer(S->H->svc, S->err, (OCILobLocator*)P->thing, 0);
-						} else if (Z_TYPE_P(parameter) == IS_STRING) {
+						} else if (Z_IS_STRING_P(parameter)) {
 							/* stick the string into the LOB */
 							consume = Z_STRVAL_P(parameter);
 							n = Z_STRLEN_P(parameter);

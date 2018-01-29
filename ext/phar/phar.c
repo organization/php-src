@@ -235,7 +235,7 @@ void phar_destroy_phar_data(phar_archive_data *phar) /* {{{ */
 		HT_FLAGS(&phar->virtual_dirs) = 0;
 	}
 
-	if (Z_TYPE(phar->metadata) != IS_UNDEF) {
+	if (!Z_IS_UNDEF(phar->metadata)) {
 		if (phar->is_persistent) {
 			if (phar->metadata_len) {
 				/* for zip comments that are strings */
@@ -389,7 +389,7 @@ void destroy_phar_manifest_entry_int(phar_entry_info *entry) /* {{{ */
 		entry->fp = 0;
 	}
 
-	if (Z_TYPE(entry->metadata) != IS_UNDEF) {
+	if (!Z_IS_UNDEF(entry->metadata)) {
 		if (entry->is_persistent) {
 			if (entry->metadata_len) {
 				/* for zip comments that are strings */
@@ -1133,7 +1133,7 @@ static int phar_parse_pharfile(php_stream *fp, char *fname, int fname_len, char 
 		switch (entry.flags & PHAR_ENT_COMPRESSION_MASK) {
 			case PHAR_ENT_COMPRESSED_GZ:
 				if (!PHAR_G(has_zlib)) {
-					if (Z_TYPE(entry.metadata) != IS_UNDEF) {
+					if (!Z_IS_UNDEF(entry.metadata)) {
 						if (entry.is_persistent) {
 							free(Z_PTR(entry.metadata));
 						} else {
@@ -1146,7 +1146,7 @@ static int phar_parse_pharfile(php_stream *fp, char *fname, int fname_len, char 
 				break;
 			case PHAR_ENT_COMPRESSED_BZ2:
 				if (!PHAR_G(has_bz2)) {
-					if (Z_TYPE(entry.metadata) != IS_UNDEF) {
+					if (!Z_IS_UNDEF(entry.metadata)) {
 						if (entry.is_persistent) {
 							free(Z_PTR(entry.metadata));
 						} else {
@@ -1159,7 +1159,7 @@ static int phar_parse_pharfile(php_stream *fp, char *fname, int fname_len, char 
 				break;
 			default:
 				if (entry.uncompressed_filesize != entry.compressed_filesize) {
-					if (Z_TYPE(entry.metadata) != IS_UNDEF) {
+					if (!Z_IS_UNDEF(entry.metadata)) {
 						if (entry.is_persistent) {
 							free(Z_PTR(entry.metadata));
 						} else {
@@ -2683,7 +2683,7 @@ int phar_flush(phar_archive_data *phar, char *user_stub, zend_long len, int conv
 
 	/* compress as necessary, calculate crcs, serialize meta-data, manifest size, and file sizes */
 	main_metadata_str.s = NULL;
-	if (Z_TYPE(phar->metadata) != IS_UNDEF) {
+	if (!Z_IS_UNDEF(phar->metadata)) {
 		PHP_VAR_SERIALIZE_INIT(metadata_hash);
 		php_var_serialize(&main_metadata_str, &phar->metadata, &metadata_hash);
 		PHP_VAR_SERIALIZE_DESTROY(metadata_hash);
@@ -2725,7 +2725,7 @@ int phar_flush(phar_archive_data *phar, char *user_stub, zend_long len, int conv
 			/* we use this to calculate API version, 1.1.1 is used for phars with directories */
 			has_dirs = 1;
 		}
-		if (Z_TYPE(entry->metadata) != IS_UNDEF) {
+		if (!Z_IS_UNDEF(entry->metadata)) {
 			if (entry->metadata_str.s) {
 				smart_str_free(&entry->metadata_str);
 			}

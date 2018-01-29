@@ -9,9 +9,9 @@
 static inline int convert_cp(UChar32* pcp, zval *zcp) {
 	zend_long cp = -1;
 
-	if (Z_TYPE_P(zcp) == IS_LONG) {
+	if (Z_IS_LONG_P(zcp)) {
 		cp = Z_LVAL_P(zcp);
-	} else if (Z_TYPE_P(zcp) == IS_STRING) {
+	} else if (Z_IS_STRING_P(zcp)) {
 		int32_t i = 0;
 		size_t zcp_len = Z_STRLEN_P(zcp);
 
@@ -442,7 +442,7 @@ IC_METHOD(foldCase) {
 	}
 
 	ret = u_foldCase(cp, options);
-	if (Z_TYPE_P(zcp) == IS_STRING) {
+	if (Z_IS_STRING_P(zcp)) {
 		char buffer[5];
 		int buffer_len = 0;
 		U8_APPEND_UNSAFE(buffer, buffer_len, ret);
@@ -645,7 +645,7 @@ IC_METHOD(name) { \
 	if ((zend_parse_parameters(ZEND_NUM_ARGS(), "z", &zcp) == FAILURE) || \
 	    (convert_cp(&cp, zcp) == FAILURE)) { return; } \
 	ret = u_##name(cp); \
-	if (Z_TYPE_P(zcp) == IS_STRING) { \
+	if (Z_IS_STRING_P(zcp)) { \
 		char buffer[5]; \
 		int buffer_len = 0; \
 		U8_APPEND_UNSAFE(buffer, buffer_len, ret); \

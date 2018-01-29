@@ -1879,7 +1879,7 @@ static int php_json_parser_object_create(php_json_parser *parser, zval *object)
 static int php_json_parser_object_update(php_json_parser *parser, zval *object, zend_string *key, zval *zvalue)
 {
 	/* if JSON_OBJECT_AS_ARRAY is set */
-	if (Z_TYPE_P(object) == IS_ARRAY) {
+	if (Z_IS_ARRAY_P(object)) {
 		zend_symtable_update(Z_ARRVAL_P(object), key, zvalue);
 	} else {
 		zval zkey;

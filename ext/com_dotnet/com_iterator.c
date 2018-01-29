@@ -57,7 +57,7 @@ static int com_iter_valid(zend_object_iterator *iter)
 {
 	struct php_com_iterator *I = (struct php_com_iterator*)Z_PTR(iter->data);
 
-	if (Z_TYPE(I->zdata) != IS_UNDEF) {
+	if (!Z_IS_UNDEF(I->zdata)) {
 		return SUCCESS;
 	}
 
@@ -91,7 +91,7 @@ static int com_iter_move_forwards(zend_object_iterator *iter)
 	/* release current cached element */
 	VariantClear(&I->v);
 
-	if (Z_TYPE(I->zdata) != IS_UNDEF) {
+	if (!Z_IS_UNDEF(I->zdata)) {
 		zval_ptr_dtor(&I->zdata);
 		ZVAL_UNDEF(&I->zdata);
 	}

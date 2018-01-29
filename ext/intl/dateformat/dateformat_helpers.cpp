@@ -39,7 +39,7 @@ int datefmt_process_calendar_arg(zval* calendar_zv,
 	char *msg;
 	UErrorCode status = UErrorCode();
 
-	if (calendar_zv == NULL || Z_TYPE_P(calendar_zv) == IS_NULL) {
+	if (calendar_zv == NULL || Z_IS_NULL_P(calendar_zv)) {
 
 		// default requested
 		cal = new GregorianCalendar(locale, status);
@@ -47,7 +47,7 @@ int datefmt_process_calendar_arg(zval* calendar_zv,
 
 		cal_int_type = UCAL_GREGORIAN;
 
-	} else if (Z_TYPE_P(calendar_zv) == IS_LONG) {
+	} else if (Z_IS_LONG_P(calendar_zv)) {
 
 		zend_long v = Z_LVAL_P(calendar_zv);
 		if (v != (zend_long)UCAL_TRADITIONAL && v != (zend_long)UCAL_GREGORIAN) {
@@ -68,7 +68,7 @@ int datefmt_process_calendar_arg(zval* calendar_zv,
 
 		cal_int_type = Z_LVAL_P(calendar_zv);
 
-	} else if (Z_TYPE_P(calendar_zv) == IS_OBJECT &&
+	} else if (Z_IS_OBJECT_P(calendar_zv) &&
 			instanceof_function_ex(Z_OBJCE_P(calendar_zv),
 			Calendar_ce_ptr, 0)) {
 

@@ -90,7 +90,7 @@ int fpm_php_apply_defines_ex(struct key_value_s *kv, int mode) /* {{{ */
 	if (!strcmp(name, "extension") && *value) {
 		zval zv;
 		php_dl(value, MODULE_PERSISTENT, &zv, 1);
-		return Z_TYPE(zv) == IS_TRUE;
+		return Z_IS_TRUE(zv);
 	}
 
 	if (fpm_php_zend_ini_alter_master(name, name_len, value, value_len, mode, PHP_INI_STAGE_ACTIVATE) == FAILURE) {
@@ -273,7 +273,7 @@ char* fpm_php_get_string_from_table(zend_string *table, char *key) /* {{{ */
 
 	/* find the table and ensure it's an array */
 	data = zend_hash_find(&EG(symbol_table), table);
-	if (!data || Z_TYPE_P(data) != IS_ARRAY) {
+	if (!data || !Z_IS_ARRAY_P(data)) {
 		return NULL;
 	}
 

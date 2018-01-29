@@ -136,7 +136,7 @@ static int php_dom_iterator_valid(zend_object_iterator *iter) /* {{{ */
 
 	php_dom_iterator *iterator = (php_dom_iterator *)iter;
 
-	if (Z_TYPE(iterator->curobj) != IS_UNDEF) {
+	if (!Z_IS_UNDEF(iterator->curobj)) {
 		return SUCCESS;
 	} else {
 		return FAILURE;

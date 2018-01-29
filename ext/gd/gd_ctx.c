@@ -134,13 +134,13 @@ static void _php_image_output_ctx(INTERNAL_FUNCTION_PARAMETERS, int image_type, 
 	}
 
 	if (argc > 1 && to_zval != NULL) {
-		if (Z_TYPE_P(to_zval) == IS_RESOURCE) {
+		if (Z_IS_RESOURCE_P(to_zval)) {
 			php_stream_from_zval_no_verify(stream, to_zval);
 			if (stream == NULL) {
 				RETURN_FALSE;
 			}
 			close_stream = 0;
-		} else if (Z_TYPE_P(to_zval) == IS_STRING) {
+		} else if (Z_IS_STRING_P(to_zval)) {
 			if (CHECK_ZVAL_NULL_PATH(to_zval)) {
 				php_error_docref(NULL, E_WARNING, "Invalid 2nd parameter, filename must not contain null bytes");
 				RETURN_FALSE;

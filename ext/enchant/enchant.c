@@ -183,7 +183,7 @@ enumerate_providers_fn (const char * const name,
 	add_assoc_string(&tmp_array, "desc", (char *)desc);
 	add_assoc_string(&tmp_array, "file", (char *)file);
 
-	if (Z_TYPE_P(zdesc)!=IS_ARRAY) {
+	if (!Z_IS_ARRAY_P(zdesc)) {
 		array_init(zdesc);
 	}
 
@@ -220,7 +220,7 @@ static void php_enchant_list_dicts_fn( const char * const lang_tag,
 	add_assoc_string(&tmp_array, "provider_desc", (char *)provider_desc);
 	add_assoc_string(&tmp_array, "provider_file", (char *)provider_file);
 
-	if (Z_TYPE_P(zdesc) != IS_ARRAY) {
+	if (!Z_IS_ARRAY_P(zdesc)) {
 		array_init(zdesc);
 	}
 	add_next_index_zval(zdesc, &tmp_array);

@@ -1003,7 +1003,7 @@ static char* guess_timezone(const timelib_tzdb *tzdb)
 		zval *ztz;
 
 		if (NULL != (ztz = cfg_get_entry("date.timezone", sizeof("date.timezone")))
-			&& Z_TYPE_P(ztz) == IS_STRING && Z_STRLEN_P(ztz) > 0 && timelib_timezone_id_is_valid(Z_STRVAL_P(ztz), tzdb)) {
+			&& Z_IS_STRING_P(ztz) && Z_STRLEN_P(ztz) > 0 && timelib_timezone_id_is_valid(Z_STRVAL_P(ztz), tzdb)) {
 			return Z_STRVAL_P(ztz);
 		}
 	} else if (*DATEG(default_timezone)) {
@@ -1883,7 +1883,7 @@ static void date_period_it_invalidate_current(zend_object_iterator *iter)
 {
 	date_period_it *iterator = (date_period_it *)iter;
 
-	if (Z_TYPE(iterator->current) != IS_UNDEF) {
+	if (!Z_IS_UNDEF(iterator->current)) {
 		zval_ptr_dtor(&iterator->current);
 		ZVAL_UNDEF(&iterator->current);
 	}
@@ -2034,7 +2034,7 @@ static int date_interval_has_property(zval *object, zval *member, int type, void
 	zval *prop;
 	int retval = 0;
 
-	if (UNEXPECTED(Z_TYPE_P(member) != IS_STRING)) {
+	if (UNEXPECTED(!Z_IS_STRING_P(member))) {
 		ZVAL_STR(&tmp_member, zval_get_string_func(member));
 		member = &tmp_member;
 		cache_slot = NULL;
@@ -2058,7 +2058,7 @@ static int date_interval_has_property(zval *object, zval *member, int type, void
 		} else if (type == 1) {
 			retval = zend_is_true(prop);
 		} else if (type == 0) {
-			retval = (Z_TYPE_P(prop) != IS_NULL);
+			retval = (!Z_IS_NULL_P(prop));
 		}
 	} else {
 		retval = (zend_get_std_object_handlers())->has_property(object, member, type, cache_slot);
@@ -2867,11 +2867,11 @@ static int php_date_initialize_from_hash(php_date_obj **dateobj, HashTable *myht
 	php_timezone_obj *tzobj;
 
 	z_date = zend_hash_str_find(myht, "date", sizeof("data")-1);
-	if (z_date && Z_TYPE_P(z_date) == IS_STRING) {
+	if (z_date && Z_IS_STRING_P(z_date)) {
 		z_timezone_type = zend_hash_str_find(myht, "timezone_type", sizeof("timezone_type")-1);
-		if (z_timezone_type && Z_TYPE_P(z_timezone_type) == IS_LONG) {
+		if (z_timezone_type && Z_IS_LONG_P(z_timezone_type)) {
 			z_timezone = zend_hash_str_find(myht, "timezone", sizeof("timezone")-1);
-			if (z_timezone && Z_TYPE_P(z_timezone) == IS_STRING) {
+			if (z_timezone && Z_IS_STRING_P(z_timezone)) {
 				switch (Z_LVAL_P(z_timezone_type)) {
 					case TIMELIB_ZONETYPE_OFFSET:
 					case TIMELIB_ZONETYPE_ABBR: {
@@ -3820,10 +3820,10 @@ static int php_date_timezone_initialize_from_hash(zval **return_value, php_timez
 
 	if ((z_timezone_type = zend_hash_str_find(myht, "timezone_type", sizeof("timezone_type") - 1)) != NULL) {
 		if ((z_timezone = zend_hash_str_find(myht, "timezone", sizeof("timezone") - 1)) != NULL) {
-			if (Z_TYPE_P(z_timezone_type) != IS_LONG) {
+			if (!Z_IS_LONG_P(z_timezone_type)) {
 				return FAILURE;
 			}
-			if (Z_TYPE_P(z_timezone) != IS_STRING) {
+			if (!Z_IS_STRING_P(z_timezone)) {
 				return FAILURE;
 			}
 			if (SUCCESS == timezone_initialize(*tzobj, Z_STRVAL_P(z_timezone), Z_STRLEN_P(z_timezone))) {
@@ -4122,7 +4122,7 @@ zval *date_interval_read_property(zval *object, zval *member, int type, void **c
 	timelib_sll value = -1;
 	double      fvalue = -1;
 
- 	if (Z_TYPE_P(member) != IS_STRING) {
+ 	if (!Z_IS_STRING_P(member)) {
 		ZVAL_STR(&tmp_member, zval_get_string_func(member));
 		member = &tmp_member;
 		cache_slot = NULL;
@@ -4190,7 +4190,7 @@ void date_interval_write_property(zval *object, zval *member, zval *value, void 
 	php_interval_obj *obj;
 	zval tmp_member;
 
- 	if (Z_TYPE_P(member) != IS_STRING) {
+ 	if (!Z_IS_STRING_P(member)) {
 		ZVAL_STR(&tmp_member, zval_get_string_func(member));
 		member = &tmp_member;
 		cache_slot = NULL;
@@ -4239,7 +4239,7 @@ static zval *date_interval_get_property_ptr_ptr(zval *object, zval *member, int 
 {
 	zval tmp_member, *ret;
 
-	if (Z_TYPE_P(member) != IS_STRING) {
+	if (!Z_IS_STRING_P(member)) {
 		ZVAL_STR(&tmp_member, zval_get_string_func(member));
 		member = &tmp_member;
 		cache_slot = NULL;
@@ -5138,12 +5138,12 @@ static int php_date_period_initialize_from_hash(php_period_obj *period_obj, Hash
 
 	ht_entry = zend_hash_str_find(myht, "start", sizeof("start")-1);
 	if (ht_entry) {
-		if (Z_TYPE_P(ht_entry) == IS_OBJECT && Z_OBJCE_P(ht_entry) == date_ce_date) {
+		if (Z_IS_OBJECT_P(ht_entry) && Z_OBJCE_P(ht_entry) == date_ce_date) {
 			php_date_obj *date_obj;
 			date_obj = Z_PHPDATE_P(ht_entry);
 			period_obj->start = timelib_time_clone(date_obj->time);
 			period_obj->start_ce = Z_OBJCE_P(ht_entry);
-		} else if (Z_TYPE_P(ht_entry) != IS_NULL) {
+		} else if (!Z_IS_NULL_P(ht_entry)) {
 			return 0;
 		}
 	} else {
@@ -5152,11 +5152,11 @@ static int php_date_period_initialize_from_hash(php_period_obj *period_obj, Hash
 
 	ht_entry = zend_hash_str_find(myht, "end", sizeof("end")-1);
 	if (ht_entry) {
-		if (Z_TYPE_P(ht_entry) == IS_OBJECT && Z_OBJCE_P(ht_entry) == date_ce_date) {
+		if (Z_IS_OBJECT_P(ht_entry) && Z_OBJCE_P(ht_entry) == date_ce_date) {
 			php_date_obj *date_obj;
 			date_obj = Z_PHPDATE_P(ht_entry);
 			period_obj->end = timelib_time_clone(date_obj->time);
-		} else if (Z_TYPE_P(ht_entry) != IS_NULL) {
+		} else if (!Z_IS_NULL_P(ht_entry)) {
 			return 0;
 		}
 	} else {
@@ -5165,11 +5165,11 @@ static int php_date_period_initialize_from_hash(php_period_obj *period_obj, Hash
 
 	ht_entry = zend_hash_str_find(myht, "current", sizeof("current")-1);
 	if (ht_entry) {
-		if (Z_TYPE_P(ht_entry) == IS_OBJECT && Z_OBJCE_P(ht_entry) == date_ce_date) {
+		if (Z_IS_OBJECT_P(ht_entry) && Z_OBJCE_P(ht_entry) == date_ce_date) {
 			php_date_obj *date_obj;
 			date_obj = Z_PHPDATE_P(ht_entry);
 			period_obj->current = timelib_time_clone(date_obj->time);
-		} else if (Z_TYPE_P(ht_entry) != IS_NULL)  {
+		} else if (!Z_IS_NULL_P(ht_entry))  {
 			return 0;
 		}
 	} else {
@@ -5178,7 +5178,7 @@ static int php_date_period_initialize_from_hash(php_period_obj *period_obj, Hash
 
 	ht_entry = zend_hash_str_find(myht, "interval", sizeof("interval")-1);
 	if (ht_entry) {
-		if (Z_TYPE_P(ht_entry) == IS_OBJECT && Z_OBJCE_P(ht_entry) == date_ce_interval) {
+		if (Z_IS_OBJECT_P(ht_entry) && Z_OBJCE_P(ht_entry) == date_ce_interval) {
 			php_interval_obj *interval_obj;
 			interval_obj = Z_PHPINTERVAL_P(ht_entry);
 			period_obj->interval = timelib_rel_time_clone(interval_obj->diff);
@@ -5191,7 +5191,7 @@ static int php_date_period_initialize_from_hash(php_period_obj *period_obj, Hash
 
 	ht_entry = zend_hash_str_find(myht, "recurrences", sizeof("recurrences")-1);
 	if (ht_entry &&
-			Z_TYPE_P(ht_entry) == IS_LONG && Z_LVAL_P(ht_entry) >= 0 && Z_LVAL_P(ht_entry) <= INT_MAX) {
+			Z_IS_LONG_P(ht_entry) && Z_LVAL_P(ht_entry) >= 0 && Z_LVAL_P(ht_entry) <= INT_MAX) {
 		period_obj->recurrences = Z_LVAL_P(ht_entry);
 	} else {
 		return 0;
@@ -5199,8 +5199,8 @@ static int php_date_period_initialize_from_hash(php_period_obj *period_obj, Hash
 
 	ht_entry = zend_hash_str_find(myht, "include_start_date", sizeof("include_start_date")-1);
 	if (ht_entry &&
-			(Z_TYPE_P(ht_entry) == IS_FALSE || Z_TYPE_P(ht_entry) == IS_TRUE)) {
-		period_obj->include_start_date = (Z_TYPE_P(ht_entry) == IS_TRUE);
+			(Z_IS_FALSE_P(ht_entry) || Z_IS_TRUE_P(ht_entry))) {
+		period_obj->include_start_date = (Z_IS_TRUE_P(ht_entry));
 	} else {
 		return 0;
 	}
@@ -5262,7 +5262,7 @@ static zval *date_period_read_property(zval *object, zval *member, int type, voi
 	Z_OBJPROP_P(object); /* build properties hash table */
 
 	zv = std_object_handlers.read_property(object, member, type, cache_slot, rv);
-	if (Z_TYPE_P(zv) == IS_OBJECT && Z_OBJ_HANDLER_P(zv, clone_obj)) {
+	if (Z_IS_OBJECT_P(zv) && Z_OBJ_HANDLER_P(zv, clone_obj)) {
 		/* defensive copy */
 		ZVAL_OBJ(zv, Z_OBJ_HANDLER_P(zv, clone_obj)(zv));
 	}

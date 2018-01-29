@@ -973,11 +973,11 @@ static inline php_output_handler_status_t php_output_handler_op(php_output_handl
 			zend_fcall_info_argn(&handler->func.user->fci, 2, &ob_data, &ob_mode);
 			zval_ptr_dtor(&ob_data);
 
-#define PHP_OUTPUT_USER_SUCCESS(retval) ((Z_TYPE(retval) != IS_UNDEF) && !(Z_TYPE(retval) == IS_FALSE))
+#define PHP_OUTPUT_USER_SUCCESS(retval) ((!Z_IS_UNDEF(retval)) && !(Z_IS_FALSE(retval)))
 			if (SUCCESS == zend_fcall_info_call(&handler->func.user->fci, &handler->func.user->fcc, &retval, NULL) && PHP_OUTPUT_USER_SUCCESS(retval)) {
 				/* user handler may have returned TRUE */
 				status = PHP_OUTPUT_HANDLER_NO_DATA;
-				if (Z_TYPE(retval) != IS_FALSE && Z_TYPE(retval) != IS_TRUE) {
+				if (!Z_IS_FALSE(retval) && !Z_IS_TRUE(retval)) {
 					convert_to_string_ex(&retval);
 					if (Z_STRLEN(retval)) {
 						context->out.data = estrndup(Z_STRVAL(retval), Z_STRLEN(retval));

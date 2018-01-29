@@ -55,11 +55,11 @@ enum {
 static PHP_INI_MH(OnChangeCallback) /* {{{ */
 {
 	if (EG(current_execute_data)) {
-		if (Z_TYPE(ASSERTG(callback)) != IS_UNDEF) {
+		if (!Z_IS_UNDEF(ASSERTG(callback))) {
 			zval_ptr_dtor(&ASSERTG(callback));
 			ZVAL_UNDEF(&ASSERTG(callback));
 		}
-		if (new_value && (Z_TYPE(ASSERTG(callback)) != IS_UNDEF || ZSTR_LEN(new_value))) {
+		if (new_value && (!Z_IS_UNDEF(ASSERTG(callback)) || ZSTR_LEN(new_value))) {
 			ZVAL_STR_COPY(&ASSERTG(callback), new_value);
 		}
 	} else {
@@ -128,7 +128,7 @@ PHP_MSHUTDOWN_FUNCTION(assert) /* {{{ */
 
 PHP_RSHUTDOWN_FUNCTION(assert) /* {{{ */
 {
-	if (Z_TYPE(ASSERTG(callback)) != IS_UNDEF) {
+	if (!Z_IS_UNDEF(ASSERTG(callback))) {
 		zval_ptr_dtor(&ASSERTG(callback));
 		ZVAL_UNDEF(&ASSERTG(callback));
 	}
@@ -163,7 +163,7 @@ PHP_FUNCTION(assert)
 		Z_PARAM_ZVAL(description)
 	ZEND_PARSE_PARAMETERS_END();
 
-	if (Z_TYPE_P(assertion) == IS_STRING) {
+	if (Z_IS_STRING_P(assertion)) {
 		zval retval;
 		int old_error_reporting = 0; /* shut up gcc! */
 
@@ -202,7 +202,7 @@ PHP_FUNCTION(assert)
 		}
 
 		convert_to_boolean(&retval);
-		val = Z_TYPE(retval) == IS_TRUE;
+		val = Z_IS_TRUE(retval);
 	} else {
 		val = zend_is_true(assertion);
 	}
@@ -211,11 +211,11 @@ PHP_FUNCTION(assert)
 		RETURN_TRUE;
 	}
 
-	if (Z_TYPE(ASSERTG(callback)) == IS_UNDEF && ASSERTG(cb)) {
+	if (Z_IS_UNDEF(ASSERTG(callback)) && ASSERTG(cb)) {
 		ZVAL_STRING(&ASSERTG(callback), ASSERTG(cb));
 	}
 
-	if (Z_TYPE(ASSERTG(callback)) != IS_UNDEF) {
+	if (!Z_IS_UNDEF(ASSERTG(callback))) {
 		zval args[4];
 		zval retval;
 		int i;
@@ -248,7 +248,7 @@ PHP_FUNCTION(assert)
 	if (ASSERTG(exception)) {
 		if (!description) {
 			zend_throw_exception(assertion_error_ce, NULL, E_ERROR);
-		} else if (Z_TYPE_P(description) == IS_OBJECT &&
+		} else if (Z_IS_OBJECT_P(description) &&
 			instanceof_function(Z_OBJCE_P(description), zend_ce_throwable)) {
 			Z_ADDREF_P(description);
 			zend_throw_exception_object(description);
@@ -349,7 +349,7 @@ PHP_FUNCTION(assert_options)
 		break;
 
 	case ASSERT_CALLBACK:
-		if (Z_TYPE(ASSERTG(callback)) != IS_UNDEF) {
+		if (!Z_IS_UNDEF(ASSERTG(callback))) {
 			ZVAL_COPY(return_value, &ASSERTG(callback));
 		} else if (ASSERTG(cb)) {
 			RETVAL_STRING(ASSERTG(cb));

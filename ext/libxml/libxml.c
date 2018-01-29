@@ -634,10 +634,10 @@ static xmlParserInputPtr _php_libxml_external_entity_loader(const char *URL,
 					"Call to user entity loader callback '%s' has failed; "
 					"probably it has thrown an exception",
 					fci->function_name);
-		} else */ if (Z_TYPE(retval) == IS_STRING) {
+		} else */ if (Z_IS_STRING(retval)) {
 is_string:
 			resource = Z_STRVAL(retval);
-		} else if (Z_TYPE(retval) == IS_RESOURCE) {
+		} else if (Z_IS_RESOURCE(retval)) {
 			php_stream *stream;
 			php_stream_from_zval_no_verify(stream, &retval);
 			if (stream == NULL) {
@@ -665,7 +665,7 @@ is_string:
 					}
 				}
 			}
-		} else if (Z_TYPE(retval) != IS_NULL) {
+		} else if (!Z_IS_NULL(retval)) {
 			/* retval not string nor resource nor null; convert to string */
 			convert_to_string(&retval);
 			goto is_string;
@@ -1179,7 +1179,7 @@ PHP_LIBXML_API xmlNodePtr php_libxml_import_node(zval *object)
 	xmlNodePtr node = NULL;
 	php_libxml_func_handler *export_hnd;
 
-	if (Z_TYPE_P(object) == IS_OBJECT) {
+	if (Z_IS_OBJECT_P(object)) {
 		ce = Z_OBJCE_P(object);
 		while (ce->parent != NULL) {
 			ce = ce->parent;

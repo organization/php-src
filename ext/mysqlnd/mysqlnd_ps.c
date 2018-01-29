@@ -786,7 +786,7 @@ mysqlnd_stmt_fetch_row_buffered(MYSQLND_RES * result, void * param, const unsign
 							  String of zero size, definitely can't be the next max_length.
 							  Thus for NULL and zero-length we are quite efficient.
 							*/
-							if (Z_TYPE(current_row[i]) == IS_STRING) {
+							if (Z_IS_STRING(current_row[i])) {
 								zend_ulong len = Z_STRLEN(current_row[i]);
 								if (meta->fields[i].max_length < len) {
 									meta->fields[i].max_length = len;
@@ -807,7 +807,7 @@ mysqlnd_stmt_fetch_row_buffered(MYSQLND_RES * result, void * param, const unsign
 					/* copy the type */
 					if (stmt->result_bind[i].bound == TRUE) {
 						DBG_INF_FMT("i=%u type=%u", i, Z_TYPE(current_row[i]));
-						if (Z_TYPE(current_row[i]) != IS_NULL) {
+						if (!Z_IS_NULL(current_row[i])) {
 							/*
 							  Copy the value.
 							  Pre-condition is that the zvals in the result_bind buffer
@@ -915,7 +915,7 @@ mysqlnd_stmt_fetch_row_unbuffered(MYSQLND_RES * result, void * param, const unsi
 					zval_dtor(result);
 #endif
 					if (!Z_ISNULL_P(data)) {
-						if ((Z_TYPE_P(data) == IS_STRING) && (meta->fields[i].max_length < (zend_ulong) Z_STRLEN_P(data))){
+						if ((Z_IS_STRING_P(data)) && (meta->fields[i].max_length < (zend_ulong) Z_STRLEN_P(data))){
 							meta->fields[i].max_length = Z_STRLEN_P(data);
 						}
 						ZVAL_COPY_VALUE(result, data);
@@ -1104,7 +1104,7 @@ mysqlnd_fetch_stmt_row_cursor(MYSQLND_RES * result, void * param, const unsigned
 							   	Z_REFCOUNT(stmt->result_bind[i].zv) : 0);
 
 					if (!Z_ISNULL_P(data)) {
-						if ((Z_TYPE_P(data) == IS_STRING) &&
+						if ((Z_IS_STRING_P(data)) &&
 								(meta->fields[i].max_length < (zend_ulong) Z_STRLEN_P(data))) {
 							meta->fields[i].max_length = Z_STRLEN_P(data);
 						}

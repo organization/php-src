@@ -1226,12 +1226,12 @@ PHPAPI void php_implode(const zend_string *glue, zval *pieces, zval *return_valu
 	ptr = strings = do_alloca((sizeof(*strings)) * numelems, use_heap);
 
 	ZEND_HASH_FOREACH_VAL(Z_ARRVAL_P(pieces), tmp) {
-		if (EXPECTED(Z_TYPE_P(tmp) == IS_STRING)) {
+		if (EXPECTED(Z_IS_STRING_P(tmp))) {
 			ptr->str = Z_STR_P(tmp);
 			len += ZSTR_LEN(ptr->str);
 			ptr->lval = 0;
 			ptr++;
-		} else if (UNEXPECTED(Z_TYPE_P(tmp) == IS_LONG)) {
+		} else if (UNEXPECTED(Z_IS_LONG_P(tmp))) {
 			zend_long val = Z_LVAL_P(tmp);
 
 			ptr->str = NULL;
@@ -1299,7 +1299,7 @@ PHP_FUNCTION(implode)
 	ZEND_PARSE_PARAMETERS_END();
 
 	if (arg2 == NULL) {
-		if (Z_TYPE_P(arg1) != IS_ARRAY) {
+		if (!Z_IS_ARRAY_P(arg1)) {
 			php_error_docref(NULL, E_WARNING, "Argument must be an array");
 			return;
 		}
@@ -1308,10 +1308,10 @@ PHP_FUNCTION(implode)
 		tmp_glue = NULL;
 		pieces = arg1;
 	} else {
-		if (Z_TYPE_P(arg1) == IS_ARRAY) {
+		if (Z_IS_ARRAY_P(arg1)) {
 			glue = zval_get_tmp_string(arg2, &tmp_glue);
 			pieces = arg1;
-		} else if (Z_TYPE_P(arg2) == IS_ARRAY) {
+		} else if (Z_IS_ARRAY_P(arg2)) {
 			glue = zval_get_tmp_string(arg1, &tmp_glue);
 			pieces = arg2;
 		} else {
@@ -1860,7 +1860,7 @@ PHP_FUNCTION(stristr)
 
 	haystack_dup = estrndup(ZSTR_VAL(haystack), ZSTR_LEN(haystack));
 
-	if (Z_TYPE_P(needle) == IS_STRING) {
+	if (Z_IS_STRING_P(needle)) {
 		char *orig_needle;
 		if (!Z_STRLEN_P(needle)) {
 			php_error_docref(NULL, E_WARNING, "Empty needle");
@@ -1913,7 +1913,7 @@ PHP_FUNCTION(strstr)
 		Z_PARAM_BOOL(part)
 	ZEND_PARSE_PARAMETERS_END();
 
-	if (Z_TYPE_P(needle) == IS_STRING) {
+	if (Z_IS_STRING_P(needle)) {
 		if (!Z_STRLEN_P(needle)) {
 			php_error_docref(NULL, E_WARNING, "Empty needle");
 			RETURN_FALSE;
@@ -1970,7 +1970,7 @@ PHP_FUNCTION(strpos)
 		RETURN_FALSE;
 	}
 
-	if (Z_TYPE_P(needle) == IS_STRING) {
+	if (Z_IS_STRING_P(needle)) {
 		if (!Z_STRLEN_P(needle)) {
 			php_error_docref(NULL, E_WARNING, "Empty needle");
 			RETURN_FALSE;
@@ -2030,7 +2030,7 @@ PHP_FUNCTION(stripos)
 		RETURN_FALSE;
 	}
 
-	if (Z_TYPE_P(needle) == IS_STRING) {
+	if (Z_IS_STRING_P(needle)) {
 		if (Z_STRLEN_P(needle) == 0 || Z_STRLEN_P(needle) > ZSTR_LEN(haystack)) {
 			RETURN_FALSE;
 		}
@@ -2085,7 +2085,7 @@ PHP_FUNCTION(strrpos)
 		Z_PARAM_LONG(offset)
 	ZEND_PARSE_PARAMETERS_END_EX(RETURN_FALSE);
 
-	if (Z_TYPE_P(zneedle) == IS_STRING) {
+	if (Z_IS_STRING_P(zneedle)) {
 		needle = Z_STRVAL_P(zneedle);
 		needle_len = Z_STRLEN_P(zneedle);
 	} else {
@@ -2150,7 +2150,7 @@ PHP_FUNCTION(strripos)
 	ZEND_PARSE_PARAMETERS_END_EX(RETURN_FALSE);
 
 	ZSTR_ALLOCA_ALLOC(ord_needle, 1, use_heap);
-	if (Z_TYPE_P(zneedle) == IS_STRING) {
+	if (Z_IS_STRING_P(zneedle)) {
 		needle = Z_STR_P(zneedle);
 	} else {
 		if (php_needle_char(zneedle, ZSTR_VAL(ord_needle)) != SUCCESS) {
@@ -2253,7 +2253,7 @@ PHP_FUNCTION(strrchr)
 		Z_PARAM_ZVAL(needle)
 	ZEND_PARSE_PARAMETERS_END();
 
-	if (Z_TYPE_P(needle) == IS_STRING) {
+	if (Z_IS_STRING_P(needle)) {
 		found = zend_memrchr(ZSTR_VAL(haystack), *Z_STRVAL_P(needle), ZSTR_LEN(haystack));
 	} else {
 		char needle_chr;
@@ -2466,36 +2466,36 @@ PHP_FUNCTION(substr_replace)
 		Z_PARAM_ZVAL(len)
 	ZEND_PARSE_PARAMETERS_END();
 
-	if (Z_TYPE_P(str) != IS_ARRAY) {
+	if (!Z_IS_ARRAY_P(str)) {
 		convert_to_string_ex(str);
 	}
-	if (Z_TYPE_P(repl) != IS_ARRAY) {
+	if (!Z_IS_ARRAY_P(repl)) {
 		convert_to_string_ex(repl);
 	}
-	if (Z_TYPE_P(from) != IS_ARRAY) {
+	if (!Z_IS_ARRAY_P(from)) {
 		convert_to_long_ex(from);
 	}
 
 	if (argc > 3) {
-		if (Z_TYPE_P(len) != IS_ARRAY) {
+		if (!Z_IS_ARRAY_P(len)) {
 			convert_to_long_ex(len);
 			l = Z_LVAL_P(len);
 		}
 	} else {
-		if (Z_TYPE_P(str) != IS_ARRAY) {
+		if (!Z_IS_ARRAY_P(str)) {
 			l = Z_STRLEN_P(str);
 		}
 	}
 
-	if (Z_TYPE_P(str) == IS_STRING) {
+	if (Z_IS_STRING_P(str)) {
 		if (
-			(argc == 3 && Z_TYPE_P(from) == IS_ARRAY) ||
+			(argc == 3 && Z_IS_ARRAY_P(from)) ||
 			(argc == 4 && Z_TYPE_P(from) != Z_TYPE_P(len))
 		) {
 			php_error_docref(NULL, E_WARNING, "'start' and 'length' should be of same type - numerical or array ");
 			RETURN_STR_COPY(Z_STR_P(str));
 		}
-		if (argc == 4 && Z_TYPE_P(from) == IS_ARRAY) {
+		if (argc == 4 && Z_IS_ARRAY_P(from)) {
 			if (zend_hash_num_elements(Z_ARRVAL_P(from)) != zend_hash_num_elements(Z_ARRVAL_P(len))) {
 				php_error_docref(NULL, E_WARNING, "'start' and 'length' should have the same number of elements");
 				RETURN_STR_COPY(Z_STR_P(str));
@@ -2503,8 +2503,8 @@ PHP_FUNCTION(substr_replace)
 		}
 	}
 
-	if (Z_TYPE_P(str) != IS_ARRAY) {
-		if (Z_TYPE_P(from) != IS_ARRAY) {
+	if (!Z_IS_ARRAY_P(str)) {
+		if (!Z_IS_ARRAY_P(from)) {
 			zend_string *repl_str;
 			zend_string *tmp_repl_str = NULL;
 			f = Z_LVAL_P(from);
@@ -2537,11 +2537,11 @@ PHP_FUNCTION(substr_replace)
 			if ((f + l) > (zend_long)Z_STRLEN_P(str)) {
 				l = Z_STRLEN_P(str) - f;
 			}
-			if (Z_TYPE_P(repl) == IS_ARRAY) {
+			if (Z_IS_ARRAY_P(repl)) {
 				repl_idx = 0;
 				while (repl_idx < Z_ARRVAL_P(repl)->nNumUsed) {
 					tmp_repl = &Z_ARRVAL_P(repl)->arData[repl_idx].val;
-					if (Z_TYPE_P(tmp_repl) != IS_UNDEF) {
+					if (!Z_IS_UNDEF_P(tmp_repl)) {
 						break;
 					}
 					repl_idx++;
@@ -2582,10 +2582,10 @@ PHP_FUNCTION(substr_replace)
 			zend_string *tmp_orig_str;
 			zend_string *orig_str = zval_get_tmp_string(tmp_str, &tmp_orig_str);
 
-			if (Z_TYPE_P(from) == IS_ARRAY) {
+			if (Z_IS_ARRAY_P(from)) {
 				while (from_idx < Z_ARRVAL_P(from)->nNumUsed) {
 					tmp_from = &Z_ARRVAL_P(from)->arData[from_idx].val;
-					if (Z_TYPE_P(tmp_from) != IS_UNDEF) {
+					if (!Z_IS_UNDEF_P(tmp_from)) {
 						break;
 					}
 					from_idx++;
@@ -2617,10 +2617,10 @@ PHP_FUNCTION(substr_replace)
 				}
 			}
 
-			if (argc > 3 && Z_TYPE_P(len) == IS_ARRAY) {
+			if (argc > 3 && Z_IS_ARRAY_P(len)) {
 				while (len_idx < Z_ARRVAL_P(len)->nNumUsed) {
 					tmp_len = &Z_ARRVAL_P(len)->arData[len_idx].val;
-					if (Z_TYPE_P(tmp_len) != IS_UNDEF) {
+					if (!Z_IS_UNDEF_P(tmp_len)) {
 						break;
 					}
 					len_idx++;
@@ -2650,10 +2650,10 @@ PHP_FUNCTION(substr_replace)
 
 			result_len = ZSTR_LEN(orig_str) - l;
 
-			if (Z_TYPE_P(repl) == IS_ARRAY) {
+			if (Z_IS_ARRAY_P(repl)) {
 				while (repl_idx < Z_ARRVAL_P(repl)->nNumUsed) {
 					tmp_repl = &Z_ARRVAL_P(repl)->arData[repl_idx].val;
-					if (Z_TYPE_P(tmp_repl) != IS_UNDEF) {
+					if (!Z_IS_UNDEF_P(tmp_repl)) {
 						break;
 					}
 					repl_idx++;
@@ -3451,7 +3451,7 @@ PHP_FUNCTION(strtr)
 		Z_PARAM_STRING(to, to_len)
 	ZEND_PARSE_PARAMETERS_END();
 
-	if (ac == 2 && Z_TYPE_P(from) != IS_ARRAY) {
+	if (ac == 2 && !Z_IS_ARRAY_P(from)) {
 		php_error_docref(NULL, E_WARNING, "The second argument is not an array");
 		RETURN_FALSE;
 	}
@@ -4197,11 +4197,11 @@ static zend_long php_str_replace_in_subject(zval *search, zval *replace, zval *s
 	}
 
 	/* If search is an array */
-	if (Z_TYPE_P(search) == IS_ARRAY) {
+	if (Z_IS_ARRAY_P(search)) {
 		/* Duplicate subject string for repeated replacement */
 		ZVAL_STR_COPY(result, subject_str);
 
-		if (Z_TYPE_P(replace) == IS_ARRAY) {
+		if (Z_IS_ARRAY_P(replace)) {
 			replace_idx = 0;
 		} else {
 			/* Set replacement value to the passed one */
@@ -4216,7 +4216,7 @@ static zend_long php_str_replace_in_subject(zval *search, zval *replace, zval *s
 			zend_string *search_str = zval_get_tmp_string(search_entry, &tmp_search_str);
 
 			if (ZSTR_LEN(search_str) == 0) {
-				if (Z_TYPE_P(replace) == IS_ARRAY) {
+				if (Z_IS_ARRAY_P(replace)) {
 					replace_idx++;
 				}
 				zend_tmp_string_release(tmp_search_str);
@@ -4224,11 +4224,11 @@ static zend_long php_str_replace_in_subject(zval *search, zval *replace, zval *s
 			}
 
 			/* If replace is an array. */
-			if (Z_TYPE_P(replace) == IS_ARRAY) {
+			if (Z_IS_ARRAY_P(replace)) {
 				/* Get current entry */
 				while (replace_idx < Z_ARRVAL_P(replace)->nNumUsed) {
 					replace_entry = &Z_ARRVAL_P(replace)->arData[replace_idx].val;
-					if (Z_TYPE_P(replace_entry) != IS_UNDEF) {
+					if (!Z_IS_UNDEF_P(replace_entry)) {
 						break;
 					}
 					replace_idx++;
@@ -4303,7 +4303,7 @@ static zend_long php_str_replace_in_subject(zval *search, zval *replace, zval *s
 			zend_string_release(lc_subject_str);
 		}
 	} else {
-		ZEND_ASSERT(Z_TYPE_P(search) == IS_STRING);
+		ZEND_ASSERT(Z_IS_STRING_P(search));
 		if (Z_STRLEN_P(search) == 1) {
 			ZVAL_STR(result,
 				php_char_to_str_ex(subject_str,
@@ -4353,24 +4353,24 @@ static void php_str_replace_common(INTERNAL_FUNCTION_PARAMETERS, int case_sensit
 	ZEND_PARSE_PARAMETERS_END();
 
 	/* Make sure we're dealing with strings and do the replacement. */
-	if (Z_TYPE_P(search) != IS_ARRAY) {
+	if (!Z_IS_ARRAY_P(search)) {
 		convert_to_string_ex(search);
-		if (Z_TYPE_P(replace) != IS_STRING) {
+		if (!Z_IS_STRING_P(replace)) {
 			convert_to_string_ex(replace);
 		}
-	} else if (Z_TYPE_P(replace) != IS_ARRAY) {
+	} else if (!Z_IS_ARRAY_P(replace)) {
 		convert_to_string_ex(replace);
 	}
 
 	/* if subject is an array */
-	if (Z_TYPE_P(subject) == IS_ARRAY) {
+	if (Z_IS_ARRAY_P(subject)) {
 		array_init(return_value);
 
 		/* For each subject entry, convert it to string, then perform replacement
 		   and add the result to the return_value array. */
 		ZEND_HASH_FOREACH_KEY_VAL(Z_ARRVAL_P(subject), num_key, string_key, subject_entry) {
 			ZVAL_DEREF(subject_entry);
-			if (Z_TYPE_P(subject_entry) != IS_ARRAY && Z_TYPE_P(subject_entry) != IS_OBJECT) {
+			if (!Z_IS_ARRAY_P(subject_entry) && !Z_IS_OBJECT_P(subject_entry)) {
 				count += php_str_replace_in_subject(search, replace, subject_entry, &result, case_sensitivity);
 			} else {
 				ZVAL_COPY(&result, subject_entry);
@@ -4730,10 +4730,10 @@ PHP_FUNCTION(setlocale)
 #ifdef HAVE_SETLOCALE
 	idx = 0;
 	while (1) {
-		if (Z_TYPE(args[0]) == IS_ARRAY) {
+		if (Z_IS_ARRAY(args[0])) {
 			while (idx < Z_ARRVAL(args[0])->nNumUsed) {
 				plocale = &Z_ARRVAL(args[0])->arData[idx].val;
-				if (Z_TYPE_P(plocale) != IS_UNDEF) {
+				if (!Z_IS_UNDEF_P(plocale)) {
 					break;
 				}
 				idx++;
@@ -4789,7 +4789,7 @@ PHP_FUNCTION(setlocale)
 			zend_string_release(loc);
 		}
 
-		if (Z_TYPE(args[0]) == IS_ARRAY) {
+		if (Z_IS_ARRAY(args[0])) {
 			idx++;
 		} else {
 			if (++i >= num_args) break;

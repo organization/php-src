@@ -482,7 +482,7 @@ ZEND_FUNCTION(func_get_args)
 			if (arg_count > first_extra_arg) {
 				while (i < first_extra_arg) {
 					q = p;
-					if (EXPECTED(Z_TYPE_INFO_P(q) != IS_UNDEF)) {
+					if (EXPECTED(!Z_IS_UNDEF_P(q))) {
 						ZVAL_DEREF(q);
 						if (Z_OPT_REFCOUNTED_P(q)) {
 							Z_ADDREF_P(q);
@@ -498,7 +498,7 @@ ZEND_FUNCTION(func_get_args)
 			}
 			while (i < arg_count) {
 				q = p;
-				if (EXPECTED(Z_TYPE_INFO_P(q) != IS_UNDEF)) {
+				if (EXPECTED(!Z_IS_UNDEF_P(q))) {
 					ZVAL_DEREF(q);
 					if (Z_OPT_REFCOUNTED_P(q)) {
 						Z_ADDREF_P(q);
@@ -634,9 +634,9 @@ ZEND_FUNCTION(each)
 		entry = zend_hash_get_current_data(target_hash);
 		if (!entry) {
 			RETURN_FALSE;
-		} else if (Z_TYPE_P(entry) == IS_INDIRECT) {
+		} else if (Z_IS_INDIRECT_P(entry)) {
 			entry = Z_INDIRECT_P(entry);
-			if (Z_TYPE_P(entry) == IS_UNDEF) {
+			if (Z_IS_UNDEF_P(entry)) {
 				zend_hash_move_forward(target_hash);
 				continue;
 			}
@@ -708,7 +708,7 @@ ZEND_FUNCTION(error_reporting)
 			}
 
 			p->value = new_val;
-			if (Z_TYPE_P(err) == IS_LONG) {
+			if (Z_IS_LONG_P(err)) {
 				EG(error_reporting) = Z_LVAL_P(err);
 			} else {
 				EG(error_reporting) = atoi(ZSTR_VAL(p->value));
@@ -729,7 +729,7 @@ static int validate_constant_array(HashTable *ht) /* {{{ */
 	ZEND_HASH_FOREACH_VAL_IND(ht, val) {
 		ZVAL_DEREF(val);
 		if (Z_REFCOUNTED_P(val)) {
-			if (Z_TYPE_P(val) == IS_ARRAY) {
+			if (Z_IS_ARRAY_P(val)) {
 				if (Z_REFCOUNTED_P(val)) {
 					if (Z_IS_RECURSIVE_P(val)) {
 						zend_error(E_WARNING, "Constants cannot be recursive arrays");
@@ -740,7 +740,7 @@ static int validate_constant_array(HashTable *ht) /* {{{ */
 						break;
 					}
 				}
-			} else if (Z_TYPE_P(val) != IS_STRING && Z_TYPE_P(val) != IS_RESOURCE) {
+			} else if (!Z_IS_STRING_P(val) && !Z_IS_RESOURCE_P(val)) {
 				zend_error(E_WARNING, "Constants may only evaluate to scalar values or arrays");
 				ret = 0;
 				break;
@@ -767,7 +767,7 @@ static void copy_constant_array(zval *dst, zval *src) /* {{{ */
 		} else {
 			new_val = zend_hash_index_add_new(Z_ARRVAL_P(dst), idx, val);
 		}
-		if (Z_TYPE_P(val) == IS_ARRAY) {
+		if (Z_IS_ARRAY_P(val)) {
 			if (Z_REFCOUNTED_P(val)) {
 				copy_constant_array(new_val, val);
 			}
@@ -828,7 +828,7 @@ repeat:
 			}
 			break;
 		case IS_OBJECT:
-			if (Z_TYPE(val_free) == IS_UNDEF) {
+			if (Z_IS_UNDEF(val_free)) {
 				if (Z_OBJ_HT_P(val)->get) {
 					zval rv;
 					val = Z_OBJ_HT_P(val)->get(val, &rv);
@@ -949,9 +949,9 @@ ZEND_FUNCTION(get_parent_class)
 		}
 	}
 
-	if (Z_TYPE_P(arg) == IS_OBJECT) {
+	if (Z_IS_OBJECT_P(arg)) {
 		ce = Z_OBJ_P(arg)->ce;
-	} else if (Z_TYPE_P(arg) == IS_STRING) {
+	} else if (Z_IS_STRING_P(arg)) {
 	    ce = zend_lookup_class(Z_STR_P(arg));
 	}
 
@@ -985,12 +985,12 @@ static void is_a_impl(INTERNAL_FUNCTION_PARAMETERS, zend_bool only_subclass) /* 
 	 *   and there is no easy way to deprecate this.
 	 */
 
-	if (allow_string && Z_TYPE_P(obj) == IS_STRING) {
+	if (allow_string && Z_IS_STRING_P(obj)) {
 		instance_ce = zend_lookup_class(Z_STR_P(obj));
 		if (!instance_ce) {
 			RETURN_FALSE;
 		}
-	} else if (Z_TYPE_P(obj) == IS_OBJECT) {
+	} else if (Z_IS_OBJECT_P(obj)) {
 		instance_ce = Z_OBJCE_P(obj);
 	} else {
 		RETURN_FALSE;
@@ -1054,7 +1054,7 @@ static void add_class_vars(zend_class_entry *scope, zend_class_entry *ce, int st
 		} else if (!statics && (prop_info->flags & ZEND_ACC_STATIC) == 0) {
 			prop = &ce->default_properties_table[OBJ_PROP_TO_NUM(prop_info->offset)];
 		}
-		if (!prop || Z_TYPE_P(prop) == IS_UNDEF) {
+		if (!prop || Z_IS_UNDEF_P(prop)) {
 			continue;
 		}
 
@@ -1142,7 +1142,7 @@ ZEND_FUNCTION(get_object_vars)
 
 		ZEND_HASH_FOREACH_KEY_VAL(properties, num_key, key, value) {
 			zend_bool unmangle = 0;
-			if (Z_TYPE_P(value) == IS_INDIRECT) {
+			if (Z_IS_INDIRECT_P(value)) {
 				value = Z_INDIRECT_P(value);
 				if (UNEXPECTED(Z_ISUNDEF_P(value))) {
 					continue;
@@ -1214,9 +1214,9 @@ ZEND_FUNCTION(get_class_methods)
 		return;
 	}
 
-	if (Z_TYPE_P(klass) == IS_OBJECT) {
+	if (Z_IS_OBJECT_P(klass)) {
 		ce = Z_OBJCE_P(klass);
-	} else if (Z_TYPE_P(klass) == IS_STRING) {
+	} else if (Z_IS_STRING_P(klass)) {
 	    ce = zend_lookup_class(Z_STR_P(klass));
 	}
 
@@ -1274,9 +1274,9 @@ ZEND_FUNCTION(method_exists)
 		Z_PARAM_STR(method_name)
 	ZEND_PARSE_PARAMETERS_END();
 
-	if (Z_TYPE_P(klass) == IS_OBJECT) {
+	if (Z_IS_OBJECT_P(klass)) {
 		ce = Z_OBJCE_P(klass);
-	} else if (Z_TYPE_P(klass) == IS_STRING) {
+	} else if (Z_IS_STRING_P(klass)) {
 		if ((ce = zend_lookup_class(Z_STR_P(klass))) == NULL) {
 			RETURN_FALSE;
 		}
@@ -1291,7 +1291,7 @@ ZEND_FUNCTION(method_exists)
 	} else {
 		union _zend_function *func = NULL;
 
-		if (Z_TYPE_P(klass) == IS_OBJECT
+		if (Z_IS_OBJECT_P(klass)
 		&& Z_OBJ_HT_P(klass)->get_method != NULL
 		&& (func = Z_OBJ_HT_P(klass)->get_method(&Z_OBJ_P(klass), method_name, NULL)) != NULL
 		) {
@@ -1332,12 +1332,12 @@ ZEND_FUNCTION(property_exists)
 		RETURN_FALSE;
 	}
 
-	if (Z_TYPE_P(object) == IS_STRING) {
+	if (Z_IS_STRING_P(object)) {
 		ce = zend_lookup_class(Z_STR_P(object));
 		if (!ce) {
 			RETURN_FALSE;
 		}
-	} else if (Z_TYPE_P(object) == IS_OBJECT) {
+	} else if (Z_IS_OBJECT_P(object)) {
 		ce = Z_OBJCE_P(object);
 	} else {
 		zend_error(E_WARNING, "First parameter must either be an object or the name of an existing class");
@@ -1351,7 +1351,7 @@ ZEND_FUNCTION(property_exists)
 
 	ZVAL_STR(&property_z, property);
 
-	if (Z_TYPE_P(object) ==  IS_OBJECT &&
+	if (Z_IS_OBJECT_P(object) &&
 		Z_OBJ_HANDLER_P(object, has_property) &&
 		Z_OBJ_HANDLER_P(object, has_property)(object, &property_z, 2, NULL)) {
 		RETURN_TRUE;
@@ -1597,7 +1597,7 @@ ZEND_FUNCTION(set_error_handler)
 		return;
 	}
 
-	if (Z_TYPE_P(error_handler) != IS_NULL) { /* NULL == unset */
+	if (!Z_IS_NULL_P(error_handler)) { /* NULL == unset */
 		if (!zend_is_callable(error_handler, 0, NULL)) {
 			zend_string *error_handler_name = zend_get_callable_name(error_handler);
 			zend_error(E_WARNING, "%s() expects the argument (%s) to be a valid callback",
@@ -1607,14 +1607,14 @@ ZEND_FUNCTION(set_error_handler)
 		}
 	}
 
-	if (Z_TYPE(EG(user_error_handler)) != IS_UNDEF) {
+	if (!Z_IS_UNDEF(EG(user_error_handler))) {
 		ZVAL_COPY(return_value, &EG(user_error_handler));
 
 		zend_stack_push(&EG(user_error_handlers_error_reporting), &EG(user_error_handler_error_reporting));
 		zend_stack_push(&EG(user_error_handlers), &EG(user_error_handler));
 	}
 
-	if (Z_TYPE_P(error_handler) == IS_NULL) { /* unset user-defined handler */
+	if (Z_IS_NULL_P(error_handler)) { /* unset user-defined handler */
 		ZVAL_UNDEF(&EG(user_error_handler));
 		return;
 	}
@@ -1632,7 +1632,7 @@ ZEND_FUNCTION(restore_error_handler)
 		return;
 	}
 
-	if (Z_TYPE(EG(user_error_handler)) != IS_UNDEF) {
+	if (!Z_IS_UNDEF(EG(user_error_handler))) {
 		zval zeh;
 
 		ZVAL_COPY_VALUE(&zeh, &EG(user_error_handler));
@@ -1664,7 +1664,7 @@ ZEND_FUNCTION(set_exception_handler)
 		return;
 	}
 
-	if (Z_TYPE_P(exception_handler) != IS_NULL) { /* NULL == unset */
+	if (!Z_IS_NULL_P(exception_handler)) { /* NULL == unset */
 		if (!zend_is_callable(exception_handler, 0, NULL)) {
 		zend_string *exception_handler_name = zend_get_callable_name(exception_handler);
 			zend_error(E_WARNING, "%s() expects the argument (%s) to be a valid callback",
@@ -1674,13 +1674,13 @@ ZEND_FUNCTION(set_exception_handler)
 		}
 	}
 
-	if (Z_TYPE(EG(user_exception_handler)) != IS_UNDEF) {
+	if (!Z_IS_UNDEF(EG(user_exception_handler))) {
 		ZVAL_COPY(return_value, &EG(user_exception_handler));
 
 		zend_stack_push(&EG(user_exception_handlers), &EG(user_exception_handler));
 	}
 
-	if (Z_TYPE_P(exception_handler) == IS_NULL) { /* unset user-defined handler */
+	if (Z_IS_NULL_P(exception_handler)) { /* unset user-defined handler */
 		ZVAL_UNDEF(&EG(user_exception_handler));
 		return;
 	}
@@ -1697,7 +1697,7 @@ ZEND_FUNCTION(restore_exception_handler)
 		return;
 	}
 
-	if (Z_TYPE(EG(user_exception_handler)) != IS_UNDEF) {
+	if (!Z_IS_UNDEF(EG(user_exception_handler))) {
 		zval_ptr_dtor(&EG(user_exception_handler));
 	}
 	if (zend_stack_is_empty(&EG(user_exception_handlers))) {
@@ -2098,7 +2098,7 @@ ZEND_FUNCTION(get_defined_constants)
 				module_number = val->module_number;
 			}
 
-			if (Z_TYPE(modules[module_number]) == IS_UNDEF) {
+			if (Z_IS_UNDEF(modules[module_number])) {
 				array_init(&modules[module_number]);
 				add_assoc_zval(return_value, module_names[module_number], &modules[module_number]);
 			}
@@ -2152,7 +2152,7 @@ static void debug_backtrace_get_args(zend_execute_data *call, zval *arg_array) /
 					}
 				} else {
 					while (i < first_extra_arg) {
-						if (EXPECTED(Z_TYPE_INFO_P(p) != IS_UNDEF)) {
+						if (EXPECTED(!Z_IS_UNDEF_P(p))) {
 							if (Z_OPT_REFCOUNTED_P(p)) {
 								Z_ADDREF_P(p);
 							}
@@ -2168,7 +2168,7 @@ static void debug_backtrace_get_args(zend_execute_data *call, zval *arg_array) /
 			}
 
 			while (i < num_args) {
-				if (EXPECTED(Z_TYPE_INFO_P(p) != IS_UNDEF)) {
+				if (EXPECTED(!Z_IS_UNDEF_P(p))) {
 					if (Z_OPT_REFCOUNTED_P(p)) {
 						Z_ADDREF_P(p);
 					}
@@ -2268,7 +2268,7 @@ ZEND_FUNCTION(debug_print_backtrace)
 		}
 
 		/* $this may be passed into regular internal functions */
-		object = (Z_TYPE(call->This) == IS_OBJECT) ? Z_OBJ(call->This) : NULL;
+		object = (Z_IS_OBJECT(call->This)) ? Z_OBJ(call->This) : NULL;
 
 		if (call->func) {
 			zend_string *zend_function_name;
@@ -2363,7 +2363,7 @@ ZEND_FUNCTION(debug_print_backtrace)
 			}
 		}
 		zend_printf("%s(", function_name);
-		if (Z_TYPE(arg_array) != IS_UNDEF) {
+		if (!Z_IS_UNDEF(arg_array)) {
 			debug_print_backtrace_args(&arg_array);
 			zval_ptr_dtor(&arg_array);
 		}
@@ -2504,7 +2504,7 @@ ZEND_API void zend_fetch_debug_backtrace(zval *return_value, int skip_last, int 
 		}
 
 		/* $this may be passed into regular internal functions */
-		object = (call && (Z_TYPE(call->This) == IS_OBJECT)) ? Z_OBJ(call->This) : NULL;
+		object = (call && (Z_IS_OBJECT(call->This))) ? Z_OBJ(call->This) : NULL;
 
 		if (call && call->func) {
 			func = call->func;

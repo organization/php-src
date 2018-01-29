@@ -303,7 +303,7 @@ static int really_register_bound_param(struct pdo_bound_param_data *param, pdo_s
 	}
 
 	if (PDO_PARAM_TYPE(param->param_type) == PDO_PARAM_STR && param->max_value_len <= 0 && !Z_ISNULL_P(parameter)) {
-		if (Z_TYPE_P(parameter) == IS_DOUBLE) {
+		if (Z_IS_DOUBLE_P(parameter)) {
 			char *p;
 			int len = zend_spprintf_unchecked(&p, 0, "%.*H", (int) EG(precision), Z_DVAL_P(parameter));
 			ZVAL_STRINGL(parameter, p, len);
@@ -311,9 +311,9 @@ static int really_register_bound_param(struct pdo_bound_param_data *param, pdo_s
 		} else {
 			convert_to_string(parameter);
 		}
-	} else if (PDO_PARAM_TYPE(param->param_type) == PDO_PARAM_INT && (Z_TYPE_P(parameter) == IS_FALSE || Z_TYPE_P(parameter) == IS_TRUE)) {
+	} else if (PDO_PARAM_TYPE(param->param_type) == PDO_PARAM_INT && (Z_IS_FALSE_P(parameter) || Z_IS_TRUE_P(parameter))) {
 		convert_to_long(parameter);
-	} else if (PDO_PARAM_TYPE(param->param_type) == PDO_PARAM_BOOL && Z_TYPE_P(parameter) == IS_LONG) {
+	} else if (PDO_PARAM_TYPE(param->param_type) == PDO_PARAM_BOOL && Z_IS_LONG_P(parameter)) {
 		convert_to_boolean(parameter);
 	}
 
@@ -551,7 +551,7 @@ static inline void fetch_value(pdo_stmt_t *stmt, zval *dest, int colno, int *typ
 				ZVAL_NULL(dest);
 			}
 
-			if (Z_TYPE_P(dest) == IS_NULL) {
+			if (Z_IS_NULL_P(dest)) {
 				type = new_type;
 			}
 			break;
@@ -654,7 +654,7 @@ static inline void fetch_value(pdo_stmt_t *stmt, zval *dest, int colno, int *typ
 		}
 	}
 
-	if (Z_TYPE_P(dest) == IS_NULL && stmt->dbh->oracle_nulls == PDO_NULL_TO_STRING) {
+	if (Z_IS_NULL_P(dest) && stmt->dbh->oracle_nulls == PDO_NULL_TO_STRING) {
 		ZVAL_EMPTY_STRING(dest);
 	}
 }
@@ -908,7 +908,7 @@ static int do_fetch(pdo_stmt_t *stmt, int do_bind, zval *return_value, enum pdo_
 					do_fetch_opt_finish(stmt, 0);
 
 					fetch_value(stmt, &val, i++, NULL);
-					if (Z_TYPE(val) != IS_NULL) {
+					if (!Z_IS_NULL(val)) {
 						convert_to_string(&val);
 						if ((cep = zend_lookup_class(Z_STR(val))) == NULL) {
 							stmt->fetch.cls.ce = ZEND_STANDARD_CLASS_DEF_PTR;
@@ -1012,7 +1012,7 @@ static int do_fetch(pdo_stmt_t *stmt, int do_bind, zval *return_value, enum pdo_
 						zval tmp;
 						fetch_value(stmt, &tmp, ++i, NULL);
 
-						if (Z_TYPE(val) == IS_LONG) {
+						if (Z_IS_LONG(val)) {
 							zend_hash_index_update((return_all ? Z_ARRVAL_P(return_all) : Z_ARRVAL_P(return_value)), Z_LVAL(val), &tmp);
 						} else {
 							convert_to_string(&val);
@@ -1038,7 +1038,7 @@ static int do_fetch(pdo_stmt_t *stmt, int do_bind, zval *return_value, enum pdo_
 						zval *curr_val;
 						if ((curr_val = zend_hash_find(Z_ARRVAL_P(return_value), stmt->columns[i].name))) {
 							zval arr;
-							if (Z_TYPE_P(curr_val) != IS_ARRAY) {
+							if (!Z_IS_ARRAY_P(curr_val)) {
 								/* a little bit of black magic here:
 								 * we're creating a new array and swapping it for the
 								 * zval that's already stored in the hash under the name
@@ -1100,7 +1100,7 @@ static int do_fetch(pdo_stmt_t *stmt, int do_bind, zval *return_value, enum pdo_
 							zval_ptr_dtor(&val);
 							pdo_raise_impl_error(stmt->dbh, stmt, "HY000", "cannot unserialize class");
 							return 0;
-						} else if (ce->unserialize(return_value, ce, (unsigned char *)(Z_TYPE(val) == IS_STRING ? Z_STRVAL(val) : ""), Z_TYPE(val) == IS_STRING ? Z_STRLEN(val) : 0, NULL) == FAILURE) {
+						} else if (ce->unserialize(return_value, ce, (unsigned char *)(Z_IS_STRING(val) ? Z_STRVAL(val) : ""), Z_IS_STRING(val) ? Z_STRLEN(val) : 0, NULL) == FAILURE) {
 							zval_ptr_dtor(&val);
 							pdo_raise_impl_error(stmt->dbh, stmt, "HY000", "cannot unserialize class");
 							zval_dtor(return_value);
@@ -1305,7 +1305,7 @@ static PHP_METHOD(PDOStatement, fetchObject)
 	do_fetch_opt_finish(stmt, 0);
 
 	if (ctor_args) {
-		if (Z_TYPE_P(ctor_args) == IS_ARRAY && zend_hash_num_elements(Z_ARRVAL_P(ctor_args))) {
+		if (Z_IS_ARRAY_P(ctor_args) && zend_hash_num_elements(Z_ARRVAL_P(ctor_args))) {
 			ZVAL_ARR(&stmt->fetch.cls.ctor_args, zend_array_dup(Z_ARRVAL_P(ctor_args)));
 		} else {
 			ZVAL_UNDEF(&stmt->fetch.cls.ctor_args);
@@ -1399,12 +1399,12 @@ static PHP_METHOD(PDOStatement, fetchAll)
 			stmt->fetch.cls.ce = zend_standard_class_def;
 			break;
 		case 3:
-			if (Z_TYPE_P(ctor_args) != IS_NULL && Z_TYPE_P(ctor_args) != IS_ARRAY) {
+			if (!Z_IS_NULL_P(ctor_args) && !Z_IS_ARRAY_P(ctor_args)) {
 				pdo_raise_impl_error(stmt->dbh, stmt, "HY000", "ctor_args must be either NULL or an array");
 				error = 1;
 				break;
 			}
-			if (Z_TYPE_P(ctor_args) != IS_ARRAY || !zend_hash_num_elements(Z_ARRVAL_P(ctor_args))) {
+			if (!Z_IS_ARRAY_P(ctor_args) || !zend_hash_num_elements(Z_ARRVAL_P(ctor_args))) {
 				ctor_args = NULL;
 			}
 			/* no break */
@@ -1414,7 +1414,7 @@ static PHP_METHOD(PDOStatement, fetchAll)
 			} else {
 				ZVAL_UNDEF(&stmt->fetch.cls.ctor_args);
 			}
-			if (Z_TYPE_P(arg2) != IS_STRING) {
+			if (!Z_IS_STRING_P(arg2)) {
 				pdo_raise_impl_error(stmt->dbh, stmt, "HY000", "Invalid class name (should be a string)");
 				error = 1;
 				break;
@@ -1517,7 +1517,7 @@ static PHP_METHOD(PDOStatement, fetchAll)
 		if (error != 2) {
 			RETURN_FALSE;
 		} else { /* on no results, return an empty array */
-			if (Z_TYPE_P(return_value) != IS_ARRAY) {
+			if (!Z_IS_ARRAY_P(return_value)) {
 				array_init(return_value);
 			}
 			return;
@@ -1864,7 +1864,7 @@ int pdo_stmt_setup_fetch_mode(INTERNAL_FUNCTION_PARAMETERS, pdo_stmt_t *stmt, in
 	retval = zend_get_parameters_array_ex(ZEND_NUM_ARGS(), args);
 
 	if (SUCCESS == retval) {
-		if (Z_TYPE(args[skip]) != IS_LONG) {
+		if (!Z_IS_LONG(args[skip])) {
 			pdo_raise_impl_error(stmt->dbh, stmt, "HY000", "mode must be an integer");
 			retval = FAILURE;
 		} else {
@@ -1902,7 +1902,7 @@ int pdo_stmt_setup_fetch_mode(INTERNAL_FUNCTION_PARAMETERS, pdo_stmt_t *stmt, in
 		case PDO_FETCH_COLUMN:
 			if (argc != 2) {
 				pdo_raise_impl_error(stmt->dbh, stmt, "HY000", "fetch mode requires the colno argument");
-			} else	if (Z_TYPE(args[skip+1]) != IS_LONG) {
+			} else	if (!Z_IS_LONG(args[skip+1])) {
 				pdo_raise_impl_error(stmt->dbh, stmt, "HY000", "colno must be an integer");
 			} else {
 				stmt->fetch.column = Z_LVAL(args[skip+1]);
@@ -1925,7 +1925,7 @@ int pdo_stmt_setup_fetch_mode(INTERNAL_FUNCTION_PARAMETERS, pdo_stmt_t *stmt, in
 					pdo_raise_impl_error(stmt->dbh, stmt, "HY000", "fetch mode requires the classname argument");
 				} else if (argc > 3) {
 					pdo_raise_impl_error(stmt->dbh, stmt, "HY000", "too many arguments");
-				} else if (Z_TYPE(args[skip+1]) != IS_STRING) {
+				} else if (!Z_IS_STRING(args[skip+1])) {
 					pdo_raise_impl_error(stmt->dbh, stmt, "HY000", "classname must be a string");
 				} else {
 					cep = zend_lookup_class(Z_STR(args[skip+1]));
@@ -1943,10 +1943,10 @@ int pdo_stmt_setup_fetch_mode(INTERNAL_FUNCTION_PARAMETERS, pdo_stmt_t *stmt, in
 				}
 #endif
 				if (argc == 3) {
-					if (Z_TYPE(args[skip+2]) != IS_NULL && Z_TYPE(args[skip+2]) != IS_ARRAY) {
+					if (!Z_IS_NULL(args[skip+2]) && !Z_IS_ARRAY(args[skip+2])) {
 						pdo_raise_impl_error(stmt->dbh, stmt, "HY000", "ctor_args must be either NULL or an array");
 						retval = FAILURE;
-					} else if (Z_TYPE(args[skip+2]) == IS_ARRAY && zend_hash_num_elements(Z_ARRVAL(args[skip+2]))) {
+					} else if (Z_IS_ARRAY(args[skip+2]) && zend_hash_num_elements(Z_ARRVAL(args[skip+2]))) {
 						ZVAL_ARR(&stmt->fetch.cls.ctor_args, zend_array_dup(Z_ARRVAL(args[skip+2])));
 					}
 				}
@@ -1961,7 +1961,7 @@ int pdo_stmt_setup_fetch_mode(INTERNAL_FUNCTION_PARAMETERS, pdo_stmt_t *stmt, in
 		case PDO_FETCH_INTO:
 			if (argc != 2) {
 				pdo_raise_impl_error(stmt->dbh, stmt, "HY000", "fetch mode requires the object parameter");
-			} else if (Z_TYPE(args[skip+1]) != IS_OBJECT) {
+			} else if (!Z_IS_OBJECT(args[skip+1])) {
 				pdo_raise_impl_error(stmt->dbh, stmt, "HY000", "object must be an object");
 			} else {
 				retval = SUCCESS;
@@ -2517,11 +2517,11 @@ static zval *row_prop_read(zval *object, zval *member, int type, void **cache_sl
 
 	ZVAL_NULL(rv);
 	if (stmt) {
-		if (Z_TYPE_P(member) == IS_LONG) {
+		if (Z_IS_LONG_P(member)) {
 			if (Z_LVAL_P(member) >= 0 && Z_LVAL_P(member) < stmt->column_count) {
 				fetch_value(stmt, rv, Z_LVAL_P(member), NULL);
 			}
-		} else if (Z_TYPE_P(member) == IS_STRING
+		} else if (Z_IS_STRING_P(member)
 			   && is_numeric_string_ex(Z_STRVAL_P(member), Z_STRLEN_P(member), &lval, NULL, 0, NULL) == IS_LONG)	{
 			if (lval >= 0 && lval < stmt->column_count) {
 				fetch_value(stmt, rv, lval, NULL);
@@ -2571,9 +2571,9 @@ static int row_prop_exists(zval *object, zval *member, int check_empty, void **c
 	zend_long lval;
 
 	if (stmt) {
-		if (Z_TYPE_P(member) == IS_LONG) {
+		if (Z_IS_LONG_P(member)) {
 			return Z_LVAL_P(member) >= 0 && Z_LVAL_P(member) < stmt->column_count;
-		} else if (Z_TYPE_P(member) == IS_STRING) {
+		} else if (Z_IS_STRING_P(member)) {
 			if (is_numeric_string_ex(Z_STRVAL_P(member), Z_STRLEN_P(member), &lval, NULL, 0, NULL) == IS_LONG)	{
 				return lval >=0 && lval < stmt->column_count;
 			}
@@ -2590,7 +2590,7 @@ static int row_prop_exists(zval *object, zval *member, int check_empty, void **c
 					zval val;
 
 					fetch_value(stmt, &val, colno, NULL);
-					res = check_empty ? i_zend_is_true(&val) : Z_TYPE(val) != IS_NULL;
+					res = check_empty ? i_zend_is_true(&val) : !Z_IS_NULL(val);
 					zval_dtor(&val);
 
 					return res;

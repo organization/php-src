@@ -2231,7 +2231,7 @@ PHP_FUNCTION(iconv_mime_encode)
 		zval *pzval;
 
 		if ((pzval = zend_hash_str_find(Z_ARRVAL_P(pref), "scheme", sizeof("scheme") - 1)) != NULL) {
-			if (Z_TYPE_P(pzval) == IS_STRING && Z_STRLEN_P(pzval) > 0) {
+			if (Z_IS_STRING_P(pzval) && Z_STRLEN_P(pzval) > 0) {
 				switch (Z_STRVAL_P(pzval)[0]) {
 					case 'B': case 'b':
 						scheme_id = PHP_ICONV_ENC_SCHEME_BASE64;
@@ -2244,7 +2244,7 @@ PHP_FUNCTION(iconv_mime_encode)
 			}
 		}
 
-		if ((pzval = zend_hash_str_find(Z_ARRVAL_P(pref), "input-charset", sizeof("input-charset") - 1)) != NULL && Z_TYPE_P(pzval) == IS_STRING) {
+		if ((pzval = zend_hash_str_find(Z_ARRVAL_P(pref), "input-charset", sizeof("input-charset") - 1)) != NULL && Z_IS_STRING_P(pzval)) {
 			if (Z_STRLEN_P(pzval) >= ICONV_CSNMAXLEN) {
 				php_error_docref(NULL, E_WARNING, "Charset parameter exceeds the maximum allowed length of %d characters", ICONV_CSNMAXLEN);
 				RETURN_FALSE;
@@ -2256,7 +2256,7 @@ PHP_FUNCTION(iconv_mime_encode)
 		}
 
 
-		if ((pzval = zend_hash_str_find(Z_ARRVAL_P(pref), "output-charset", sizeof("output-charset") - 1)) != NULL && Z_TYPE_P(pzval) == IS_STRING) {
+		if ((pzval = zend_hash_str_find(Z_ARRVAL_P(pref), "output-charset", sizeof("output-charset") - 1)) != NULL && Z_IS_STRING_P(pzval)) {
 			if (Z_STRLEN_P(pzval) >= ICONV_CSNMAXLEN) {
 				php_error_docref(NULL, E_WARNING, "Charset parameter exceeds the maximum allowed length of %d characters", ICONV_CSNMAXLEN);
 				RETURN_FALSE;
@@ -2272,7 +2272,7 @@ PHP_FUNCTION(iconv_mime_encode)
 		}
 
 		if ((pzval = zend_hash_str_find(Z_ARRVAL_P(pref), "line-break-chars", sizeof("line-break-chars") - 1)) != NULL) {
-			if (Z_TYPE_P(pzval) != IS_STRING) {
+			if (!Z_IS_STRING_P(pzval)) {
 				tmp_str = zval_get_string_func(pzval);
 				lfchars = ZSTR_VAL(tmp_str);
 			} else {
@@ -2413,7 +2413,7 @@ PHP_FUNCTION(iconv_mime_decode_headers)
 			zval *elem;
 
 			if ((elem = zend_hash_str_find(Z_ARRVAL_P(return_value), header_name, header_name_len)) != NULL) {
-				if (Z_TYPE_P(elem) != IS_ARRAY) {
+				if (!Z_IS_ARRAY_P(elem)) {
 					zval new_elem;
 
 					array_init(&new_elem);

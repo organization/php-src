@@ -86,7 +86,7 @@ zend_class_entry *php_session_update_timestamp_iface_entry;
    *********** */
 
 #define IF_SESSION_VARS() \
-	if (Z_ISREF_P(&PS(http_session_vars)) && Z_TYPE_P(Z_REFVAL(PS(http_session_vars))) == IS_ARRAY)
+	if (Z_ISREF_P(&PS(http_session_vars)) && Z_IS_ARRAY_P(Z_REFVAL(PS(http_session_vars))))
 
 #define SESSION_CHECK_ACTIVE_STATE	\
 	if (PS(session_status) == php_session_active) {	\
@@ -871,7 +871,7 @@ PS_SERIALIZER_DECODE_FUNC(php_serialize) /* {{{ */
 	if (!Z_ISUNDEF(PS(http_session_vars))) {
 		zval_ptr_dtor(&PS(http_session_vars));
 	}
-	if (Z_TYPE(session_vars) == IS_NULL) {
+	if (Z_IS_NULL(session_vars)) {
 		array_init(&session_vars);
 	}
 	ZVAL_NEW_REF(&PS(http_session_vars), &session_vars);
@@ -1407,7 +1407,7 @@ PHPAPI const ps_serializer *_php_find_ps_serializer(char *name) /* {{{ */
 
 static void ppid2sid(zval *ppid) {
 	ZVAL_DEREF(ppid);
-	if (Z_TYPE_P(ppid) == IS_STRING) {
+	if (Z_IS_STRING_P(ppid)) {
 		PS(id) = zend_string_init(Z_STRVAL_P(ppid), Z_STRLEN_P(ppid), 0);
 		PS(send_cookie) = 0;
 	} else {
@@ -1468,7 +1468,7 @@ PHPAPI int php_session_reset_id(void) /* {{{ */
 		if (PS(use_cookies) &&
 			(data = zend_hash_str_find(&EG(symbol_table), "_COOKIE", sizeof("_COOKIE") - 1))) {
 			ZVAL_DEREF(data);
-			if (Z_TYPE_P(data) == IS_ARRAY &&
+			if (Z_IS_ARRAY_P(data) &&
 				(ppid = zend_hash_str_find(Z_ARRVAL_P(data), PS(session_name), strlen(PS(session_name))))) {
 				ZVAL_DEREF(ppid);
 				apply_trans_sid = 0;
@@ -1540,7 +1540,7 @@ PHPAPI int php_session_start(void) /* {{{ */
 	if (!PS(id)) {
 		if (PS(use_cookies) && (data = zend_hash_str_find(&EG(symbol_table), "_COOKIE", sizeof("_COOKIE") - 1))) {
 			ZVAL_DEREF(data);
-			if (Z_TYPE_P(data) == IS_ARRAY && (ppid = zend_hash_str_find(Z_ARRVAL_P(data), PS(session_name), lensess))) {
+			if (Z_IS_ARRAY_P(data) && (ppid = zend_hash_str_find(Z_ARRVAL_P(data), PS(session_name), lensess))) {
 				ppid2sid(ppid);
 				PS(send_cookie) = 0;
 				PS(define_sid) = 0;
@@ -1550,13 +1550,13 @@ PHPAPI int php_session_start(void) /* {{{ */
 		if (!PS(use_only_cookies)) {
 			if (!PS(id) && (data = zend_hash_str_find(&EG(symbol_table), "_GET", sizeof("_GET") - 1))) {
 				ZVAL_DEREF(data);
-				if (Z_TYPE_P(data) == IS_ARRAY && (ppid = zend_hash_str_find(Z_ARRVAL_P(data), PS(session_name), lensess))) {
+				if (Z_IS_ARRAY_P(data) && (ppid = zend_hash_str_find(Z_ARRVAL_P(data), PS(session_name), lensess))) {
 					ppid2sid(ppid);
 				}
 			}
 			if (!PS(id) && (data = zend_hash_str_find(&EG(symbol_table), "_POST", sizeof("_POST") - 1))) {
 				ZVAL_DEREF(data);
-				if (Z_TYPE_P(data) == IS_ARRAY && (ppid = zend_hash_str_find(Z_ARRVAL_P(data), PS(session_name), lensess))) {
+				if (Z_IS_ARRAY_P(data) && (ppid = zend_hash_str_find(Z_ARRVAL_P(data), PS(session_name), lensess))) {
 					ppid2sid(ppid);
 				}
 			}
@@ -1565,7 +1565,7 @@ PHPAPI int php_session_start(void) /* {{{ */
 			 * http://yoursite/<session-name>=<session-id>/script.php */
 			if (!PS(id) && zend_is_auto_global_str("_SERVER", sizeof("_SERVER") - 1) == SUCCESS &&
 				(data = zend_hash_str_find(Z_ARRVAL(PG(http_globals)[TRACK_VARS_SERVER]), "REQUEST_URI", sizeof("REQUEST_URI") - 1)) &&
-				Z_TYPE_P(data) == IS_STRING &&
+				Z_IS_STRING_P(data) &&
 				(p = strstr(Z_STRVAL_P(data), PS(session_name))) &&
 				p[lensess] == '='
 				) {
@@ -1580,7 +1580,7 @@ PHPAPI int php_session_start(void) /* {{{ */
 			if (PS(id) && PS(extern_referer_chk)[0] != '\0' &&
 				!Z_ISUNDEF(PG(http_globals)[TRACK_VARS_SERVER]) &&
 				(data = zend_hash_str_find(Z_ARRVAL(PG(http_globals)[TRACK_VARS_SERVER]), "HTTP_REFERER", sizeof("HTTP_REFERER") - 1)) &&
-				Z_TYPE_P(data) == IS_STRING &&
+				Z_IS_STRING_P(data) &&
 				Z_STRLEN_P(data) != 0 &&
 				strstr(Z_STRVAL_P(data), PS(extern_referer_chk)) == NULL
 			) {
@@ -2980,7 +2980,7 @@ static zend_bool early_find_sid_in(zval *dest, int where, php_session_rfc1867_pr
 	}
 
 	if ((ppid = zend_hash_str_find(Z_ARRVAL(PG(http_globals)[where]), PS(session_name), progress->sname_len))
-			&& Z_TYPE_P(ppid) == IS_STRING) {
+			&& Z_IS_STRING_P(ppid)) {
 		zval_dtor(dest);
 		ZVAL_DEREF(ppid);
 		ZVAL_COPY(dest, ppid);
@@ -3014,13 +3014,13 @@ static zend_bool php_check_cancel_upload(php_session_rfc1867_progress *progress)
 	if ((progress_ary = zend_symtable_find(Z_ARRVAL_P(Z_REFVAL(PS(http_session_vars))), progress->key.s)) == NULL) {
 		return 0;
 	}
-	if (Z_TYPE_P(progress_ary) != IS_ARRAY) {
+	if (!Z_IS_ARRAY_P(progress_ary)) {
 		return 0;
 	}
 	if ((cancel_upload = zend_hash_str_find(Z_ARRVAL_P(progress_ary), "cancel_upload", sizeof("cancel_upload") - 1)) == NULL) {
 		return 0;
 	}
-	return Z_TYPE_P(cancel_upload) == IS_TRUE;
+	return Z_IS_TRUE_P(cancel_upload);
 } /* }}} */
 
 static void php_session_rfc1867_update(php_session_rfc1867_progress *progress, int force_update) /* {{{ */

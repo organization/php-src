@@ -714,13 +714,13 @@ PHP_FUNCTION(com_event_sink)
 	php_com_initialize();
 	obj = CDNO_FETCH(object);
 
-	if (sink && Z_TYPE_P(sink) == IS_ARRAY) {
+	if (sink && Z_IS_ARRAY_P(sink)) {
 		/* 0 => typelibname, 1 => dispname */
 		zval *tmp;
 
-		if ((tmp = zend_hash_index_find(Z_ARRVAL_P(sink), 0)) != NULL && Z_TYPE_P(tmp) == IS_STRING)
+		if ((tmp = zend_hash_index_find(Z_ARRVAL_P(sink), 0)) != NULL && Z_IS_STRING_P(tmp))
 			typelibname = Z_STRVAL_P(tmp);
-		if ((tmp = zend_hash_index_find(Z_ARRVAL_P(sink), 1)) != NULL && Z_TYPE_P(tmp) == IS_STRING)
+		if ((tmp = zend_hash_index_find(Z_ARRVAL_P(sink), 1)) != NULL && Z_IS_STRING_P(tmp))
 			dispname = Z_STRVAL_P(tmp);
 	} else if (sink != NULL) {
 		convert_to_string(sink);
@@ -773,7 +773,7 @@ PHP_FUNCTION(com_print_typeinfo)
 	}
 
 	php_com_initialize();
-	if (Z_TYPE_P(arg1) == IS_OBJECT) {
+	if (Z_IS_OBJECT_P(arg1)) {
 		CDNO_FETCH_VERIFY(obj, arg1);
 	} else {
 		convert_to_string(arg1);

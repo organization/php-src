@@ -673,7 +673,7 @@ PHP_FUNCTION(pcntl_waitpid)
 
 #ifdef HAVE_WAIT4
 	if (z_rusage) {
-		if (Z_TYPE_P(z_rusage) != IS_ARRAY) {
+		if (!Z_IS_ARRAY_P(z_rusage)) {
 			zval_dtor(z_rusage);
 			array_init(z_rusage);
 		} else {
@@ -725,7 +725,7 @@ PHP_FUNCTION(pcntl_wait)
 	status = zval_get_long(z_status);
 #ifdef HAVE_WAIT3
 	if (z_rusage) {
-		if (Z_TYPE_P(z_rusage) != IS_ARRAY) {
+		if (!Z_IS_ARRAY_P(z_rusage)) {
 			zval_dtor(z_rusage);
 			array_init(z_rusage);
 		} else {
@@ -1016,7 +1016,7 @@ PHP_FUNCTION(pcntl_signal)
 	}
 
 	/* Special long value case for SIG_DFL and SIG_IGN */
-	if (Z_TYPE_P(handle) == IS_LONG) {
+	if (Z_IS_LONG_P(handle)) {
 		if (Z_LVAL_P(handle) != (zend_long) SIG_DFL && Z_LVAL_P(handle) != (zend_long) SIG_IGN) {
 			php_error_docref(NULL, E_WARNING, "Invalid value for handle argument specified");
 			RETURN_FALSE;
@@ -1119,7 +1119,7 @@ PHP_FUNCTION(pcntl_sigprocmask)
 	}
 
 	if (user_oldset != NULL) {
-		if (Z_TYPE_P(user_oldset) != IS_ARRAY) {
+		if (!Z_IS_ARRAY_P(user_oldset)) {
 			zval_dtor(user_oldset);
 			array_init(user_oldset);
 		} else {
@@ -1218,7 +1218,7 @@ PHP_FUNCTION(pcntl_sigtimedwait)
 static void pcntl_siginfo_to_zval(int signo, siginfo_t *siginfo, zval *user_siginfo) /* {{{ */
 {
 	if (signo > 0 && user_siginfo) {
-		if (Z_TYPE_P(user_siginfo) != IS_ARRAY) {
+		if (!Z_IS_ARRAY_P(user_siginfo)) {
 			zval_dtor(user_siginfo);
 			array_init(user_siginfo);
 		} else {
@@ -1434,7 +1434,7 @@ void pcntl_signal_dispatch()
 	/* Allocate */
 	while (queue) {
 		if ((handle = zend_hash_index_find(&PCNTL_G(php_signal_table), queue->signo)) != NULL) {
-			if (Z_TYPE_P(handle) != IS_LONG) {
+			if (!Z_IS_LONG_P(handle)) {
 				ZVAL_NULL(&retval);
 				ZVAL_LONG(&params[0], queue->signo);
 #ifdef HAVE_STRUCT_SIGINFO_T

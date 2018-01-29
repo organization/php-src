@@ -56,15 +56,15 @@ static void ps_call_handler(zval *func, int argc, zval *argv, zval *retval)
 #define PSF(a) PS(mod_user_names).name.ps_##a
 
 #define FINISH \
-	if (Z_TYPE(retval) != IS_UNDEF) { \
-		if (Z_TYPE(retval) == IS_TRUE) { \
+	if (!Z_IS_UNDEF(retval)) { \
+		if (Z_IS_TRUE(retval)) { \
 			ret = SUCCESS; \
-		} else if (Z_TYPE(retval) == IS_FALSE) { \
+		} else if (Z_IS_FALSE(retval)) { \
 			ret = FAILURE; \
-        }  else if ((Z_TYPE(retval) == IS_LONG) && (Z_LVAL(retval) == -1)) { \
+        }  else if ((Z_IS_LONG(retval)) && (Z_LVAL(retval) == -1)) { \
 			/* BC for clever users - Deprecate me */ \
 			ret = FAILURE; \
-		} else if ((Z_TYPE(retval) == IS_LONG) && (Z_LVAL(retval) == 0)) { \
+		} else if ((Z_IS_LONG(retval)) && (Z_LVAL(retval) == 0)) { \
 			/* BC for clever users - Deprecate me */ \
 			ret = SUCCESS; \
 		} else { \
@@ -146,7 +146,7 @@ PS_READ_FUNC(user)
 	ps_call_handler(&PSF(read), 1, args, &retval);
 
 	if (!Z_ISUNDEF(retval)) {
-		if (Z_TYPE(retval) == IS_STRING) {
+		if (Z_IS_STRING(retval)) {
 			*val = zend_string_copy(Z_STR(retval));
 			ret = SUCCESS;
 		}
@@ -190,12 +190,12 @@ PS_GC_FUNC(user)
 
 	ps_call_handler(&PSF(gc), 1, args, &retval);
 
-	if (Z_TYPE(retval) == IS_LONG) {
+	if (Z_IS_LONG(retval)) {
 		convert_to_long(&retval);
 		return Z_LVAL(retval);
 	}
 	/* This is for older API compatibility */
-	if (Z_TYPE(retval) == IS_TRUE) {
+	if (Z_IS_TRUE(retval)) {
 		return 1;
 	}
 	/* Anything else is some kind of error */
@@ -212,7 +212,7 @@ PS_CREATE_SID_FUNC(user)
 		ps_call_handler(&PSF(create_sid), 0, NULL, &retval);
 
 		if (!Z_ISUNDEF(retval)) {
-			if (Z_TYPE(retval) == IS_STRING) {
+			if (Z_IS_STRING(retval)) {
 				id = zend_string_copy(Z_STR(retval));
 			}
 			zval_ptr_dtor(&retval);

@@ -54,21 +54,21 @@ PHP_FUNCTION( numfmt_format )
 	FORMATTER_METHOD_FETCH_OBJECT;
 
 	if(type == FORMAT_TYPE_DEFAULT) {
-		if(Z_TYPE_P(number) == IS_STRING) {
+		if(Z_IS_STRING_P(number)) {
 			convert_scalar_to_number_ex(number);
 		}
 
-		if(Z_TYPE_P(number) == IS_LONG) {
+		if(Z_IS_LONG_P(number)) {
 			/* take INT32 on 32-bit, int64 on 64-bit */
 			type = (sizeof(zend_long) == 8)?FORMAT_TYPE_INT64:FORMAT_TYPE_INT32;
-		} else if(Z_TYPE_P(number) == IS_DOUBLE) {
+		} else if(Z_IS_DOUBLE_P(number)) {
 			type = FORMAT_TYPE_DOUBLE;
 		} else {
 			type = FORMAT_TYPE_INT32;
 		}
 	}
 
-	if(Z_TYPE_P(number) != IS_DOUBLE && Z_TYPE_P(number) != IS_LONG) {
+	if(!Z_IS_DOUBLE_P(number) && !Z_IS_LONG_P(number)) {
 		convert_scalar_to_number(number );
 	}
 
@@ -91,7 +91,7 @@ PHP_FUNCTION( numfmt_format )
 
 		case FORMAT_TYPE_INT64:
 		{
-			int64_t value = (Z_TYPE_P(number) == IS_DOUBLE)?(int64_t)Z_DVAL_P(number):Z_LVAL_P(number);
+			int64_t value = (Z_IS_DOUBLE_P(number))?(int64_t)Z_DVAL_P(number):Z_LVAL_P(number);
 			formatted_len = unum_formatInt64(FORMATTER_OBJECT(nfo), value, formatted, formatted_len, NULL, &INTL_DATA_ERROR_CODE(nfo));
 			if (INTL_DATA_ERROR_CODE(nfo) == U_BUFFER_OVERFLOW_ERROR) {
 				intl_error_reset(INTL_DATA_ERROR_P(nfo));

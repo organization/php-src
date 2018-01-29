@@ -648,7 +648,7 @@ static inline int php_tcp_sockop_bind(php_stream *stream, php_netstream_data_t *
 #ifdef IPV6_V6ONLY
 	if (PHP_STREAM_CONTEXT(stream)
 		&& (tmpzval = php_stream_context_get_option(PHP_STREAM_CONTEXT(stream), "socket", "ipv6_v6only")) != NULL
-		&& Z_TYPE_P(tmpzval) != IS_NULL
+		&& !Z_IS_NULL_P(tmpzval)
 	) {
 		sockopts |= STREAM_SOCKOP_IPV6_V6ONLY;
 		sockopts |= STREAM_SOCKOP_IPV6_V6ONLY_ENABLED * zend_is_true(tmpzval);
@@ -732,7 +732,7 @@ static inline int php_tcp_sockop_connect(php_stream *stream, php_netstream_data_
 	}
 
 	if (PHP_STREAM_CONTEXT(stream) && (tmpzval = php_stream_context_get_option(PHP_STREAM_CONTEXT(stream), "socket", "bindto")) != NULL) {
-		if (Z_TYPE_P(tmpzval) != IS_STRING) {
+		if (!Z_IS_STRING_P(tmpzval)) {
 			if (xparam->want_errortext) {
 				xparam->outputs.error_text = strpprintf(0, "local_addr context option is not a string.");
 			}

@@ -685,7 +685,7 @@ PHP_FUNCTION(get_headers)
 		RETURN_FALSE;
 	}
 
-	if (Z_TYPE(stream->wrapperdata) != IS_ARRAY) {
+	if (!Z_IS_ARRAY(stream->wrapperdata)) {
 		php_stream_close(stream);
 		RETURN_FALSE;
 	}
@@ -693,7 +693,7 @@ PHP_FUNCTION(get_headers)
 	array_init(return_value);
 
 	/* check for curl-wrappers that provide headers via a special "headers" element */
-	if ((h = zend_hash_str_find(HASH_OF(&stream->wrapperdata), "headers", sizeof("headers")-1)) != NULL && Z_TYPE_P(h) == IS_ARRAY) {
+	if ((h = zend_hash_str_find(HASH_OF(&stream->wrapperdata), "headers", sizeof("headers")-1)) != NULL && Z_IS_ARRAY_P(h)) {
 		/* curl-wrappers don't load data until the 1st read */
 		if (!Z_ARRVAL_P(h)->nNumOfElements) {
 			php_stream_getc(stream);
@@ -705,7 +705,7 @@ PHP_FUNCTION(get_headers)
 	}
 
 	ZEND_HASH_FOREACH_VAL(hashT, hdr) {
-		if (Z_TYPE_P(hdr) != IS_STRING) {
+		if (!Z_IS_STRING_P(hdr)) {
 			continue;
 		}
 		if (!format) {

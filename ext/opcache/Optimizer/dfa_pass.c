@@ -391,7 +391,7 @@ int zend_dfa_optimize_calls(zend_op_array *op_array, zend_ssa *ssa)
 
 				if (send_array->opcode == ZEND_SEND_VAL
 				 && send_array->op1_type == IS_CONST
-				 && Z_TYPE_P(CT_CONSTANT_EX(op_array, send_array->op1.constant)) == IS_ARRAY
+				 && Z_IS_ARRAY_P(CT_CONSTANT_EX(op_array, send_array->op1.constant))
 				 && (send_needly->opcode == ZEND_SEND_VAL
 				  || send_needly->opcode == ZEND_SEND_VAR)
 			    ) {
@@ -406,9 +406,9 @@ int zend_dfa_optimize_calls(zend_op_array *op_array, zend_ssa *ssa)
 					dst = zend_new_array(zend_hash_num_elements(src));
 					if (strict) {
 						ZEND_HASH_FOREACH_VAL(src, val) {
-							if (Z_TYPE_P(val) == IS_STRING) {
+							if (Z_IS_STRING_P(val)) {
 								zend_hash_add(dst, Z_STR_P(val), &tmp);
-							} else if (Z_TYPE_P(val) == IS_LONG) {
+							} else if (Z_IS_LONG_P(val)) {
 								zend_hash_index_add(dst, Z_LVAL_P(val), &tmp);
 							} else {
 								zend_array_destroy(dst);
@@ -418,7 +418,7 @@ int zend_dfa_optimize_calls(zend_op_array *op_array, zend_ssa *ssa)
 						} ZEND_HASH_FOREACH_END();
 					} else {
 						ZEND_HASH_FOREACH_VAL(src, val) {
-							if (Z_TYPE_P(val) != IS_STRING || ZEND_HANDLE_NUMERIC(Z_STR_P(val), idx)) {
+							if (!Z_IS_STRING_P(val) || ZEND_HANDLE_NUMERIC(Z_STR_P(val), idx)) {
 								zend_array_destroy(dst);
 								ok = 0;
 								break;
@@ -811,7 +811,7 @@ optimize_jmpnz:
 					break;
 				case ZEND_COALESCE:
 					if (opline->op1_type == IS_CONST) {
-						if (Z_TYPE_P(CT_CONSTANT_EX(op_array, opline->op1.constant)) == IS_NULL) {
+						if (Z_IS_NULL_P(CT_CONSTANT_EX(op_array, opline->op1.constant))) {
 							MAKE_NOP(opline);
 							removed_ops++;
 							take_successor_1(ssa, block_num, block);
@@ -940,7 +940,7 @@ void zend_dfa_optimize_op_array(zend_op_array *op_array, zend_optimizer_ctx *ctx
 // op_1: ASSIGN ? -> #v [use_as_double], long(?) => ASSIGN ? -> #v, double(?)
 
 					zval *zv = CT_CONSTANT_EX(op_array, opline->op2.constant);
-					ZEND_ASSERT(Z_TYPE_INFO_P(zv) == IS_LONG);
+					ZEND_ASSERT(Z_IS_LONG_P(zv));
 					ZVAL_DOUBLE(&tmp, zval_get_double(zv));
 					opline->op2.constant = zend_optimizer_add_literal(op_array, &tmp);
 
@@ -951,7 +951,7 @@ void zend_dfa_optimize_op_array(zend_op_array *op_array, zend_optimizer_ctx *ctx
 // op_1: QM_ASSIGN #v [use_as_double], long(?) => QM_ASSIGN #v, double(?)
 
 					zval *zv = CT_CONSTANT_EX(op_array, opline->op1.constant);
-					ZEND_ASSERT(Z_TYPE_INFO_P(zv) == IS_LONG);
+					ZEND_ASSERT(Z_IS_LONG_P(zv));
 					ZVAL_DOUBLE(&tmp, zval_get_double(zv));
 					opline->op1.constant = zend_optimizer_add_literal(op_array, &tmp);
 				}
@@ -969,7 +969,7 @@ void zend_dfa_optimize_op_array(zend_op_array *op_array, zend_optimizer_ctx *ctx
 					if (opline->op1_type == IS_CONST
 					 && opline->op2_type != IS_CONST
 					 && (OP2_INFO() & MAY_BE_ANY) == MAY_BE_DOUBLE
-					 && Z_TYPE_INFO_P(CT_CONSTANT_EX(op_array, opline->op1.constant)) == IS_LONG
+					 && Z_IS_LONG_P(CT_CONSTANT_EX(op_array, opline->op1.constant))
 					) {
 
 // op_1: #v.? = ADD long(?), #?.? [double] => #v.? = ADD double(?), #?.? [double]
@@ -981,7 +981,7 @@ void zend_dfa_optimize_op_array(zend_op_array *op_array, zend_optimizer_ctx *ctx
 					} else if (opline->op1_type != IS_CONST
 					 && opline->op2_type == IS_CONST
 					 && (OP1_INFO() & MAY_BE_ANY) == MAY_BE_DOUBLE
-					 && Z_TYPE_INFO_P(CT_CONSTANT_EX(op_array, opline->op2.constant)) == IS_LONG
+					 && Z_IS_LONG_P(CT_CONSTANT_EX(op_array, opline->op2.constant))
 					) {
 
 // op_1: #v.? = ADD #?.? [double], long(?) => #v.? = ADD #?.? [double], double(?)
@@ -1091,7 +1091,7 @@ void zend_dfa_optimize_op_array(zend_op_array *op_array, zend_optimizer_ctx *ctx
 			 && opline->extended_value == 0
 			 && ssa->ops[op_1].op1_def == v
 			 && opline->op2_type == IS_CONST
-			 && Z_TYPE_P(CT_CONSTANT_EX(op_array, opline->op2.constant)) == IS_LONG
+			 && Z_IS_LONG_P(CT_CONSTANT_EX(op_array, opline->op2.constant))
 			 && Z_LVAL_P(CT_CONSTANT_EX(op_array, opline->op2.constant)) == 1
 			 && ssa->ops[op_1].op1_use >= 0
 			 && !(ssa->var_info[ssa->ops[op_1].op1_use].type & (MAY_BE_FALSE|MAY_BE_TRUE|MAY_BE_STRING|MAY_BE_ARRAY|MAY_BE_OBJECT|MAY_BE_RESOURCE|MAY_BE_REF))) {
@@ -1105,7 +1105,7 @@ void zend_dfa_optimize_op_array(zend_op_array *op_array, zend_optimizer_ctx *ctx
 			 && opline->extended_value == 0
 			 && ssa->ops[op_1].op1_def == v
 			 && opline->op2_type == IS_CONST
-			 && Z_TYPE_P(CT_CONSTANT_EX(op_array, opline->op2.constant)) == IS_LONG
+			 && Z_IS_LONG_P(CT_CONSTANT_EX(op_array, opline->op2.constant))
 			 && Z_LVAL_P(CT_CONSTANT_EX(op_array, opline->op2.constant)) == 1
 			 && ssa->ops[op_1].op1_use >= 0
 			 && !(ssa->var_info[ssa->ops[op_1].op1_use].type & (MAY_BE_FALSE|MAY_BE_TRUE|MAY_BE_STRING|MAY_BE_ARRAY|MAY_BE_OBJECT|MAY_BE_RESOURCE|MAY_BE_REF))) {

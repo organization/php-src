@@ -674,11 +674,11 @@ static void cgi_php_load_env_var(char *var, unsigned int var_len, char *val, uns
 
 static void cgi_php_import_environment_variables(zval *array_ptr)
 {
-	if (Z_TYPE(PG(http_globals)[TRACK_VARS_ENV]) != IS_ARRAY) {
+	if (!Z_IS_ARRAY(PG(http_globals)[TRACK_VARS_ENV])) {
 		zend_is_auto_global_str("_ENV", sizeof("_ENV")-1);
 	}
 
-	if (Z_TYPE(PG(http_globals)[TRACK_VARS_ENV]) == IS_ARRAY &&
+	if (Z_IS_ARRAY(PG(http_globals)[TRACK_VARS_ENV]) &&
 		Z_ARR_P(array_ptr) != Z_ARR(PG(http_globals)[TRACK_VARS_ENV])) {
 		zend_array_destroy(Z_ARR_P(array_ptr));
 		Z_ARR_P(array_ptr) = zend_array_dup(Z_ARR(PG(http_globals)[TRACK_VARS_ENV]));

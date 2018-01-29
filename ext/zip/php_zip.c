@@ -297,7 +297,7 @@ static int php_zip_add_file(struct zip *za, const char *filename, size_t filenam
 	}
 
 	php_stat(resolved_path, strlen(resolved_path), FS_EXISTS, &exists_flag);
-	if (Z_TYPE(exists_flag) == IS_FALSE) {
+	if (Z_IS_FALSE(exists_flag)) {
 		return -1;
 	}
 
@@ -324,7 +324,7 @@ static int php_zip_parse_options(zval *options, zend_long *remove_all_path, char
 
 	/* If I add more options, it would make sense to create a nice static struct and loop over it. */
 	if ((option = zend_hash_str_find(Z_ARRVAL_P(options), "remove_path", sizeof("remove_path") - 1)) != NULL) {
-		if (Z_TYPE_P(option) != IS_STRING) {
+		if (!Z_IS_STRING_P(option)) {
 			php_error_docref(NULL, E_WARNING, "remove_path option expected to be a string");
 			return -1;
 		}
@@ -344,7 +344,7 @@ static int php_zip_parse_options(zval *options, zend_long *remove_all_path, char
 	}
 
 	if ((option = zend_hash_str_find(Z_ARRVAL_P(options), "add_path", sizeof("add_path") - 1)) != NULL) {
-		if (Z_TYPE_P(option) != IS_STRING) {
+		if (!Z_IS_STRING_P(option)) {
 			php_error_docref(NULL, E_WARNING, "add_path option expected to be a string");
 			return -1;
 		}
@@ -880,7 +880,7 @@ static zval *php_zip_get_property_ptr_ptr(zval *object, zval *member, int type, 
 	zip_prop_handler *hnd = NULL;
 	zend_object_handlers *std_hnd;
 
-	if (Z_TYPE_P(member) != IS_STRING) {
+	if (!Z_IS_STRING_P(member)) {
 		ZVAL_STR(&tmp_member, zval_get_string_func(member));
 		member = &tmp_member;
 		cache_slot = NULL;
@@ -913,7 +913,7 @@ static zval *php_zip_read_property(zval *object, zval *member, int type, void **
 	zip_prop_handler *hnd = NULL;
 	zend_object_handlers *std_hnd;
 
-	if (Z_TYPE_P(member) != IS_STRING) {
+	if (!Z_IS_STRING_P(member)) {
 		ZVAL_STR(&tmp_member, zval_get_string_func(member));
 		member = &tmp_member;
 		cache_slot = NULL;
@@ -951,7 +951,7 @@ static int php_zip_has_property(zval *object, zval *member, int type, void **cac
 	zend_object_handlers *std_hnd;
 	int retval = 0;
 
-	if (Z_TYPE_P(member) != IS_STRING) {
+	if (!Z_IS_STRING_P(member)) {
 		ZVAL_STR(&tmp_member, zval_get_string_func(member));
 		member = &tmp_member;
 		cache_slot = NULL;
@@ -972,7 +972,7 @@ static int php_zip_has_property(zval *object, zval *member, int type, void **cac
 			if (type == 1) {
 				retval = zend_is_true(&tmp);
 			} else if (type == 0) {
-				retval = (Z_TYPE(tmp) != IS_NULL);
+				retval = (!Z_IS_NULL(tmp));
 			}
 		}
 
@@ -2754,7 +2754,7 @@ static ZIPARCHIVE_METHOD(extractTo)
 	}
 
 	ZIP_FROM_OBJECT(intern, self);
-	if (zval_files && (Z_TYPE_P(zval_files) != IS_NULL)) {
+	if (zval_files && (!Z_IS_NULL_P(zval_files))) {
 		switch (Z_TYPE_P(zval_files)) {
 			case IS_STRING:
 				if (!php_zip_extract_file(intern, pathto, Z_STRVAL_P(zval_files), Z_STRLEN_P(zval_files))) {

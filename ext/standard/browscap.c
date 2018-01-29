@@ -691,7 +691,7 @@ static void browscap_zval_copy_ctor(zval *p) /* {{{ */
 	if (Z_REFCOUNTED_P(p)) {
 		zend_string *str;
 
-		ZEND_ASSERT(Z_TYPE_P(p) == IS_STRING);
+		ZEND_ASSERT(Z_IS_STRING_P(p));
 		str = Z_STR_P(p);
 		if (!(GC_FLAGS(str) & GC_PERSISTENT)) {
 			GC_ADDREF(str);
@@ -735,7 +735,7 @@ PHP_FUNCTION(get_browser)
 
 	if (agent_name == NULL) {
 		zval *http_user_agent = NULL;
-		if (Z_TYPE(PG(http_globals)[TRACK_VARS_SERVER]) == IS_ARRAY
+		if (Z_IS_ARRAY(PG(http_globals)[TRACK_VARS_SERVER])
 				|| zend_is_auto_global_str(ZEND_STRL("_SERVER"))) {
 			http_user_agent = zend_hash_str_find(
 				Z_ARRVAL_P(&PG(http_globals)[TRACK_VARS_SERVER]),

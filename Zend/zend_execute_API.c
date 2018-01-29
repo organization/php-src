@@ -186,10 +186,10 @@ void init_executor(void) /* {{{ */
 
 static int zval_call_destructor(zval *zv) /* {{{ */
 {
-	if (Z_TYPE_P(zv) == IS_INDIRECT) {
+	if (Z_IS_INDIRECT_P(zv)) {
 		zv = Z_INDIRECT_P(zv);
 	}
-	if (Z_TYPE_P(zv) == IS_OBJECT && Z_REFCOUNT_P(zv) == 1) {
+	if (Z_IS_OBJECT_P(zv) && Z_REFCOUNT_P(zv) == 1) {
 		return ZEND_HASH_APPLY_REMOVE;
 	} else {
 		return ZEND_HASH_APPLY_KEEP;
@@ -199,7 +199,7 @@ static int zval_call_destructor(zval *zv) /* {{{ */
 
 static void zend_unclean_zval_ptr_dtor(zval *zv) /* {{{ */
 {
-	if (Z_TYPE_P(zv) == IS_INDIRECT) {
+	if (Z_IS_INDIRECT_P(zv)) {
 		zv = Z_INDIRECT_P(zv);
 	}
 	i_zval_ptr_dtor(zv ZEND_FILE_LINE_CC);
@@ -309,12 +309,12 @@ void shutdown_executor(void) /* {{{ */
 
 		/* remove error handlers before destroying classes and functions,
 		 * so that if handler used some class, crash would not happen */
-		if (Z_TYPE(EG(user_error_handler)) != IS_UNDEF) {
+		if (!Z_IS_UNDEF(EG(user_error_handler))) {
 			zval_ptr_dtor(&EG(user_error_handler));
 			ZVAL_UNDEF(&EG(user_error_handler));
 		}
 
-		if (Z_TYPE(EG(user_exception_handler)) != IS_UNDEF) {
+		if (!Z_IS_UNDEF(EG(user_exception_handler))) {
 			zval_ptr_dtor(&EG(user_exception_handler));
 			ZVAL_UNDEF(&EG(user_exception_handler));
 		}
@@ -987,7 +987,7 @@ ZEND_API zend_class_entry *zend_lookup_class(zend_string *name) /* {{{ */
 ZEND_API zend_class_entry *zend_get_called_scope(zend_execute_data *ex) /* {{{ */
 {
 	while (ex) {
-		if (Z_TYPE(ex->This) == IS_OBJECT) {
+		if (Z_IS_OBJECT(ex->This)) {
 			return Z_OBJCE(ex->This);
 		} else if (Z_CE(ex->This)) {
 			return Z_CE(ex->This);
@@ -1005,7 +1005,7 @@ ZEND_API zend_class_entry *zend_get_called_scope(zend_execute_data *ex) /* {{{ *
 ZEND_API zend_object *zend_get_this_object(zend_execute_data *ex) /* {{{ */
 {
 	while (ex) {
-		if (Z_TYPE(ex->This) == IS_OBJECT) {
+		if (Z_IS_OBJECT(ex->This)) {
 			return Z_OBJ(ex->This);
 		} else if (ex->func) {
 			if (ex->func->type != ZEND_INTERNAL_FUNCTION || ex->func->common.scope) {
@@ -1058,7 +1058,7 @@ ZEND_API int zend_eval_stringl(char *str, size_t str_len, zval *retval_ptr, char
 			zend_bailout();
 		} zend_end_try();
 
-		if (Z_TYPE(local_retval) != IS_UNDEF) {
+		if (!Z_IS_UNDEF(local_retval)) {
 			if (retval_ptr) {
 				ZVAL_COPY_VALUE(retval_ptr, &local_retval);
 			} else {
@@ -1539,7 +1539,7 @@ ZEND_API void zend_attach_symbol_table(zend_execute_data *execute_data) /* {{{ *
 			zval *zv = zend_hash_find_ex(ht, *str, 1);
 
 			if (zv) {
-				if (Z_TYPE_P(zv) == IS_INDIRECT) {
+				if (Z_IS_INDIRECT_P(zv)) {
 					zval *val = Z_INDIRECT_P(zv);
 
 					ZVAL_COPY_VALUE(var, val);
@@ -1570,7 +1570,7 @@ ZEND_API void zend_detach_symbol_table(zend_execute_data *execute_data) /* {{{ *
 		zval *var = EX_VAR_NUM(0);
 
 		do {
-			if (Z_TYPE_P(var) == IS_UNDEF) {
+			if (Z_IS_UNDEF_P(var)) {
 				zend_hash_del(ht, *str);
 			} else {
 				zend_hash_update(ht, *str, var);

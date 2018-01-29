@@ -67,7 +67,7 @@ sb4 callback_fn(void *svchp, void *envhp, void *fo_ctx, ub4 fo_type, ub4 fo_even
 	}
 
 	/* Set return value */
-	if (Z_TYPE(retval) == IS_LONG) {
+	if (Z_IS_LONG(retval)) {
 		returnValue = (sb4) Z_LVAL(retval);
 	}
 

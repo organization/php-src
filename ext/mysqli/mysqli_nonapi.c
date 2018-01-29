@@ -657,13 +657,13 @@ static int mysqlnd_zval_array_to_mysqlnd_array(zval *in_array, MYSQLND ***out_ar
 	zval *elem;
 	int i = 0, current = 0;
 
-	if (Z_TYPE_P(in_array) != IS_ARRAY) {
+	if (!Z_IS_ARRAY_P(in_array)) {
 		return 0;
 	}
 	*out_array = ecalloc(zend_hash_num_elements(Z_ARRVAL_P(in_array)) + 1, sizeof(MYSQLND *));
 	ZEND_HASH_FOREACH_VAL(Z_ARRVAL_P(in_array), elem) {
 		i++;
-		if (Z_TYPE_P(elem) != IS_OBJECT ||
+		if (!Z_IS_OBJECT_P(elem) ||
 			!instanceof_function(Z_OBJCE_P(elem), mysqli_link_class_entry)) {
 			php_error_docref(NULL, E_WARNING, "Parameter %d not a mysqli object", i);
 		} else {
@@ -698,7 +698,7 @@ static int mysqlnd_zval_array_from_mysqlnd_array(MYSQLND **in_array, zval *out_a
 
 	ZEND_HASH_FOREACH_VAL(Z_ARRVAL_P(out_array), elem) {
 		i++;
-		if (Z_TYPE_P(elem) != IS_OBJECT ||
+		if (!Z_IS_OBJECT_P(elem) ||
 				!instanceof_function(Z_OBJCE_P(elem), mysqli_link_class_entry)) {
 			continue;
 		}

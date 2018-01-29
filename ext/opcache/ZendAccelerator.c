@@ -648,7 +648,7 @@ static void accel_copy_permanent_strings(zend_new_interned_string_func_t new_int
 		if (c->name) {
 			c->name = new_interned_string(c->name);
 		}
-		if (Z_TYPE(c->value) == IS_STRING) {
+		if (Z_IS_STRING(c->value)) {
 			ZVAL_STR(&c->value, new_interned_string(Z_STR(c->value)));
 		}
 	} ZEND_HASH_FOREACH_END();

@@ -201,8 +201,8 @@ static void dom_xpath_ext_function_php(xmlXPathParserContextPtr ctxt, int nargs,
 		valuePush(ctxt, xmlXPathNewString((xmlChar *)""));
 	} else {
 		result = zend_call_function(&fci, NULL);
-		if (result == SUCCESS && Z_TYPE(retval) != IS_UNDEF) {
-			if (Z_TYPE(retval) == IS_OBJECT && instanceof_function(Z_OBJCE(retval), dom_node_class_entry)) {
+		if (result == SUCCESS && !Z_IS_UNDEF(retval)) {
+			if (Z_IS_OBJECT(retval) && instanceof_function(Z_OBJCE(retval), dom_node_class_entry)) {
 				xmlNode *nodep;
 				dom_object *obj;
 				if (intern->node_list == NULL) {
@@ -213,9 +213,9 @@ static void dom_xpath_ext_function_php(xmlXPathParserContextPtr ctxt, int nargs,
 				obj = Z_DOMOBJ_P(&retval);
 				nodep = dom_object_get_node(obj);
 				valuePush(ctxt, xmlXPathNewNodeSet(nodep));
-			} else if (Z_TYPE(retval) == IS_FALSE || Z_TYPE(retval) == IS_TRUE) {
-				valuePush(ctxt, xmlXPathNewBoolean(Z_TYPE(retval) == IS_TRUE));
-			} else if (Z_TYPE(retval) == IS_OBJECT) {
+			} else if (Z_IS_FALSE(retval) || Z_IS_TRUE(retval)) {
+				valuePush(ctxt, xmlXPathNewBoolean(Z_IS_TRUE(retval)));
+			} else if (Z_IS_OBJECT(retval)) {
 				php_error_docref(NULL, E_WARNING, "A PHP Object cannot be converted to a XPath-string");
 				valuePush(ctxt, xmlXPathNewString((xmlChar *)""));
 			} else {

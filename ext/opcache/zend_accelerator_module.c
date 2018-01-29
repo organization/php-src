@@ -356,7 +356,7 @@ static int accel_file_in_cache(INTERNAL_FUNCTION_PARAMETERS)
 
 	if (ZEND_NUM_ARGS() != 1 ||
 	    zend_get_parameters_array_ex(1, &zfilename) == FAILURE ||
-	    Z_TYPE(zfilename) != IS_STRING ||
+	    !Z_IS_STRING(zfilename) ||
 	    Z_STRLEN(zfilename) == 0) {
 		return 0;
 	}

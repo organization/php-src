@@ -46,7 +46,7 @@ static const DateFormat::EStyle valid_styles[] = {
 };
 
 static bool valid_format(zval *z) {
-	if (Z_TYPE_P(z) == IS_LONG) {
+	if (Z_IS_LONG_P(z)) {
 		zend_long lval = Z_LVAL_P(z);
 		for (int i = 0; i < sizeof(valid_styles) / sizeof(*valid_styles); i++) {
 			if ((zend_long)valid_styles[i] == lval) {
@@ -82,9 +82,9 @@ U_CFUNC PHP_FUNCTION(datefmt_format_object)
 		locale_str = intl_locale_get_default();
 	}
 
-	if (format == NULL || Z_TYPE_P(format) == IS_NULL) {
+	if (format == NULL || Z_IS_NULL_P(format)) {
 		//nothing
-	} else if (Z_TYPE_P(format) == IS_ARRAY) {
+	} else if (Z_IS_ARRAY_P(format)) {
 		HashTable		*ht	= Z_ARRVAL_P(format);
 		uint32_t         idx;
 		zval			*z;
@@ -99,7 +99,7 @@ U_CFUNC PHP_FUNCTION(datefmt_format_object)
 		idx = 0;
 		while (idx < ht->nNumUsed) {
 			z = &ht->arData[idx].val;
-			if (Z_TYPE_P(z) != IS_UNDEF) {
+			if (!Z_IS_UNDEF_P(z)) {
 				break;
 			}
 			idx++;
@@ -115,7 +115,7 @@ U_CFUNC PHP_FUNCTION(datefmt_format_object)
 		idx++;
 		while (idx < ht->nNumUsed) {
 			z = &ht->arData[idx].val;
-			if (Z_TYPE_P(z) != IS_UNDEF) {
+			if (!Z_IS_UNDEF_P(z)) {
 				break;
 			}
 			idx++;
@@ -127,7 +127,7 @@ U_CFUNC PHP_FUNCTION(datefmt_format_object)
 			RETURN_FALSE;
 		}
 		timeStyle = (DateFormat::EStyle)Z_LVAL_P(z);
-	} else if (Z_TYPE_P(format) == IS_LONG) {
+	} else if (Z_IS_LONG_P(format)) {
 		if (!valid_format(format)) {
 			intl_error_set(NULL, U_ILLEGAL_ARGUMENT_ERROR,
 					"datefmt_format_object: the date/time format type is invalid",

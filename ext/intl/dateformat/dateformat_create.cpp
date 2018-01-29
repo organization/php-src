@@ -114,7 +114,7 @@ static int datefmt_ctor(INTERNAL_FUNCTION_PARAMETERS, zend_bool is_constructor)
 	}
 
 	/* process timezone */
-	explicit_tz = timezone_zv != NULL && Z_TYPE_P(timezone_zv) != IS_NULL;
+	explicit_tz = timezone_zv != NULL && !Z_IS_NULL_P(timezone_zv);
 
 	if (explicit_tz || calendar_owned ) {
 		//we have an explicit time zone or a non-object calendar

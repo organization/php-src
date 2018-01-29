@@ -359,7 +359,7 @@ static php_stream *user_wrapper_opener(php_stream_wrapper *wrapper, const char *
 	us->wrapper = uwrap;
 
 	user_stream_create_object(uwrap, context, &us->object);
-	if (Z_TYPE(us->object) == IS_UNDEF) {
+	if (Z_IS_UNDEF(us->object)) {
 		FG(user_stream_current_filename) = NULL;
 		PG(in_user_include) = old_in_user_include;
 		efree(us);
@@ -386,12 +386,12 @@ static php_stream *user_wrapper_opener(php_stream_wrapper *wrapper, const char *
 		zend_bailout();
 	} zend_end_try();
 
-	if (call_result == SUCCESS && Z_TYPE(zretval) != IS_UNDEF && zval_is_true(&zretval)) {
+	if (call_result == SUCCESS && !Z_IS_UNDEF(zretval) && zval_is_true(&zretval)) {
 		/* the stream is now open! */
 		stream = php_stream_alloc_rel(&php_stream_userspace_ops, us, 0, mode);
 
 		/* if the opened path is set, copy it out */
-		if (Z_ISREF(args[3]) && Z_TYPE_P(Z_REFVAL(args[3])) == IS_STRING && opened_path) {
+		if (Z_ISREF(args[3]) && Z_IS_STRING_P(Z_REFVAL(args[3])) && opened_path) {
 			*opened_path = zend_string_copy(Z_STR_P(Z_REFVAL(args[3])));
 		}
 
@@ -442,7 +442,7 @@ static php_stream *user_wrapper_opendir(php_stream_wrapper *wrapper, const char 
 	us->wrapper = uwrap;
 
 	user_stream_create_object(uwrap, context, &us->object);
-	if (Z_TYPE(us->object) == IS_UNDEF) {
+	if (Z_IS_UNDEF(us->object)) {
 		FG(user_stream_current_filename) = NULL;
 		efree(us);
 		return NULL;
@@ -461,7 +461,7 @@ static php_stream *user_wrapper_opendir(php_stream_wrapper *wrapper, const char 
 			2, args,
 			0, NULL	);
 
-	if (call_result == SUCCESS && Z_TYPE(zretval) != IS_UNDEF && zval_is_true(&zretval)) {
+	if (call_result == SUCCESS && !Z_IS_UNDEF(zretval) && zval_is_true(&zretval)) {
 		/* the stream is now open! */
 		stream = php_stream_alloc_rel(&php_stream_userspace_dir_ops, us, 0, mode);
 
@@ -618,7 +618,7 @@ static size_t php_userstreamop_write(php_stream *stream, const char *buf, size_t
 		return 0;
 	}
 
-	if (call_result == SUCCESS && Z_TYPE(retval) != IS_UNDEF) {
+	if (call_result == SUCCESS && !Z_IS_UNDEF(retval)) {
 		convert_to_long(&retval);
 		didwrite = Z_LVAL(retval);
 	} else if (call_result == FAILURE) {
@@ -668,7 +668,7 @@ static size_t php_userstreamop_read(php_stream *stream, char *buf, size_t count)
 		return -1;
 	}
 
-	if (call_result == SUCCESS && Z_TYPE(retval) != IS_UNDEF) {
+	if (call_result == SUCCESS && !Z_IS_UNDEF(retval)) {
 		convert_to_string(&retval);
 		didread = Z_STRLEN(retval);
 		if (didread > count) {
@@ -696,7 +696,7 @@ static size_t php_userstreamop_read(php_stream *stream, char *buf, size_t count)
 			&retval,
 			0, NULL, 0, NULL);
 
-	if (call_result == SUCCESS && Z_TYPE(retval) != IS_UNDEF && zval_is_true(&retval)) {
+	if (call_result == SUCCESS && !Z_IS_UNDEF(retval) && zval_is_true(&retval)) {
 		stream->eof = 1;
 	} else if (call_result == FAILURE) {
 		php_error_docref(NULL, E_WARNING,
@@ -756,7 +756,7 @@ static int php_userstreamop_flush(php_stream *stream)
 			&retval,
 			0, NULL, 0, NULL);
 
-	if (call_result == SUCCESS && Z_TYPE(retval) != IS_UNDEF && zval_is_true(&retval))
+	if (call_result == SUCCESS && !Z_IS_UNDEF(retval) && zval_is_true(&retval))
 		call_result = 0;
 	else
 		call_result = -1;
@@ -801,7 +801,7 @@ static int php_userstreamop_seek(php_stream *stream, zend_off_t offset, int when
 		zval_ptr_dtor(&retval);
 
 		return -1;
-	} else if (call_result == SUCCESS && Z_TYPE(retval) != IS_UNDEF && zval_is_true(&retval)) {
+	} else if (call_result == SUCCESS && !Z_IS_UNDEF(retval) && zval_is_true(&retval)) {
 		ret = 0;
 	} else {
 		ret = -1;
@@ -823,7 +823,7 @@ static int php_userstreamop_seek(php_stream *stream, zend_off_t offset, int when
 		&retval,
 		0, NULL, 0, NULL);
 
-	if (call_result == SUCCESS && Z_TYPE(retval) == IS_LONG) {
+	if (call_result == SUCCESS && Z_IS_LONG(retval)) {
 		*newoffs = Z_LVAL(retval);
 		ret = 0;
 	} else if (call_result == FAILURE) {
@@ -893,7 +893,7 @@ static int php_userstreamop_stat(php_stream *stream, php_stream_statbuf *ssb)
 			&retval,
 			0, NULL, 0, NULL);
 
-	if (call_result == SUCCESS && Z_TYPE(retval) == IS_ARRAY) {
+	if (call_result == SUCCESS && Z_IS_ARRAY(retval)) {
 		if (SUCCESS == statbuf_from_array(&retval, ssb))
 			ret = 0;
 	} else {
@@ -922,7 +922,7 @@ static int php_userstreamop_set_option(php_stream *stream, int option, int value
 	case PHP_STREAM_OPTION_CHECK_LIVENESS:
 		ZVAL_STRINGL(&func_name, USERSTREAM_EOF, sizeof(USERSTREAM_EOF)-1);
 		call_result = call_user_function_ex(NULL, Z_ISUNDEF(us->object)? NULL : &us->object, &func_name, &retval, 0, NULL, 0, NULL);
-		if (call_result == SUCCESS && (Z_TYPE(retval) == IS_FALSE || Z_TYPE(retval) == IS_TRUE)) {
+		if (call_result == SUCCESS && (Z_IS_FALSE(retval) || Z_IS_TRUE(retval))) {
 			ret = zval_is_true(&retval) ? PHP_STREAM_OPTION_RETURN_ERR : PHP_STREAM_OPTION_RETURN_OK;
 		} else {
 			ret = PHP_STREAM_OPTION_RETURN_ERR;
@@ -961,8 +961,8 @@ static int php_userstreamop_set_option(php_stream *stream, int option, int value
 						&retval,
 						1, args, 0, NULL);
 
-		if (call_result == SUCCESS && (Z_TYPE(retval) == IS_FALSE || Z_TYPE(retval) == IS_TRUE)) {
-			ret = (Z_TYPE(retval) == IS_FALSE);
+		if (call_result == SUCCESS && (Z_IS_FALSE(retval) || Z_IS_TRUE(retval))) {
+			ret = (Z_IS_FALSE(retval));
 		} else if (call_result == FAILURE) {
 			if (value == 0) {
 			   	/* lock support test (TODO: more check) */
@@ -1001,9 +1001,9 @@ static int php_userstreamop_set_option(php_stream *stream, int option, int value
 								&func_name,
 								&retval,
 								1, args, 0, NULL);
-				if (call_result == SUCCESS && Z_TYPE(retval) != IS_UNDEF) {
-					if (Z_TYPE(retval) == IS_FALSE || Z_TYPE(retval) == IS_TRUE) {
-						ret = (Z_TYPE(retval) == IS_TRUE) ? PHP_STREAM_OPTION_RETURN_OK :
+				if (call_result == SUCCESS && !Z_IS_UNDEF(retval)) {
+					if (Z_IS_FALSE(retval) || Z_IS_TRUE(retval)) {
+						ret = (Z_IS_TRUE(retval)) ? PHP_STREAM_OPTION_RETURN_OK :
 											   PHP_STREAM_OPTION_RETURN_ERR;
 					} else {
 						php_error_docref(NULL, E_WARNING,
@@ -1070,7 +1070,7 @@ static int php_userstreamop_set_option(php_stream *stream, int option, int value
 			php_error_docref(NULL, E_WARNING, "%s::" USERSTREAM_SET_OPTION " is not implemented!",
 					us->wrapper->classname);
 			ret = PHP_STREAM_OPTION_RETURN_ERR;
-		} else if (Z_TYPE(retval) != IS_UNDEF && zend_is_true(&retval)) {
+		} else if (!Z_IS_UNDEF(retval) && zend_is_true(&retval)) {
 			ret = PHP_STREAM_OPTION_RETURN_OK;
 		} else {
 			ret = PHP_STREAM_OPTION_RETURN_ERR;
@@ -1101,7 +1101,7 @@ static int user_wrapper_unlink(php_stream_wrapper *wrapper, const char *url, int
 
 	/* create an instance of our class */
 	user_stream_create_object(uwrap, context, &object);
-	if (Z_TYPE(object) == IS_UNDEF) {
+	if (Z_IS_UNDEF(object)) {
 		return ret;
 	}
 
@@ -1117,8 +1117,8 @@ static int user_wrapper_unlink(php_stream_wrapper *wrapper, const char *url, int
 			1, args,
 			0, NULL	);
 
-	if (call_result == SUCCESS && (Z_TYPE(zretval) == IS_FALSE || Z_TYPE(zretval) == IS_TRUE)) {
-		ret = (Z_TYPE(zretval) == IS_TRUE);
+	if (call_result == SUCCESS && (Z_IS_FALSE(zretval) || Z_IS_TRUE(zretval))) {
+		ret = (Z_IS_TRUE(zretval));
 	} else if (call_result == FAILURE) {
 		php_error_docref(NULL, E_WARNING, "%s::" USERSTREAM_UNLINK " is not implemented!", uwrap->classname);
  	}
@@ -1145,7 +1145,7 @@ static int user_wrapper_rename(php_stream_wrapper *wrapper, const char *url_from
 
 	/* create an instance of our class */
 	user_stream_create_object(uwrap, context, &object);
-	if (Z_TYPE(object) == IS_UNDEF) {
+	if (Z_IS_UNDEF(object)) {
 		return ret;
 	}
 
@@ -1162,8 +1162,8 @@ static int user_wrapper_rename(php_stream_wrapper *wrapper, const char *url_from
 			2, args,
 			0, NULL	);
 
-	if (call_result == SUCCESS && (Z_TYPE(zretval) == IS_FALSE || Z_TYPE(zretval) == IS_TRUE)) {
-		ret = (Z_TYPE(zretval) == IS_TRUE);
+	if (call_result == SUCCESS && (Z_IS_FALSE(zretval) || Z_IS_TRUE(zretval))) {
+		ret = (Z_IS_TRUE(zretval));
 	} else if (call_result == FAILURE) {
 		php_error_docref(NULL, E_WARNING, "%s::" USERSTREAM_RENAME " is not implemented!", uwrap->classname);
  	}
@@ -1191,7 +1191,7 @@ static int user_wrapper_mkdir(php_stream_wrapper *wrapper, const char *url, int 
 
 	/* create an instance of our class */
 	user_stream_create_object(uwrap, context, &object);
-	if (Z_TYPE(object) == IS_UNDEF) {
+	if (Z_IS_UNDEF(object)) {
 		return ret;
 	}
 
@@ -1209,8 +1209,8 @@ static int user_wrapper_mkdir(php_stream_wrapper *wrapper, const char *url, int 
 			3, args,
 			0, NULL	);
 
-	if (call_result == SUCCESS && (Z_TYPE(zretval) == IS_FALSE || Z_TYPE(zretval) == IS_TRUE)) {
-		ret = (Z_TYPE(zretval) == IS_TRUE);
+	if (call_result == SUCCESS && (Z_IS_FALSE(zretval) || Z_IS_TRUE(zretval))) {
+		ret = (Z_IS_TRUE(zretval));
 	} else if (call_result == FAILURE) {
 		php_error_docref(NULL, E_WARNING, "%s::" USERSTREAM_MKDIR " is not implemented!", uwrap->classname);
  	}
@@ -1239,7 +1239,7 @@ static int user_wrapper_rmdir(php_stream_wrapper *wrapper, const char *url,
 
 	/* create an instance of our class */
 	user_stream_create_object(uwrap, context, &object);
-	if (Z_TYPE(object) == IS_UNDEF) {
+	if (Z_IS_UNDEF(object)) {
 		return ret;
 	}
 
@@ -1256,8 +1256,8 @@ static int user_wrapper_rmdir(php_stream_wrapper *wrapper, const char *url,
 			2, args,
 			0, NULL	);
 
-	if (call_result == SUCCESS && (Z_TYPE(zretval) == IS_FALSE || Z_TYPE(zretval) == IS_TRUE)) {
-		ret = (Z_TYPE(zretval) == IS_TRUE);
+	if (call_result == SUCCESS && (Z_IS_FALSE(zretval) || Z_IS_TRUE(zretval))) {
+		ret = (Z_IS_TRUE(zretval));
 	} else if (call_result == FAILURE) {
 		php_error_docref(NULL, E_WARNING, "%s::" USERSTREAM_RMDIR " is not implemented!", uwrap->classname);
  	}
@@ -1309,7 +1309,7 @@ static int user_wrapper_metadata(php_stream_wrapper *wrapper, const char *url, i
 
 	/* create an instance of our class */
 	user_stream_create_object(uwrap, context, &object);
-	if (Z_TYPE(object) == IS_UNDEF) {
+	if (Z_IS_UNDEF(object)) {
 		zval_ptr_dtor(&args[2]);
 		return ret;
 	}
@@ -1327,8 +1327,8 @@ static int user_wrapper_metadata(php_stream_wrapper *wrapper, const char *url, i
 			3, args,
 			0, NULL	);
 
-	if (call_result == SUCCESS && (Z_TYPE(zretval) == IS_FALSE || Z_TYPE(zretval) == IS_TRUE)) {
-		ret = Z_TYPE(zretval) == IS_TRUE;
+	if (call_result == SUCCESS && (Z_IS_FALSE(zretval) || Z_IS_TRUE(zretval))) {
+		ret = Z_IS_TRUE(zretval);
 	} else if (call_result == FAILURE) {
 		php_error_docref(NULL, E_WARNING, "%s::" USERSTREAM_METADATA " is not implemented!", uwrap->classname);
  	}
@@ -1358,7 +1358,7 @@ static int user_wrapper_stat_url(php_stream_wrapper *wrapper, const char *url, i
 
 	/* create an instance of our class */
 	user_stream_create_object(uwrap, context, &object);
-	if (Z_TYPE(object) == IS_UNDEF) {
+	if (Z_IS_UNDEF(object)) {
 		return ret;
 	}
 
@@ -1375,7 +1375,7 @@ static int user_wrapper_stat_url(php_stream_wrapper *wrapper, const char *url, i
 			2, args,
 			0, NULL	);
 
-	if (call_result == SUCCESS && Z_TYPE(zretval) == IS_ARRAY) {
+	if (call_result == SUCCESS && Z_IS_ARRAY(zretval)) {
 		/* We got the info we needed */
 		if (SUCCESS == statbuf_from_array(&zretval, ssb))
 			ret = 0;
@@ -1420,7 +1420,7 @@ static size_t php_userstreamop_readdir(php_stream *stream, char *buf, size_t cou
 			0, NULL,
 			0, NULL);
 
-	if (call_result == SUCCESS && Z_TYPE(retval) != IS_FALSE && Z_TYPE(retval) != IS_TRUE) {
+	if (call_result == SUCCESS && !Z_IS_FALSE(retval) && !Z_IS_TRUE(retval)) {
 		convert_to_string(&retval);
 		PHP_STRLCPY(ent->d_name, Z_STRVAL(retval), sizeof(ent->d_name), Z_STRLEN(retval));
 

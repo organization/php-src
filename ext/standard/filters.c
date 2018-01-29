@@ -250,7 +250,7 @@ static php_stream_filter *strfilter_strip_tags_create(const char *filtername, zv
 	inst = pemalloc(sizeof(php_strip_tags_filter), persistent);
 
 	if (filterparams != NULL) {
-		if (Z_TYPE_P(filterparams) == IS_ARRAY) {
+		if (Z_IS_ARRAY_P(filterparams)) {
 			zval *tmp;
 
 			ZEND_HASH_FOREACH_VAL(Z_ARRVAL_P(filterparams), tmp) {
@@ -1702,7 +1702,7 @@ static php_stream_filter *strfilter_convert_create(const char *filtername, zval 
 	char *dot;
 	int conv_mode = 0;
 
-	if (filterparams != NULL && Z_TYPE_P(filterparams) != IS_ARRAY) {
+	if (filterparams != NULL && !Z_IS_ARRAY_P(filterparams)) {
 		php_error_docref(NULL, E_WARNING, "stream filter (%s): invalid filter parameter", filtername);
 		return NULL;
 	}

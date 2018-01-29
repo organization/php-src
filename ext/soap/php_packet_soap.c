@@ -371,7 +371,7 @@ int parse_packet_soap(zval *this_ptr, char *buffer, int buffer_size, sdlFunction
 		}
 	}
 
-	if (Z_TYPE_P(return_value) == IS_ARRAY) {
+	if (Z_IS_ARRAY_P(return_value)) {
 		if (param_count == 0) {
 			zval_dtor(return_value);
 			ZVAL_NULL(return_value);

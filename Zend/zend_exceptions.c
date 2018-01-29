@@ -89,7 +89,7 @@ void zend_exception_set_previous(zend_object *exception, zend_object *add_previo
 	ex = &zv;
 	do {
 		ancestor = zend_read_property_ex(i_get_exception_base(&pv), &pv, ZSTR_KNOWN(ZEND_STR_PREVIOUS), 1, &rv);
-		while (Z_TYPE_P(ancestor) == IS_OBJECT) {
+		while (Z_IS_OBJECT_P(ancestor)) {
 			if (Z_OBJ_P(ancestor) == Z_OBJ_P(ex)) {
 				OBJ_RELEASE(add_previous);
 				return;
@@ -98,7 +98,7 @@ void zend_exception_set_previous(zend_object *exception, zend_object *add_previo
 		}
 		base_ce = i_get_exception_base(ex);
 		previous = zend_read_property_ex(base_ce, ex, ZSTR_KNOWN(ZEND_STR_PREVIOUS), 1, &rv);
-		if (Z_TYPE_P(previous) == IS_NULL) {
+		if (Z_IS_NULL_P(previous)) {
 			zend_update_property_ex(base_ce, ex, ZSTR_KNOWN(ZEND_STR_PREVIOUS), &pv);
 			GC_DELREF(add_previous);
 			return;
@@ -276,7 +276,7 @@ ZEND_METHOD(exception, __construct)
 	if (zend_parse_parameters_ex(ZEND_PARSE_PARAMS_QUIET, argc, "|SlO!", &message, &code, &previous, zend_ce_throwable) == FAILURE) {
 		zend_class_entry *ce;
 
-		if (Z_TYPE(EX(This)) == IS_OBJECT) {
+		if (Z_IS_OBJECT(EX(This))) {
 			ce = Z_OBJCE(EX(This));
 		} else if (Z_CE(EX(This))) {
 			ce = Z_CE(EX(This));
@@ -307,7 +307,7 @@ ZEND_METHOD(exception, __construct)
    Exception unserialize checks */
 #define CHECK_EXC_TYPE(id, type) \
 	pvalue = zend_read_property_ex(i_get_exception_base(object), (object), ZSTR_KNOWN(id), 1, &value); \
-	if (Z_TYPE_P(pvalue) != IS_NULL && Z_TYPE_P(pvalue) != type) { \
+	if (!Z_IS_NULL_P(pvalue) && Z_TYPE_P(pvalue) != type) { \
 		zend_unset_property(i_get_exception_base(object), object, ZSTR_VAL(ZSTR_KNOWN(id)), ZSTR_LEN(ZSTR_KNOWN(id))); \
 	}
 
@@ -322,7 +322,7 @@ ZEND_METHOD(exception, __wakeup)
 	CHECK_EXC_TYPE(ZEND_STR_LINE,     IS_LONG);
 	CHECK_EXC_TYPE(ZEND_STR_TRACE,    IS_ARRAY);
 	pvalue = zend_read_property(i_get_exception_base(object), object, "previous", sizeof("previous")-1, 1, &value);
-	if (pvalue && Z_TYPE_P(pvalue) != IS_NULL && (Z_TYPE_P(pvalue) != IS_OBJECT ||
+	if (pvalue && !Z_IS_NULL_P(pvalue) && (!Z_IS_OBJECT_P(pvalue) ||
 			!instanceof_function(Z_OBJCE_P(pvalue), i_get_exception_base(object)) ||
 			pvalue == object)) {
 		zend_unset_property(i_get_exception_base(object), object, "previous", sizeof("previous")-1);
@@ -343,7 +343,7 @@ ZEND_METHOD(error_exception, __construct)
 	if (zend_parse_parameters_ex(ZEND_PARSE_PARAMS_QUIET, argc, "|sllslO!", &message, &message_len, &code, &severity, &filename, &filename_len, &lineno, &previous, zend_ce_throwable) == FAILURE) {
 		zend_class_entry *ce;
 
-		if (Z_TYPE(EX(This)) == IS_OBJECT) {
+		if (Z_IS_OBJECT(EX(This))) {
 			ce = Z_OBJCE(EX(This));
 		} else if (Z_CE(EX(This))) {
 			ce = Z_CE(EX(This));
@@ -472,7 +472,7 @@ ZEND_METHOD(error_exception, getSeverity)
 #define TRACE_APPEND_KEY(key) do {                                          \
 		tmp = zend_hash_find(ht, key);                                      \
 		if (tmp) {                                                          \
-			if (Z_TYPE_P(tmp) != IS_STRING) {                               \
+			if (!Z_IS_STRING_P(tmp)) {                               \
 				zend_error(E_WARNING, "Value for %s is no string",          \
 					ZSTR_VAL(key));                                         \
 				smart_str_appends(str, "[unknown]");                        \
@@ -549,14 +549,14 @@ static void _build_trace_string(smart_str *str, HashTable *ht, uint32_t num) /* 
 
 	file = zend_hash_find_ex(ht, ZSTR_KNOWN(ZEND_STR_FILE), 1);
 	if (file) {
-		if (Z_TYPE_P(file) != IS_STRING) {
+		if (!Z_IS_STRING_P(file)) {
 			zend_error(E_WARNING, "Function name is no string");
 			smart_str_appends(str, "[unknown function]");
 		} else{
 			zend_long line;
 			tmp = zend_hash_find_ex(ht, ZSTR_KNOWN(ZEND_STR_LINE), 1);
 			if (tmp) {
-				if (Z_TYPE_P(tmp) == IS_LONG) {
+				if (Z_IS_LONG_P(tmp)) {
 					line = Z_LVAL_P(tmp);
 				} else {
 					zend_error(E_WARNING, "Line is no long");
@@ -579,7 +579,7 @@ static void _build_trace_string(smart_str *str, HashTable *ht, uint32_t num) /* 
 	smart_str_appendc(str, '(');
 	tmp = zend_hash_find_ex(ht, ZSTR_KNOWN(ZEND_STR_ARGS), 1);
 	if (tmp) {
-		if (Z_TYPE_P(tmp) == IS_ARRAY) {
+		if (Z_IS_ARRAY_P(tmp)) {
 			size_t last_len = ZSTR_LEN(str->s);
 			zval *arg;
 
@@ -615,11 +615,11 @@ ZEND_METHOD(exception, getTraceAsString)
 	base_ce = i_get_exception_base(object);
 
 	trace = zend_read_property_ex(base_ce, object, ZSTR_KNOWN(ZEND_STR_TRACE), 1, &rv);
-	if (Z_TYPE_P(trace) != IS_ARRAY) {
+	if (!Z_IS_ARRAY_P(trace)) {
 		RETURN_FALSE;
 	}
 	ZEND_HASH_FOREACH_NUM_KEY_VAL(Z_ARRVAL_P(trace), index, frame) {
-		if (Z_TYPE_P(frame) != IS_ARRAY) {
+		if (!Z_IS_ARRAY_P(frame)) {
 			zend_error(E_WARNING, "Expected array for frame " ZEND_ULONG_FMT, index);
 			continue;
 		}
@@ -665,7 +665,7 @@ ZEND_METHOD(exception, __toString)
 	exception = getThis();
 	fname = zend_string_init("gettraceasstring", sizeof("gettraceasstring")-1, 0);
 
-	while (exception && Z_TYPE_P(exception) == IS_OBJECT && instanceof_function(Z_OBJCE_P(exception), zend_ce_throwable)) {
+	while (exception && Z_IS_OBJECT_P(exception) && instanceof_function(Z_OBJCE_P(exception), zend_ce_throwable)) {
 		zend_string *prev_str = str;
 		zend_string *message = zval_get_string(GET_PROPERTY(exception, ZEND_STR_MESSAGE));
 		zend_string *file = zval_get_string(GET_PROPERTY(exception, ZEND_STR_FILE));
@@ -681,7 +681,7 @@ ZEND_METHOD(exception, __toString)
 
 		zend_call_function(&fci, NULL);
 
-		if (Z_TYPE(trace) != IS_STRING) {
+		if (!Z_IS_STRING(trace)) {
 			zval_ptr_dtor(&trace);
 			ZVAL_UNDEF(&trace);
 		}
@@ -696,13 +696,13 @@ ZEND_METHOD(exception, __toString)
 			str = zend_strpprintf(0, "%s: %s in %s:" ZEND_LONG_FMT
 					"\nStack trace:\n%s%s%s",
 					ZSTR_VAL(Z_OBJCE_P(exception)->name), ZSTR_VAL(message), ZSTR_VAL(file), line,
-					(Z_TYPE(trace) == IS_STRING && Z_STRLEN(trace)) ? Z_STRVAL(trace) : "#0 {main}\n",
+					(Z_IS_STRING(trace) && Z_STRLEN(trace)) ? Z_STRVAL(trace) : "#0 {main}\n",
 					ZSTR_LEN(prev_str) ? "\n\nNext " : "", ZSTR_VAL(prev_str));
 		} else {
 			str = zend_strpprintf(0, "%s in %s:" ZEND_LONG_FMT
 					"\nStack trace:\n%s%s%s",
 					ZSTR_VAL(Z_OBJCE_P(exception)->name), ZSTR_VAL(file), line,
-					(Z_TYPE(trace) == IS_STRING && Z_STRLEN(trace)) ? Z_STRVAL(trace) : "#0 {main}\n",
+					(Z_IS_STRING(trace) && Z_STRLEN(trace)) ? Z_STRVAL(trace) : "#0 {main}\n",
 					ZSTR_LEN(prev_str) ? "\n\nNext " : "", ZSTR_VAL(prev_str));
 		}
 
@@ -713,7 +713,7 @@ ZEND_METHOD(exception, __toString)
 
 		Z_PROTECT_RECURSION_P(exception);
 		exception = GET_PROPERTY(exception, ZEND_STR_PREVIOUS);
-		if (exception && Z_TYPE_P(exception) == IS_OBJECT && Z_IS_RECURSIVE_P(exception)) {
+		if (exception && Z_IS_OBJECT_P(exception) && Z_IS_RECURSIVE_P(exception)) {
 			break;
 		}
 	}
@@ -721,7 +721,7 @@ ZEND_METHOD(exception, __toString)
 
 	exception = getThis();
 	/* Reset apply counts */
-	while (exception && Z_TYPE_P(exception) == IS_OBJECT && (base_ce = i_get_exception_base(exception)) && instanceof_function(Z_OBJCE_P(exception), base_ce)) {
+	while (exception && Z_IS_OBJECT_P(exception) && (base_ce = i_get_exception_base(exception)) && instanceof_function(Z_OBJCE_P(exception), base_ce)) {
 		if (Z_IS_RECURSIVE_P(exception)) {
 			Z_UNPROTECT_RECURSION_P(exception);
 		} else {
@@ -980,7 +980,7 @@ ZEND_API ZEND_COLD void zend_exception_error(zend_object *ex, int severity) /* {
 
 		zend_call_method_with_0_params(&exception, ce_exception, NULL, "__tostring", &tmp);
 		if (!EG(exception)) {
-			if (Z_TYPE(tmp) != IS_STRING) {
+			if (!Z_IS_STRING(tmp)) {
 				zend_error(E_WARNING, "%s::__toString() must return a string", ZSTR_VAL(ce_exception->name));
 			} else {
 				zend_update_property_ex(i_get_exception_base(&exception), &exception, ZSTR_KNOWN(ZEND_STR_STRING), &tmp);
@@ -1028,7 +1028,7 @@ ZEND_API ZEND_COLD void zend_throw_exception_object(zval *exception) /* {{{ */
 {
 	zend_class_entry *exception_ce;
 
-	if (exception == NULL || Z_TYPE_P(exception) != IS_OBJECT) {
+	if (exception == NULL || !Z_IS_OBJECT_P(exception)) {
 		zend_error_noreturn(E_CORE_ERROR, "Need to supply an object when throwing an exception");
 	}
 

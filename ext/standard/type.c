@@ -98,7 +98,7 @@ PHP_FUNCTION(intval)
 		Z_PARAM_LONG(base)
 	ZEND_PARSE_PARAMETERS_END();
 
-	if (Z_TYPE_P(num) != IS_STRING || base == 10) {
+	if (!Z_IS_STRING_P(num) || base == 10) {
 		RETVAL_LONG(zval_get_long(num));
 		return;
 	}
@@ -238,7 +238,7 @@ PHP_FUNCTION(is_bool)
 		Z_PARAM_ZVAL(arg)
 	ZEND_PARSE_PARAMETERS_END_EX(RETURN_FALSE);
 
-	RETURN_BOOL(Z_TYPE_P(arg) == IS_FALSE || Z_TYPE_P(arg) == IS_TRUE);
+	RETURN_BOOL(Z_IS_FALSE_P(arg) || Z_IS_TRUE_P(arg));
 }
 /* }}} */
 

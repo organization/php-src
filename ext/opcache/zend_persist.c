@@ -125,7 +125,7 @@ static void zend_hash_persist(HashTable *ht, zend_persist_func_t pPersistElement
 
 		for (idx = 0; idx < ht->nNumUsed; idx++) {
 			p = ht->arData + idx;
-			if (Z_TYPE(p->val) == IS_UNDEF) continue;
+			if (Z_IS_UNDEF(p->val)) continue;
 
 			/* persist bucket and key */
 			if (p->key) {
@@ -153,7 +153,7 @@ static void zend_hash_persist(HashTable *ht, zend_persist_func_t pPersistElement
 
 	for (idx = 0; idx < ht->nNumUsed; idx++) {
 		p = ht->arData + idx;
-		if (Z_TYPE(p->val) == IS_UNDEF) continue;
+		if (Z_IS_UNDEF(p->val)) continue;
 
 		/* persist bucket and key */
 		if (p->key) {
@@ -207,7 +207,7 @@ static void zend_hash_persist_immutable(HashTable *ht)
 
 		for (idx = 0; idx < ht->nNumUsed; idx++) {
 			p = ht->arData + idx;
-			if (Z_TYPE(p->val) == IS_UNDEF) continue;
+			if (Z_IS_UNDEF(p->val)) continue;
 
 			/* persist bucket and key */
 			if (p->key) {
@@ -232,7 +232,7 @@ static void zend_hash_persist_immutable(HashTable *ht)
 	}
 	for (idx = 0; idx < ht->nNumUsed; idx++) {
 		p = ht->arData + idx;
-		if (Z_TYPE(p->val) == IS_UNDEF) continue;
+		if (Z_IS_UNDEF(p->val)) continue;
 
 		/* persist bucket and key */
 		if (p->key) {

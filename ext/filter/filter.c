@@ -381,7 +381,7 @@ static void php_zval_filter(zval *value, zend_long filter, zend_long flags, zval
 
 	/* #49274, fatal error with object without a toString method
 	  Fails nicely instead of getting a recovarable fatal error. */
-	if (Z_TYPE_P(value) == IS_OBJECT) {
+	if (Z_IS_OBJECT_P(value)) {
 		zend_class_entry *ce;
 
 		ce = Z_OBJCE_P(value);
@@ -403,9 +403,9 @@ static void php_zval_filter(zval *value, zend_long filter, zend_long flags, zval
 	filter_func.function(value, flags, options, charset);
 
 handle_default:
-	if (options && (Z_TYPE_P(options) == IS_ARRAY || Z_TYPE_P(options) == IS_OBJECT) &&
-		((flags & FILTER_NULL_ON_FAILURE && Z_TYPE_P(value) == IS_NULL) ||
-		(!(flags & FILTER_NULL_ON_FAILURE) && Z_TYPE_P(value) == IS_FALSE)) &&
+	if (options && (Z_IS_ARRAY_P(options) || Z_IS_OBJECT_P(options)) &&
+		((flags & FILTER_NULL_ON_FAILURE && Z_IS_NULL_P(value)) ||
+		(!(flags & FILTER_NULL_ON_FAILURE) && Z_IS_FALSE_P(value))) &&
 		zend_hash_str_exists(HASH_OF(options), "default", sizeof("default") - 1)) {
 		zval *tmp;
 		if ((tmp = zend_hash_str_find(HASH_OF(options), "default", sizeof("default") - 1)) != NULL) {
@@ -496,7 +496,7 @@ static unsigned int php_sapi_filter(int arg, char *var, char **val, size_t val_l
 
 static void php_zval_filter_recursive(zval *value, zend_long filter, zend_long flags, zval *options, char *charset, zend_bool copy) /* {{{ */
 {
-	if (Z_TYPE_P(value) == IS_ARRAY) {
+	if (Z_IS_ARRAY_P(value)) {
 		zval *element;
 
 		if (Z_IS_RECURSIVE_P(value)) {
@@ -506,7 +506,7 @@ static void php_zval_filter_recursive(zval *value, zend_long filter, zend_long f
 
 		ZEND_HASH_FOREACH_VAL(Z_ARRVAL_P(value), element) {
 			ZVAL_DEREF(element);
-			if (Z_TYPE_P(element) == IS_ARRAY) {
+			if (Z_IS_ARRAY_P(element)) {
 				SEPARATE_ARRAY(element);
 				php_zval_filter_recursive(element, filter, flags, options, charset, copy);
 			} else {
@@ -590,7 +590,7 @@ static void php_filter_call(zval *filtered, zend_long filter, zval *filter_args,
 	zval *option;
 	char *charset = NULL;
 
-	if (filter_args && Z_TYPE_P(filter_args) != IS_ARRAY) {
+	if (filter_args && !Z_IS_ARRAY_P(filter_args)) {
 		zend_long lval = zval_get_long(filter_args);
 
 		if (filter != -1) { /* handler for array apply */
@@ -618,7 +618,7 @@ static void php_filter_call(zval *filtered, zend_long filter, zval *filter_args,
 
 		if ((option = zend_hash_str_find(HASH_OF(filter_args), "options", sizeof("options") - 1)) != NULL) {
 			if (filter != FILTER_CALLBACK) {
-				if (Z_TYPE_P(option) == IS_ARRAY) {
+				if (Z_IS_ARRAY_P(option)) {
 					options = option;
 				}
 			} else {
@@ -628,7 +628,7 @@ static void php_filter_call(zval *filtered, zend_long filter, zval *filter_args,
 		}
 	}
 
-	if (Z_TYPE_P(filtered) == IS_ARRAY) {
+	if (Z_IS_ARRAY_P(filtered)) {
 		if (filter_flags & FILTER_REQUIRE_SCALAR) {
 			zval_ptr_dtor(filtered);
 			if (filter_flags & FILTER_NULL_ON_FAILURE) {
@@ -670,11 +670,11 @@ static void php_filter_array_handler(zval *input, zval *op, zval *return_value, 
 		zval_ptr_dtor(return_value);
 		ZVAL_DUP(return_value, input);
 		php_filter_call(return_value, FILTER_DEFAULT, NULL, 0, FILTER_REQUIRE_ARRAY);
-	} else if (Z_TYPE_P(op) == IS_LONG) {
+	} else if (Z_IS_LONG_P(op)) {
 		zval_ptr_dtor(return_value);
 		ZVAL_DUP(return_value, input);
 		php_filter_call(return_value, Z_LVAL_P(op), NULL, 0, FILTER_REQUIRE_ARRAY);
-	} else if (Z_TYPE_P(op) == IS_ARRAY) {
+	} else if (Z_IS_ARRAY_P(op)) {
 		array_init(return_value);
 
 		ZEND_HASH_FOREACH_STR_KEY_VAL(Z_ARRVAL_P(op), arg_key, arg_elm) {
@@ -730,14 +730,14 @@ PHP_FUNCTION(filter_input)
 		zend_long filter_flags = 0;
 		zval *option, *opt, *def;
 		if (filter_args) {
-			if (Z_TYPE_P(filter_args) == IS_LONG) {
+			if (Z_IS_LONG_P(filter_args)) {
 				filter_flags = Z_LVAL_P(filter_args);
-			} else if (Z_TYPE_P(filter_args) == IS_ARRAY && (option = zend_hash_str_find(HASH_OF(filter_args), "flags", sizeof("flags") - 1)) != NULL) {
+			} else if (Z_IS_ARRAY_P(filter_args) && (option = zend_hash_str_find(HASH_OF(filter_args), "flags", sizeof("flags") - 1)) != NULL) {
 				filter_flags = zval_get_long(option);
 			}
-			if (Z_TYPE_P(filter_args) == IS_ARRAY &&
+			if (Z_IS_ARRAY_P(filter_args) &&
 				(opt = zend_hash_str_find(HASH_OF(filter_args), "options", sizeof("options") - 1)) != NULL &&
-				Z_TYPE_P(opt) == IS_ARRAY &&
+				Z_IS_ARRAY_P(opt) &&
 				(def = zend_hash_str_find(HASH_OF(opt), "default", sizeof("default") - 1)) != NULL) {
 				ZVAL_COPY(return_value, def);
 				return;
@@ -797,7 +797,7 @@ PHP_FUNCTION(filter_input_array)
 		return;
 	}
 
-	if (op && (Z_TYPE_P(op) != IS_ARRAY) && !(Z_TYPE_P(op) == IS_LONG && PHP_FILTER_ID_EXISTS(Z_LVAL_P(op)))) {
+	if (op && (!Z_IS_ARRAY_P(op)) && !(Z_IS_LONG_P(op) && PHP_FILTER_ID_EXISTS(Z_LVAL_P(op)))) {
 		RETURN_FALSE;
 	}
 
@@ -807,9 +807,9 @@ PHP_FUNCTION(filter_input_array)
 		zend_long filter_flags = 0;
 		zval *option;
 		if (op) {
-			if (Z_TYPE_P(op) == IS_LONG) {
+			if (Z_IS_LONG_P(op)) {
 				filter_flags = Z_LVAL_P(op);
-			} else if (Z_TYPE_P(op) == IS_ARRAY && (option = zend_hash_str_find(HASH_OF(op), "flags", sizeof("flags") - 1)) != NULL) {
+			} else if (Z_IS_ARRAY_P(op) && (option = zend_hash_str_find(HASH_OF(op), "flags", sizeof("flags") - 1)) != NULL) {
 				filter_flags = zval_get_long(option);
 			}
 		}
@@ -842,7 +842,7 @@ PHP_FUNCTION(filter_var_array)
 		return;
 	}
 
-	if (op && (Z_TYPE_P(op) != IS_ARRAY) && !(Z_TYPE_P(op) == IS_LONG && PHP_FILTER_ID_EXISTS(Z_LVAL_P(op)))) {
+	if (op && (!Z_IS_ARRAY_P(op)) && !(Z_IS_LONG_P(op) && PHP_FILTER_ID_EXISTS(Z_LVAL_P(op)))) {
 		RETURN_FALSE;
 	}
 

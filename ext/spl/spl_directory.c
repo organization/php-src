@@ -284,7 +284,7 @@ static int spl_filesystem_file_open(spl_filesystem_object *intern, int use_inclu
 	ZVAL_UNDEF(&intern->u.file.zresource);
 
 	php_stat(intern->file_name, intern->file_name_len, FS_IS_DIR, &tmp);
-	if (Z_TYPE(tmp) == IS_TRUE) {
+	if (Z_IS_TRUE(tmp)) {
 		intern->u.file.open_mode = NULL;
 		intern->file_name = NULL;
 		zend_throw_exception_ex(spl_ce_LogicException, 0, "Cannot use SplFileObject with directories");
@@ -2165,7 +2165,7 @@ static int spl_filesystem_file_read_line_ex(zval * this_ptr, spl_filesystem_obje
 				intern->u.file.current_line_num++;
 			}
 			spl_filesystem_file_free_line(intern);
-			if (Z_TYPE(retval) == IS_STRING) {
+			if (Z_IS_STRING(retval)) {
 				intern->u.file.current_line = estrndup(Z_STRVAL(retval), Z_STRLEN(retval));
 				intern->u.file.current_line_len = Z_STRLEN(retval);
 			} else {
@@ -2202,7 +2202,7 @@ static int spl_filesystem_file_is_empty_line(spl_filesystem_object *intern) /* {
 						idx++;
 					}
 					first = &Z_ARRVAL(intern->u.file.current_zval)->arData[idx].val;
-					return Z_TYPE_P(first) == IS_STRING && Z_STRLEN_P(first) == 0;
+					return Z_IS_STRING_P(first) && Z_STRLEN_P(first) == 0;
 				}
 				return zend_hash_num_elements(Z_ARRVAL(intern->u.file.current_zval)) == 0;
 			case IS_NULL:

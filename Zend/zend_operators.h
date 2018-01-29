@@ -265,17 +265,17 @@ ZEND_API double       ZEND_FASTCALL zval_get_double_func(zval *op);
 ZEND_API zend_string* ZEND_FASTCALL zval_get_string_func(zval *op);
 
 static zend_always_inline zend_long zval_get_long(zval *op) {
-	return EXPECTED(Z_TYPE_P(op) == IS_LONG) ? Z_LVAL_P(op) : zval_get_long_func(op);
+	return EXPECTED(Z_IS_LONG_P(op)) ? Z_LVAL_P(op) : zval_get_long_func(op);
 }
 static zend_always_inline double zval_get_double(zval *op) {
-	return EXPECTED(Z_TYPE_P(op) == IS_DOUBLE) ? Z_DVAL_P(op) : zval_get_double_func(op);
+	return EXPECTED(Z_IS_DOUBLE_P(op)) ? Z_DVAL_P(op) : zval_get_double_func(op);
 }
 static zend_always_inline zend_string *zval_get_string(zval *op) {
-	return EXPECTED(Z_TYPE_P(op) == IS_STRING) ? zend_string_copy(Z_STR_P(op)) : zval_get_string_func(op);
+	return EXPECTED(Z_IS_STRING_P(op)) ? zend_string_copy(Z_STR_P(op)) : zval_get_string_func(op);
 }
 
 static zend_always_inline zend_string *zval_get_tmp_string(zval *op, zend_string **tmp) {
-	if (EXPECTED(Z_TYPE_P(op) == IS_STRING)) {
+	if (EXPECTED(Z_IS_STRING_P(op))) {
 		*tmp = NULL;
 		return Z_STR_P(op);
 	} else {
@@ -296,8 +296,8 @@ static zend_always_inline void zend_tmp_string_release(zend_string *tmp) {
 #define _zval_get_double_func(op) zval_get_double_func(op)
 #define _zval_get_string_func(op) zval_get_string_func(op)
 
-#define convert_to_cstring(op) if (Z_TYPE_P(op) != IS_STRING) { _convert_to_cstring((op) ZEND_FILE_LINE_CC); }
-#define convert_to_string(op) if (Z_TYPE_P(op) != IS_STRING) { _convert_to_string((op) ZEND_FILE_LINE_CC); }
+#define convert_to_cstring(op) if (!Z_IS_STRING_P(op)) { _convert_to_cstring((op) ZEND_FILE_LINE_CC); }
+#define convert_to_string(op) if (!Z_IS_STRING_P(op)) { _convert_to_string((op) ZEND_FILE_LINE_CC); }
 
 
 ZEND_API int ZEND_FASTCALL zend_is_true(zval *op);
@@ -446,7 +446,7 @@ ZEND_API void ZEND_FASTCALL zend_locale_sprintf_double(zval *op ZEND_FILE_LINE_D
 #define convert_to_null_ex(pzv)		convert_to_ex_master(pzv, null, IS_NULL)
 
 #define convert_scalar_to_number_ex(pzv)							\
-	if (Z_TYPE_P(pzv)!=IS_LONG && Z_TYPE_P(pzv)!=IS_DOUBLE) {		\
+	if (!Z_IS_LONG_P(pzv) && !Z_IS_DOUBLE_P(pzv)) {		\
 		convert_scalar_to_number(pzv);					\
 	}
 
@@ -635,19 +635,19 @@ overflow: ZEND_ATTRIBUTE_COLD_LABEL
 
 static zend_always_inline int fast_add_function(zval *result, zval *op1, zval *op2)
 {
-	if (EXPECTED(Z_TYPE_P(op1) == IS_LONG)) {
-		if (EXPECTED(Z_TYPE_P(op2) == IS_LONG)) {
+	if (EXPECTED(Z_IS_LONG_P(op1))) {
+		if (EXPECTED(Z_IS_LONG_P(op2))) {
 			fast_long_add_function(result, op1, op2);
 			return SUCCESS;
-		} else if (EXPECTED(Z_TYPE_P(op2) == IS_DOUBLE)) {
+		} else if (EXPECTED(Z_IS_DOUBLE_P(op2))) {
 			ZVAL_DOUBLE(result, ((double)Z_LVAL_P(op1)) + Z_DVAL_P(op2));
 			return SUCCESS;
 		}
-	} else if (EXPECTED(Z_TYPE_P(op1) == IS_DOUBLE)) {
-		if (EXPECTED(Z_TYPE_P(op2) == IS_DOUBLE)) {
+	} else if (EXPECTED(Z_IS_DOUBLE_P(op1))) {
+		if (EXPECTED(Z_IS_DOUBLE_P(op2))) {
 			ZVAL_DOUBLE(result, Z_DVAL_P(op1) + Z_DVAL_P(op2));
 			return SUCCESS;
-		} else if (EXPECTED(Z_TYPE_P(op2) == IS_LONG)) {
+		} else if (EXPECTED(Z_IS_LONG_P(op2))) {
 			ZVAL_DOUBLE(result, Z_DVAL_P(op1) + ((double)Z_LVAL_P(op2)));
 			return SUCCESS;
 		}
@@ -736,20 +736,20 @@ static zend_always_inline int zend_fast_equal_strings(zend_string *s1, zend_stri
 static zend_always_inline int fast_equal_check_function(zval *op1, zval *op2)
 {
 	zval result;
-	if (EXPECTED(Z_TYPE_P(op1) == IS_LONG)) {
-		if (EXPECTED(Z_TYPE_P(op2) == IS_LONG)) {
+	if (EXPECTED(Z_IS_LONG_P(op1))) {
+		if (EXPECTED(Z_IS_LONG_P(op2))) {
 			return Z_LVAL_P(op1) == Z_LVAL_P(op2);
-		} else if (EXPECTED(Z_TYPE_P(op2) == IS_DOUBLE)) {
+		} else if (EXPECTED(Z_IS_DOUBLE_P(op2))) {
 			return ((double)Z_LVAL_P(op1)) == Z_DVAL_P(op2);
 		}
-	} else if (EXPECTED(Z_TYPE_P(op1) == IS_DOUBLE)) {
-		if (EXPECTED(Z_TYPE_P(op2) == IS_DOUBLE)) {
+	} else if (EXPECTED(Z_IS_DOUBLE_P(op1))) {
+		if (EXPECTED(Z_IS_DOUBLE_P(op2))) {
 			return Z_DVAL_P(op1) == Z_DVAL_P(op2);
-		} else if (EXPECTED(Z_TYPE_P(op2) == IS_LONG)) {
+		} else if (EXPECTED(Z_IS_LONG_P(op2))) {
 			return Z_DVAL_P(op1) == ((double)Z_LVAL_P(op2));
 		}
-	} else if (EXPECTED(Z_TYPE_P(op1) == IS_STRING)) {
-		if (EXPECTED(Z_TYPE_P(op2) == IS_STRING)) {
+	} else if (EXPECTED(Z_IS_STRING_P(op1))) {
+		if (EXPECTED(Z_IS_STRING_P(op2))) {
 			return zend_fast_equal_strings(Z_STR_P(op1), Z_STR_P(op2));
 		}
 	}
@@ -760,7 +760,7 @@ static zend_always_inline int fast_equal_check_function(zval *op1, zval *op2)
 static zend_always_inline int fast_equal_check_long(zval *op1, zval *op2)
 {
 	zval result;
-	if (EXPECTED(Z_TYPE_P(op2) == IS_LONG)) {
+	if (EXPECTED(Z_IS_LONG_P(op2))) {
 		return Z_LVAL_P(op1) == Z_LVAL_P(op2);
 	}
 	compare_function(&result, op1, op2);
@@ -770,7 +770,7 @@ static zend_always_inline int fast_equal_check_long(zval *op1, zval *op2)
 static zend_always_inline int fast_equal_check_string(zval *op1, zval *op2)
 {
 	zval result;
-	if (EXPECTED(Z_TYPE_P(op2) == IS_STRING)) {
+	if (EXPECTED(Z_IS_STRING_P(op2))) {
 		return zend_fast_equal_strings(Z_STR_P(op1), Z_STR_P(op2));
 	}
 	compare_function(&result, op1, op2);
@@ -798,7 +798,7 @@ static zend_always_inline int fast_is_not_identical_function(zval *op1, zval *op
 }
 
 #define ZEND_TRY_BINARY_OP1_OBJECT_OPERATION(opcode, binary_op)                                            \
-	if (UNEXPECTED(Z_TYPE_P(op1) == IS_OBJECT)                                                             \
+	if (UNEXPECTED(Z_IS_OBJECT_P(op1))                                                             \
 		&& op1 == result                                                                                   \
 		&& UNEXPECTED(Z_OBJ_HANDLER_P(op1, get))                                                           \
 		&& EXPECTED(Z_OBJ_HANDLER_P(op1, set))) {                                                          \
@@ -810,7 +810,7 @@ static zend_always_inline int fast_is_not_identical_function(zval *op1, zval *op
 		Z_OBJ_HANDLER_P(op1, set)(op1, objval);                                                  \
 		zval_ptr_dtor(objval);                                                                             \
 		return ret;                                                                                        \
-	} else if (UNEXPECTED(Z_TYPE_P(op1) == IS_OBJECT)                                                      \
+	} else if (UNEXPECTED(Z_IS_OBJECT_P(op1))                                                      \
 		&& UNEXPECTED(Z_OBJ_HANDLER_P(op1, do_operation))) {                                               \
 		if (EXPECTED(SUCCESS == Z_OBJ_HANDLER_P(op1, do_operation)(opcode, result, op1, op2))) { \
 			return SUCCESS;                                                                                \
@@ -818,7 +818,7 @@ static zend_always_inline int fast_is_not_identical_function(zval *op1, zval *op
 	}
 
 #define ZEND_TRY_BINARY_OP2_OBJECT_OPERATION(opcode)                                                       \
-	if (UNEXPECTED(Z_TYPE_P(op2) == IS_OBJECT)                                                             \
+	if (UNEXPECTED(Z_IS_OBJECT_P(op2))                                                             \
 		&& UNEXPECTED(Z_OBJ_HANDLER_P(op2, do_operation))                                                  \
 		&& EXPECTED(SUCCESS == Z_OBJ_HANDLER_P(op2, do_operation)(opcode, result, op1, op2))) {  \
 		return SUCCESS;                                                                                    \
@@ -830,7 +830,7 @@ static zend_always_inline int fast_is_not_identical_function(zval *op1, zval *op
 	ZEND_TRY_BINARY_OP2_OBJECT_OPERATION(opcode)
 
 #define ZEND_TRY_UNARY_OBJECT_OPERATION(opcode)                                                            \
-	if (UNEXPECTED(Z_TYPE_P(op1) == IS_OBJECT)                                                             \
+	if (UNEXPECTED(Z_IS_OBJECT_P(op1))                                                             \
 		&& UNEXPECTED(Z_OBJ_HANDLER_P(op1, do_operation))                                                  \
 		&& EXPECTED(SUCCESS == Z_OBJ_HANDLER_P(op1, do_operation)(opcode, result, op1, NULL))) { \
 		return SUCCESS;                                                                                    \

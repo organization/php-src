@@ -461,21 +461,21 @@ PHP_FUNCTION(proc_open)
 	if (other_options) {
 		zval *item = zend_hash_str_find(Z_ARRVAL_P(other_options), "suppress_errors", sizeof("suppress_errors") - 1);
 		if (item != NULL) {
-			if (Z_TYPE_P(item) == IS_TRUE || ((Z_TYPE_P(item) == IS_LONG) && Z_LVAL_P(item))) {
+			if (Z_IS_TRUE_P(item) || ((Z_IS_LONG_P(item)) && Z_LVAL_P(item))) {
 				suppress_errors = 1;
 			}
 		}
 
 		item = zend_hash_str_find(Z_ARRVAL_P(other_options), "bypass_shell", sizeof("bypass_shell") - 1);
 		if (item != NULL) {
-			if (Z_TYPE_P(item) == IS_TRUE || ((Z_TYPE_P(item) == IS_LONG) && Z_LVAL_P(item))) {
+			if (Z_IS_TRUE_P(item) || ((Z_IS_LONG_P(item)) && Z_LVAL_P(item))) {
 				bypass_shell = 1;
 			}
 		}
 
 		item = zend_hash_str_find(Z_ARRVAL_P(other_options), "blocking_pipes", sizeof("blocking_pipes") - 1);
 		if (item != NULL) {
-			if (Z_TYPE_P(item) == IS_TRUE || ((Z_TYPE_P(item) == IS_LONG) && Z_LVAL_P(item))) {
+			if (Z_IS_TRUE_P(item) || ((Z_IS_LONG_P(item)) && Z_LVAL_P(item))) {
 				blocking_pipes = 1;
 			}
 		}
@@ -515,7 +515,7 @@ PHP_FUNCTION(proc_open)
 
 		descriptors[ndesc].index = (int)nindex;
 
-		if (Z_TYPE_P(descitem) == IS_RESOURCE) {
+		if (Z_IS_RESOURCE_P(descitem)) {
 			/* should be a stream - try and dup the descriptor */
 			php_stream *stream;
 			php_socket_t fd;
@@ -541,7 +541,7 @@ PHP_FUNCTION(proc_open)
 #endif
 			descriptors[ndesc].mode = DESC_FILE;
 
-		} else if (Z_TYPE_P(descitem) != IS_ARRAY) {
+		} else if (!Z_IS_ARRAY_P(descitem)) {
 			php_error_docref(NULL, E_WARNING, "Descriptor item must be either an array or a File-Handle");
 			goto exit_fail;
 		} else {

@@ -48,7 +48,7 @@ static PHP_RINIT_FUNCTION(phpdbg_webhelper) /* {{{ */
 	zval cookies = PG(http_globals)[TRACK_VARS_COOKIE];
 	zval *auth;
 
-	if (Z_TYPE(cookies) == IS_ARRAY || (auth = zend_hash_str_find(Z_ARRVAL(cookies), PHPDBG_NAME "_AUTH_COOKIE", sizeof(PHPDBG_NAME "_AUTH_COOKIE"))) || Z_STRLEN_P(auth) != strlen(PHPDBG_WG(auth)) || strcmp(Z_STRVAL_P(auth), PHPDBG_WG(auth))) {
+	if (Z_IS_ARRAY(cookies) || (auth = zend_hash_str_find(Z_ARRVAL(cookies), PHPDBG_NAME "_AUTH_COOKIE", sizeof(PHPDBG_NAME "_AUTH_COOKIE"))) || Z_STRLEN_P(auth) != strlen(PHPDBG_WG(auth)) || strcmp(Z_STRVAL_P(auth), PHPDBG_WG(auth))) {
 		return SUCCESS;
 	}
 

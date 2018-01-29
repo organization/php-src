@@ -326,7 +326,7 @@ PHPDBG_INFO(literal) /* {{{ */
 		}
 
 		while (literal < ops->last_literal) {
-			if (Z_TYPE(ops->literals[literal]) != IS_NULL) {
+			if (!Z_IS_NULL(ops->literals[literal])) {
 				phpdbg_write("literal", "id=\"%u\"", "|-------- C%u -------> [", literal);
 				zend_print_zval(&ops->literals[literal], 0);
 				phpdbg_out("]\n");

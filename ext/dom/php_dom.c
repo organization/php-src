@@ -400,7 +400,7 @@ static int dom_property_exists(zval *object, zval *member, int check_empty, void
 			if (check_empty == 1) {
 				retval = zend_is_true(&tmp);
 			} else if (check_empty == 0) {
-				retval = (Z_TYPE(tmp) != IS_NULL);
+				retval = (!Z_IS_NULL(tmp));
 			}
 			zval_dtor(&tmp);
 		}
@@ -442,7 +442,7 @@ static HashTable* dom_get_debug_info_helper(zval *object, int *is_temp) /* {{{ *
 			continue;
 		}
 
-		if (Z_TYPE(value) == IS_OBJECT) {
+		if (Z_IS_OBJECT(value)) {
 			zval_dtor(&value);
 			ZVAL_NEW_STR(&value, object_str);
 			zend_string_addref(object_str);

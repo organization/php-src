@@ -84,8 +84,8 @@ int zend_optimizer_eval_binary_op(zval *result, zend_uchar opcode, zval *op1, zv
 
 	switch (opcode) {
 		case ZEND_ADD:
-			if ((Z_TYPE_P(op1) == IS_ARRAY
-			  || Z_TYPE_P(op2) == IS_ARRAY)
+			if ((Z_IS_ARRAY_P(op1)
+			  || Z_IS_ARRAY_P(op2))
 			 && Z_TYPE_P(op1) != Z_TYPE_P(op2)) {
 				/* produces "Unsupported operand types" exception */
 				return FAILURE;
@@ -103,8 +103,8 @@ int zend_optimizer_eval_binary_op(zval *result, zend_uchar opcode, zval *op1, zv
 		case ZEND_POW:
 		case ZEND_CONCAT:
 		case ZEND_FAST_CONCAT:
-			if (Z_TYPE_P(op1) == IS_ARRAY
-			 || Z_TYPE_P(op2) == IS_ARRAY) {
+			if (Z_IS_ARRAY_P(op1)
+			 || Z_IS_ARRAY_P(op2)) {
 				/* produces "Unsupported operand types" exception */
 				return FAILURE;
 			}
@@ -133,9 +133,9 @@ int zend_optimizer_eval_unary_op(zval *result, zend_uchar opcode, zval *op1) /* 
 
 	if (unary_op) {
 		if (opcode == ZEND_BW_NOT
-		 && Z_TYPE_P(op1) != IS_LONG
-		 && Z_TYPE_P(op1) != IS_DOUBLE
-		 && Z_TYPE_P(op1) != IS_STRING) {
+		 && !Z_IS_LONG_P(op1)
+		 && !Z_IS_DOUBLE_P(op1)
+		 && !Z_IS_STRING_P(op1)) {
 			/* produces "Unsupported operand types" exception */
 			return FAILURE;
 		}
@@ -165,7 +165,7 @@ int zend_optimizer_eval_cast(zval *result, uint32_t type, zval *op1) /* {{{ */
 		case IS_STRING:
 			/* Conversion from double to string takes into account run-time
 			   'precision' setting and cannot be evaluated at compile-time */
-			if (Z_TYPE_P(op1) != IS_ARRAY && Z_TYPE_P(op1) != IS_DOUBLE) {
+			if (!Z_IS_ARRAY_P(op1) && !Z_IS_DOUBLE_P(op1)) {
 				ZVAL_STR(result, zval_get_string(op1));
 				return SUCCESS;
 			}
@@ -181,7 +181,7 @@ int zend_optimizer_eval_cast(zval *result, uint32_t type, zval *op1) /* {{{ */
 
 int zend_optimizer_eval_strlen(zval *result, zval *op1) /* {{{ */
 {
-	if (Z_TYPE_P(op1) != IS_STRING) {
+	if (!Z_IS_STRING_P(op1)) {
 		return FAILURE;
 	}
 	ZVAL_LONG(result, Z_STRLEN_P(op1));
@@ -236,7 +236,7 @@ static inline void alloc_cache_slots(zend_op_array *op_array, zend_op *opline, u
 	op_array->cache_size += num * sizeof(void *);
 }
 #define REQUIRES_STRING(val) do { \
-	if (Z_TYPE_P(val) != IS_STRING) { \
+	if (!Z_IS_STRING_P(val)) { \
 		return 0; \
 	} \
 } while (0)
@@ -339,7 +339,7 @@ int zend_optimizer_update_op1_const(zend_op_array *op_array,
 	}
 
 	opline->op1_type = IS_CONST;
-	if (Z_TYPE(ZEND_OP1_LITERAL(opline)) == IS_STRING) {
+	if (Z_IS_STRING(ZEND_OP1_LITERAL(opline))) {
 		zend_string_hash_val(Z_STR(ZEND_OP1_LITERAL(opline)));
 	}
 	return 1;
@@ -400,7 +400,7 @@ int zend_optimizer_update_op2_const(zend_op_array *op_array,
 			alloc_cache_slots(op_array, opline, 1);
 			break;
 		case ZEND_INIT_DYNAMIC_CALL:
-			if (Z_TYPE_P(val) == IS_STRING) {
+			if (Z_IS_STRING_P(val)) {
 				if (zend_memrchr(Z_STRVAL_P(val), ':', Z_STRLEN_P(val))) {
 					return 0;
 				}
@@ -485,7 +485,7 @@ int zend_optimizer_update_op2_const(zend_op_array *op_array,
 		case ZEND_FETCH_DIM_UNSET:
 		case ZEND_FETCH_LIST_R:
 		case ZEND_FETCH_LIST_W:
-			if (Z_TYPE_P(val) == IS_STRING) {
+			if (Z_IS_STRING_P(val)) {
 				zend_ulong index;
 				if (ZEND_HANDLE_NUMERIC(Z_STR_P(val), index)) {
 					zval_ptr_dtor_nogc(val);
@@ -510,7 +510,7 @@ int zend_optimizer_update_op2_const(zend_op_array *op_array,
 	}
 
 	opline->op2_type = IS_CONST;
-	if (Z_TYPE(ZEND_OP2_LITERAL(opline)) == IS_STRING) {
+	if (Z_IS_STRING(ZEND_OP2_LITERAL(opline))) {
 		zend_string_hash_val(Z_STR(ZEND_OP2_LITERAL(opline)));
 	}
 	return 1;
@@ -644,7 +644,7 @@ int zend_optimizer_replace_by_const(zend_op_array *op_array,
 							m->op1.var == var) {
 							zval v;
 							ZVAL_COPY(&v, val);
-							if (Z_TYPE(v) == IS_STRING) {
+							if (Z_IS_STRING(v)) {
 								zend_string_hash_val(Z_STR(v));
 							}
 							m->op1.constant = zend_optimizer_add_literal(op_array, &v);
@@ -702,7 +702,7 @@ int zend_optimizer_replace_by_const(zend_op_array *op_array,
 									m->opcode = ZEND_IS_EQUAL;
 								}
 								ZVAL_COPY(&v, val);
-								if (Z_TYPE(v) == IS_STRING) {
+								if (Z_IS_STRING(v)) {
 									zend_string_hash_val(Z_STR(v));
 								}
 								m->op1.constant = zend_optimizer_add_literal(op_array, &v);
@@ -853,7 +853,7 @@ static zend_class_entry *get_class_entry_from_op1(
 		zend_script *script, zend_op_array *op_array, zend_op *opline, zend_bool rt_constants) {
 	if (opline->op1_type == IS_CONST) {
 		zval *op1 = CRT_CONSTANT_EX(op_array, opline, opline->op1, rt_constants);
-		if (Z_TYPE_P(op1) == IS_STRING) {
+		if (Z_IS_STRING_P(op1)) {
 			zend_string *class_name = Z_STR_P(op1 + 1);
 			zend_class_entry *ce;
 			if (script && (ce = zend_hash_find_ptr(&script->class_table, class_name))) {
@@ -900,7 +900,7 @@ zend_function *zend_optimizer_get_called_func(
 		}
 		case ZEND_INIT_FCALL_BY_NAME:
 		case ZEND_INIT_NS_FCALL_BY_NAME:
-			if (opline->op2_type == IS_CONST && Z_TYPE_P(GET_OP(op2)) == IS_STRING) {
+			if (opline->op2_type == IS_CONST && Z_IS_STRING_P(GET_OP(op2))) {
 				zval *function_name = GET_OP(op2) + 1;
 				zend_function *func;
 				if (script && (func = zend_hash_find_ptr(&script->function_table, Z_STR_P(function_name)))) {
@@ -917,7 +917,7 @@ zend_function *zend_optimizer_get_called_func(
 			}
 			break;
 		case ZEND_INIT_STATIC_METHOD_CALL:
-			if (opline->op2_type == IS_CONST && Z_TYPE_P(GET_OP(op2)) == IS_STRING) {
+			if (opline->op2_type == IS_CONST && Z_IS_STRING_P(GET_OP(op2))) {
 				zend_class_entry *ce = get_class_entry_from_op1(
 					script, op_array, opline, rt_constants);
 				if (ce) {
@@ -928,7 +928,7 @@ zend_function *zend_optimizer_get_called_func(
 			break;
 		case ZEND_INIT_METHOD_CALL:
 			if (opline->op1_type == IS_UNUSED
-					&& opline->op2_type == IS_CONST && Z_TYPE_P(GET_OP(op2)) == IS_STRING
+					&& opline->op2_type == IS_CONST && Z_IS_STRING_P(GET_OP(op2))
 					&& op_array->scope && !(op_array->scope->ce_flags & ZEND_ACC_TRAIT)) {
 				zend_string *method_name = Z_STR_P(GET_OP(op2) + 1);
 				zend_function *fbc = zend_hash_find_ptr(

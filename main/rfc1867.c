@@ -775,7 +775,7 @@ SAPI_API SAPI_POST_HANDLER_FUNC(rfc1867_post_handler) /* {{{ */
 	zend_hash_init(uploaded_files, 8, NULL, free_filename, 0);
 	SG(rfc1867_uploaded_files) = uploaded_files;
 
-	if (Z_TYPE(PG(http_globals)[TRACK_VARS_FILES]) != IS_ARRAY) {
+	if (!Z_IS_ARRAY(PG(http_globals)[TRACK_VARS_FILES])) {
 		/* php_auto_globals_create_files() might have already done that */
 		array_init(&PG(http_globals)[TRACK_VARS_FILES]);
 	}

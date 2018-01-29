@@ -81,7 +81,7 @@ PHPAPI void php_register_variable_ex(char *var_name, zval *val, zval *track_vars
 
 	assert(var_name != NULL);
 
-	if (track_vars_array && Z_TYPE_P(track_vars_array) == IS_ARRAY) {
+	if (track_vars_array && Z_IS_ARRAY_P(track_vars_array)) {
 		symtable1 = Z_ARRVAL_P(track_vars_array);
 	}
 
@@ -220,10 +220,10 @@ PHPAPI void php_register_variable_ex(char *var_name, zval *val, zval *track_vars
 					array_init(&tmp);
 					gpc_element_p = zend_symtable_str_update_ind(symtable1, index, index_len, &tmp);
 				} else {
-					if (Z_TYPE_P(gpc_element_p) == IS_INDIRECT) {
+					if (Z_IS_INDIRECT_P(gpc_element_p)) {
 						gpc_element_p = Z_INDIRECT_P(gpc_element_p);
 					}
-					if (Z_TYPE_P(gpc_element_p) != IS_ARRAY) {
+					if (!Z_IS_ARRAY_P(gpc_element_p)) {
 						zval_ptr_dtor(gpc_element_p);
 						array_init(gpc_element_p);
 					}
@@ -257,7 +257,7 @@ plain_var:
 			 * to have the same (plain text) cookie name for the same path and we should not overwrite
 			 * more specific cookies with the less specific ones.
 			 */
-			if (Z_TYPE(PG(http_globals)[TRACK_VARS_COOKIE]) != IS_UNDEF &&
+			if (!Z_IS_UNDEF(PG(http_globals)[TRACK_VARS_COOKIE]) &&
 				symtable1 == Z_ARRVAL(PG(http_globals)[TRACK_VARS_COOKIE]) &&
 				zend_symtable_str_exists(symtable1, index, index_len)) {
 				zval_ptr_dtor(val);
@@ -637,7 +637,7 @@ PHPAPI void php_build_argv(char *s, zval *track_vars_array)
 		zend_hash_update(&EG(symbol_table), ZSTR_KNOWN(ZEND_STR_ARGV), &arr);
 		zend_hash_update(&EG(symbol_table), ZSTR_KNOWN(ZEND_STR_ARGC), &argc);
 	}
-	if (track_vars_array && Z_TYPE_P(track_vars_array) == IS_ARRAY) {
+	if (track_vars_array && Z_IS_ARRAY_P(track_vars_array)) {
 		Z_ADDREF(arr);
 		zend_hash_update(Z_ARRVAL_P(track_vars_array), ZSTR_KNOWN(ZEND_STR_ARGV), &arr);
 		zend_hash_update(Z_ARRVAL_P(track_vars_array), ZSTR_KNOWN(ZEND_STR_ARGC), &argc);
@@ -695,10 +695,10 @@ static void php_autoglobal_merge(HashTable *dest, HashTable *src)
 	int globals_check = (dest == (&EG(symbol_table)));
 
 	ZEND_HASH_FOREACH_KEY_VAL(src, num_key, string_key, src_entry) {
-		if (Z_TYPE_P(src_entry) != IS_ARRAY
+		if (!Z_IS_ARRAY_P(src_entry)
 			|| (string_key && (dest_entry = zend_hash_find(dest, string_key)) == NULL)
 			|| (string_key == NULL && (dest_entry = zend_hash_index_find(dest, num_key)) == NULL)
-			|| Z_TYPE_P(dest_entry) != IS_ARRAY) {
+			|| !Z_IS_ARRAY_P(dest_entry)) {
 			Z_TRY_ADDREF_P(src_entry);
 			if (string_key) {
 				if (!globals_check || ZSTR_LEN(string_key) != sizeof("GLOBALS") - 1
@@ -787,7 +787,7 @@ static zend_bool php_auto_globals_create_cookie(zend_string *name)
 
 static zend_bool php_auto_globals_create_files(zend_string *name)
 {
-	if (Z_TYPE(PG(http_globals)[TRACK_VARS_FILES]) == IS_UNDEF) {
+	if (Z_IS_UNDEF(PG(http_globals)[TRACK_VARS_FILES])) {
 		array_init(&PG(http_globals)[TRACK_VARS_FILES]);
 	}
 

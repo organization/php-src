@@ -25,7 +25,7 @@ ZEND_EXTERN_MODULE_GLOBALS(phpdbg)
 
 static void phpdbg_rebuild_http_globals_array(int type, const char *name) {
 	zval *zvp;
-	if (Z_TYPE(PG(http_globals)[type]) != IS_UNDEF) {
+	if (!Z_IS_UNDEF(PG(http_globals)[type])) {
 		zval_dtor(&PG(http_globals)[type]);
 	}
 	if ((zvp = zend_hash_str_find(&EG(symbol_table), name, strlen(name)))) {
@@ -139,12 +139,12 @@ void phpdbg_webdata_decompress(char *msg, int len) {
 	ht = Z_ARRVAL(zv);
 
 	/* Reapply symbol table */
-	if ((zvp = zend_hash_str_find(ht, ZEND_STRL("GLOBALS"))) && Z_TYPE_P(zvp) == IS_ARRAY) {
+	if ((zvp = zend_hash_str_find(ht, ZEND_STRL("GLOBALS"))) && Z_IS_ARRAY_P(zvp)) {
 		{
 			zval *srv;
-			if ((srv = zend_hash_str_find(Z_ARRVAL_P(zvp), ZEND_STRL("_SERVER"))) && Z_TYPE_P(srv) == IS_ARRAY) {
+			if ((srv = zend_hash_str_find(Z_ARRVAL_P(zvp), ZEND_STRL("_SERVER"))) && Z_IS_ARRAY_P(srv)) {
 				zval *script;
-				if ((script = zend_hash_str_find(Z_ARRVAL_P(srv), ZEND_STRL("SCRIPT_FILENAME"))) && Z_TYPE_P(script) == IS_STRING) {
+				if ((script = zend_hash_str_find(Z_ARRVAL_P(srv), ZEND_STRL("SCRIPT_FILENAME"))) && Z_IS_STRING_P(script)) {
 					phpdbg_param_t param;
 					param.str = Z_STRVAL_P(script);
 					PHPDBG_COMMAND_HANDLER(exec)(&param);
@@ -170,7 +170,7 @@ void phpdbg_webdata_decompress(char *msg, int len) {
 		free_zv = zvp;
 	}
 
-	if ((zvp = zend_hash_str_find(ht, ZEND_STRL("input"))) && Z_TYPE_P(zvp) == IS_STRING) {
+	if ((zvp = zend_hash_str_find(ht, ZEND_STRL("input"))) && Z_IS_STRING_P(zvp)) {
 		if (SG(request_info).request_body) {
 			php_stream_close(SG(request_info).request_body);
 		}
@@ -179,7 +179,7 @@ void phpdbg_webdata_decompress(char *msg, int len) {
 		php_stream_write(SG(request_info).request_body, Z_STRVAL_P(zvp), Z_STRLEN_P(zvp));
 	}
 
-	if ((zvp = zend_hash_str_find(ht, ZEND_STRL("cwd"))) && Z_TYPE_P(zvp) == IS_STRING) {
+	if ((zvp = zend_hash_str_find(ht, ZEND_STRL("cwd"))) && Z_IS_STRING_P(zvp)) {
 		if (VCWD_CHDIR(Z_STRVAL_P(zvp)) == SUCCESS) {
 			if (BG(CurrentStatFile) && !IS_ABSOLUTE_PATH(BG(CurrentStatFile), strlen(BG(CurrentStatFile)))) {
 				efree(BG(CurrentStatFile));
@@ -192,18 +192,18 @@ void phpdbg_webdata_decompress(char *msg, int len) {
 		}
 	}
 
-	if ((zvp = zend_hash_str_find(ht, ZEND_STRL("sapi_name"))) && (Z_TYPE_P(zvp) == IS_STRING || Z_TYPE_P(zvp) == IS_NULL)) {
+	if ((zvp = zend_hash_str_find(ht, ZEND_STRL("sapi_name"))) && (Z_IS_STRING_P(zvp) || Z_IS_NULL_P(zvp))) {
 		if (PHPDBG_G(sapi_name_ptr)) {
 			free(PHPDBG_G(sapi_name_ptr));
 		}
-		if (Z_TYPE_P(zvp) == IS_STRING) {
+		if (Z_IS_STRING_P(zvp)) {
 			PHPDBG_G(sapi_name_ptr) = sapi_module.name = strdup(Z_STRVAL_P(zvp));
 		} else {
 			PHPDBG_G(sapi_name_ptr) = sapi_module.name = NULL;
 		}
 	}
 
-	if ((zvp = zend_hash_str_find(ht, ZEND_STRL("modules"))) && Z_TYPE_P(zvp) == IS_ARRAY) {
+	if ((zvp = zend_hash_str_find(ht, ZEND_STRL("modules"))) && Z_IS_ARRAY_P(zvp)) {
 		phpdbg_intersect_ptr pos;
 		zval *module;
 		zend_module_entry *mod;
@@ -239,7 +239,7 @@ void phpdbg_webdata_decompress(char *msg, int len) {
 		zend_hash_clean(&zv_registry);
 	}
 
-	if ((zvp = zend_hash_str_find(ht, ZEND_STRL("extensions"))) && Z_TYPE_P(zvp) == IS_ARRAY) {
+	if ((zvp = zend_hash_str_find(ht, ZEND_STRL("extensions"))) && Z_IS_ARRAY_P(zvp)) {
 		zend_extension *extension;
 		zend_llist_position pos;
 		zval *name = NULL;
@@ -253,7 +253,7 @@ void phpdbg_webdata_decompress(char *msg, int len) {
 			}
 
 			ZEND_HASH_FOREACH_STR_KEY_PTR(Z_ARRVAL_P(zvp), strkey, name) {
-				if (Z_TYPE_P(name) == IS_STRING && !zend_binary_strcmp(extension->name, strlen(extension->name), Z_STRVAL_P(name), Z_STRLEN_P(name))) {
+				if (Z_IS_STRING_P(name) && !zend_binary_strcmp(extension->name, strlen(extension->name), Z_STRVAL_P(name), Z_STRLEN_P(name))) {
 					break;
 				}
 				name = NULL;
@@ -288,7 +288,7 @@ void phpdbg_webdata_decompress(char *msg, int len) {
 		}
 
 		ZEND_HASH_FOREACH_VAL(Z_ARRVAL_P(zvp), name) {
-			if (Z_TYPE_P(name) == IS_STRING) {
+			if (Z_IS_STRING_P(name)) {
 				phpdbg_notice("wait", "missingextension=\"%.*s\"", "The Zend extension %.*s isn't present in " PHPDBG_NAME ", you still can load via dl /path/to/extension.so", (int) Z_STRLEN_P(name), Z_STRVAL_P(name));
 			}
 		} ZEND_HASH_FOREACH_END();
@@ -296,13 +296,13 @@ void phpdbg_webdata_decompress(char *msg, int len) {
 
 	zend_ini_deactivate();
 
-	if ((zvp = zend_hash_str_find(ht, ZEND_STRL("systemini"))) && Z_TYPE_P(zvp) == IS_ARRAY) {
+	if ((zvp = zend_hash_str_find(ht, ZEND_STRL("systemini"))) && Z_IS_ARRAY_P(zvp)) {
 		zval *ini_entry;
 		zend_ini_entry *original_ini;
 		zend_string *key;
 
 		ZEND_HASH_FOREACH_STR_KEY_VAL(Z_ARRVAL_P(zvp), key, ini_entry) {
-			if (key && Z_TYPE_P(ini_entry) == IS_STRING) {
+			if (key && Z_IS_STRING_P(ini_entry)) {
 				if ((original_ini = zend_hash_find_ptr(EG(ini_directives), key))) {
 					if (!original_ini->on_modify || original_ini->on_modify(original_ini, Z_STR_P(ini_entry), original_ini->mh_arg1, original_ini->mh_arg2, original_ini->mh_arg3, ZEND_INI_STAGE_ACTIVATE) == SUCCESS) {
 						if (original_ini->modified && original_ini->orig_value != original_ini->value) {
@@ -316,12 +316,12 @@ void phpdbg_webdata_decompress(char *msg, int len) {
 		} ZEND_HASH_FOREACH_END();
 	}
 
-	if ((zvp = zend_hash_str_find(ht, ZEND_STRL("userini"))) && Z_TYPE_P(zvp) == IS_ARRAY) {
+	if ((zvp = zend_hash_str_find(ht, ZEND_STRL("userini"))) && Z_IS_ARRAY_P(zvp)) {
 		zval *ini_entry;
 		zend_string *key;
 
 		ZEND_HASH_FOREACH_STR_KEY_VAL(Z_ARRVAL_P(zvp), key, ini_entry) {
-			if (key && Z_TYPE_P(ini_entry) == IS_STRING) {
+			if (key && Z_IS_STRING_P(ini_entry)) {
 				zend_alter_ini_entry_ex(key, Z_STR_P(ini_entry), ZEND_INI_PERDIR, ZEND_INI_STAGE_HTACCESS, 1);
 			}
 		} ZEND_HASH_FOREACH_END();

@@ -1869,7 +1869,7 @@ php_oci_connection *php_oci_do_connect_ex(char *username, int username_len, char
 							connection->used_this_request = 1;
 							if (connection->id) {
 								tmp_val = zend_hash_index_find(&EG(regular_list), connection->id->handle);
-								if ((tmp_val != NULL) && (Z_TYPE_P(tmp_val) == IS_RESOURCE)) {
+								if ((tmp_val != NULL) && (Z_IS_RESOURCE_P(tmp_val))) {
 									tmp = Z_RES_VAL_P(tmp_val);
 								}
 

@@ -600,12 +600,12 @@ static inline zend_long php_add_var_hash(php_serialize_data_t data, zval *var) /
 
 	data->n += 1;
 
-	if (!is_ref && Z_TYPE_P(var) != IS_OBJECT) {
+	if (!is_ref && !Z_IS_OBJECT_P(var)) {
 		return 0;
 	}
 
 	/* References to objects are treated as if the reference didn't exist */
-	if (is_ref && Z_TYPE_P(Z_REFVAL_P(var)) == IS_OBJECT) {
+	if (is_ref && Z_IS_OBJECT_P(Z_REFVAL_P(var))) {
 		var = Z_REFVAL_P(var);
 	}
 
@@ -704,7 +704,7 @@ static void php_var_serialize_collect_names(HashTable *ht, HashTable *src) /* {{
 
 	zend_hash_init(ht, zend_hash_num_elements(src), NULL, NULL, 0);
 	ZEND_HASH_FOREACH_VAL(src, val) {
-		if (Z_TYPE_P(val) != IS_STRING) {
+		if (!Z_IS_STRING_P(val)) {
 			php_error_docref(NULL, E_NOTICE,
 					"__sleep should return an array only containing the names of instance-variables to serialize.");
 		}
@@ -743,9 +743,9 @@ static void php_var_serialize_class(smart_str *buf, zval *struc, zval *retval_pt
 
 		zval *val = zend_hash_find_ex(propers, name, 1);
 		if (val != NULL) {
-			if (Z_TYPE_P(val) == IS_INDIRECT) {
+			if (Z_IS_INDIRECT_P(val)) {
 				val = Z_INDIRECT_P(val);
-				if (Z_TYPE_P(val) == IS_UNDEF) {
+				if (Z_IS_UNDEF_P(val)) {
 					goto undef_prop;
 				}
 			}
@@ -759,7 +759,7 @@ static void php_var_serialize_class(smart_str *buf, zval *struc, zval *retval_pt
 				ZSTR_VAL(ce->name), ZSTR_LEN(ce->name), ZSTR_VAL(name), ZSTR_LEN(name), 0);
 		val = zend_hash_find(propers, priv_name);
 		if (val != NULL) {
-			if (Z_TYPE_P(val) == IS_INDIRECT) {
+			if (Z_IS_INDIRECT_P(val)) {
 				val = Z_INDIRECT_P(val);
 				if (Z_ISUNDEF_P(val)) {
 					zend_string_free(priv_name);
@@ -778,9 +778,9 @@ static void php_var_serialize_class(smart_str *buf, zval *struc, zval *retval_pt
 				"*", 1, ZSTR_VAL(name), ZSTR_LEN(name), 0);
 		val = zend_hash_find(propers, prot_name);
 		if (val != NULL) {
-			if (Z_TYPE_P(val) == IS_INDIRECT) {
+			if (Z_IS_INDIRECT_P(val)) {
 				val = Z_INDIRECT_P(val);
-				if (Z_TYPE_P(val) == IS_UNDEF) {
+				if (Z_IS_UNDEF_P(val)) {
 					zend_string_free(prot_name);
 					goto undef_prop;
 				}
@@ -820,7 +820,7 @@ static void php_var_serialize_intern(smart_str *buf, zval *struc, php_serialize_
 			smart_str_append_long(buf, var_already);
 			smart_str_appendc(buf, ';');
 			return;
-		} else if (Z_TYPE_P(struc) == IS_OBJECT) {
+		} else if (Z_IS_OBJECT_P(struc)) {
 			smart_str_appendl(buf, "r:", 2);
 			smart_str_append_long(buf, var_already);
 			smart_str_appendc(buf, ';');
@@ -912,7 +912,7 @@ again:
 		case IS_ARRAY: {
 			uint32_t i;
 			zend_bool incomplete_class = 0;
-			if (Z_TYPE_P(struc) == IS_ARRAY) {
+			if (Z_IS_ARRAY_P(struc)) {
 				smart_str_appendl(buf, "a:", 2);
 				myht = Z_ARRVAL_P(struc);
 				i = zend_array_count(myht);
@@ -951,10 +951,10 @@ again:
 
 					/* we should still add element even if it's not OK,
 					 * since we already wrote the length of the array before */
-					if (Z_TYPE_P(data) == IS_ARRAY) {
-						if (Z_TYPE_P(data) == IS_ARRAY
+					if (Z_IS_ARRAY_P(data)) {
+						if (Z_IS_ARRAY_P(data)
 						 && (UNEXPECTED(Z_IS_RECURSIVE_P(data))
-						  || UNEXPECTED(Z_TYPE_P(struc) == IS_ARRAY && Z_ARR_P(data) == Z_ARR_P(struc)))) {
+						  || UNEXPECTED(Z_IS_ARRAY_P(struc) && Z_ARR_P(data) == Z_ARR_P(struc)))) {
 							smart_str_appendl(buf, "N;", 2);
 						} else {
 							if (Z_REFCOUNTED_P(data)) {
@@ -1076,17 +1076,17 @@ PHP_FUNCTION(unserialize)
 	prev_class_hash = php_var_unserialize_get_allowed_classes(var_hash);
 	if (options != NULL) {
 		classes = zend_hash_str_find(Z_ARRVAL_P(options), "allowed_classes", sizeof("allowed_classes")-1);
-		if (classes && Z_TYPE_P(classes) != IS_ARRAY && Z_TYPE_P(classes) != IS_TRUE && Z_TYPE_P(classes) != IS_FALSE) {
+		if (classes && !Z_IS_ARRAY_P(classes) && !Z_IS_TRUE_P(classes) && !Z_IS_FALSE_P(classes)) {
 			php_error_docref(NULL, E_WARNING, "allowed_classes option should be array or boolean");
 			PHP_VAR_UNSERIALIZE_DESTROY(var_hash);
 			RETURN_FALSE;
 		}
 
-		if(classes && (Z_TYPE_P(classes) == IS_ARRAY || !zend_is_true(classes))) {
+		if(classes && (Z_IS_ARRAY_P(classes) || !zend_is_true(classes))) {
 			ALLOC_HASHTABLE(class_hash);
-			zend_hash_init(class_hash, (Z_TYPE_P(classes) == IS_ARRAY)?zend_hash_num_elements(Z_ARRVAL_P(classes)):0, NULL, NULL, 0);
+			zend_hash_init(class_hash, (Z_IS_ARRAY_P(classes))?zend_hash_num_elements(Z_ARRVAL_P(classes)):0, NULL, NULL, 0);
 		}
-		if(class_hash && Z_TYPE_P(classes) == IS_ARRAY) {
+		if(class_hash && Z_IS_ARRAY_P(classes)) {
 			zval *entry;
 			zend_string *lcname;
 

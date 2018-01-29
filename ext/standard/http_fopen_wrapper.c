@@ -156,7 +156,7 @@ static php_stream *php_stream_url_wrap_http_ex(php_stream_wrapper *wrapper,
 		!zend_string_equals_literal_ci(resource->scheme, "https")) {
 		if (!context ||
 			(tmpzval = php_stream_context_get_option(context, wrapper->wops->label, "proxy")) == NULL ||
-			Z_TYPE_P(tmpzval) != IS_STRING ||
+			!Z_IS_STRING_P(tmpzval) ||
 			Z_STRLEN_P(tmpzval) == 0) {
 			php_url_free(resource);
 			return php_stream_open_wrapper_ex(path, mode, REPORT_ERRORS, NULL, context);
@@ -186,7 +186,7 @@ static php_stream *php_stream_url_wrap_http_ex(php_stream_wrapper *wrapper,
 
 		if (context &&
 			(tmpzval = php_stream_context_get_option(context, wrapper->wops->label, "proxy")) != NULL &&
-			Z_TYPE_P(tmpzval) == IS_STRING &&
+			Z_IS_STRING_P(tmpzval) &&
 			Z_STRLEN_P(tmpzval) > 0) {
 			use_proxy = 1;
 			transport_len = Z_STRLEN_P(tmpzval);
@@ -250,11 +250,11 @@ static php_stream *php_stream_url_wrap_http_ex(php_stream_wrapper *wrapper,
 		if (context && (tmpzval = php_stream_context_get_option(context, "http", "header")) != NULL) {
 			char *s, *p;
 
-			if (Z_TYPE_P(tmpzval) == IS_ARRAY) {
+			if (Z_IS_ARRAY_P(tmpzval)) {
 				zval *tmpheader = NULL;
 
 				ZEND_HASH_FOREACH_VAL(Z_ARRVAL_P(tmpzval), tmpheader) {
-					if (Z_TYPE_P(tmpheader) == IS_STRING) {
+					if (Z_IS_STRING_P(tmpheader)) {
 						s = Z_STRVAL_P(tmpheader);
 						do {
 							while (*s == ' ' || *s == '\t') s++;
@@ -278,7 +278,7 @@ static php_stream *php_stream_url_wrap_http_ex(php_stream_wrapper *wrapper,
 						} while (*s != 0);
 					}
 				} ZEND_HASH_FOREACH_END();
-			} else if (Z_TYPE_P(tmpzval) == IS_STRING && Z_STRLEN_P(tmpzval)) {
+			} else if (Z_IS_STRING_P(tmpzval) && Z_STRLEN_P(tmpzval)) {
 				s = Z_STRVAL_P(tmpzval);
 				do {
 					while (*s == ' ' || *s == '\t') s++;
@@ -358,7 +358,7 @@ finish:
 
 	custom_request_method = 0;
 	if (context && (tmpzval = php_stream_context_get_option(context, "http", "method")) != NULL) {
-		if (Z_TYPE_P(tmpzval) == IS_STRING && Z_STRLEN_P(tmpzval) > 0) {
+		if (Z_IS_STRING_P(tmpzval) && Z_STRLEN_P(tmpzval) > 0) {
 			/* As per the RFC, automatically redirected requests MUST NOT use other methods than
 			 * GET and HEAD unless it can be confirmed by the user */
 			if (!redirected
@@ -418,12 +418,12 @@ finish:
 	if (context && (tmpzval = php_stream_context_get_option(context, "http", "header")) != NULL) {
 		tmp = NULL;
 
-		if (Z_TYPE_P(tmpzval) == IS_ARRAY) {
+		if (Z_IS_ARRAY_P(tmpzval)) {
 			zval *tmpheader = NULL;
 			smart_str tmpstr = {0};
 
 			ZEND_HASH_FOREACH_VAL(Z_ARRVAL_P(tmpzval), tmpheader) {
-				if (Z_TYPE_P(tmpheader) == IS_STRING) {
+				if (Z_IS_STRING_P(tmpheader)) {
 					smart_str_append(&tmpstr, Z_STR_P(tmpheader));
 					smart_str_appendl(&tmpstr, "\r\n", sizeof("\r\n") - 1);
 				}
@@ -434,7 +434,7 @@ finish:
 				tmp = php_trim(tmpstr.s, NULL, 0, 3);
 				smart_str_free(&tmpstr);
 			}
-		} else if (Z_TYPE_P(tmpzval) == IS_STRING && Z_STRLEN_P(tmpzval)) {
+		} else if (Z_IS_STRING_P(tmpzval) && Z_STRLEN_P(tmpzval)) {
 			/* Remove newlines and spaces from start and end php_trim will estrndup() */
 			tmp = php_trim(Z_STR_P(tmpzval), NULL, 0, 3);
 		}
@@ -586,7 +586,7 @@ finish:
 
 	if (context &&
 	    (ua_zval = php_stream_context_get_option(context, "http", "user_agent")) != NULL &&
-		Z_TYPE_P(ua_zval) == IS_STRING) {
+		Z_IS_STRING_P(ua_zval)) {
 		ua_str = Z_STRVAL_P(ua_zval);
 	} else if (FG(user_agent)) {
 		ua_str = FG(user_agent);
@@ -621,7 +621,7 @@ finish:
 				context &&
 				!(have_header & HTTP_HEADER_CONTENT_LENGTH) &&
 				(tmpzval = php_stream_context_get_option(context, "http", "content")) != NULL &&
-				Z_TYPE_P(tmpzval) == IS_STRING && Z_STRLEN_P(tmpzval) > 0
+				Z_IS_STRING_P(tmpzval) && Z_STRLEN_P(tmpzval) > 0
 		) {
 			smart_str_appends(&req_buf, "Content-Length: ");
 			smart_str_append_unsigned(&req_buf, Z_STRLEN_P(tmpzval));
@@ -637,7 +637,7 @@ finish:
 	/* Request content, such as for POST requests */
 	if (header_init && context &&
 		(tmpzval = php_stream_context_get_option(context, "http", "content")) != NULL &&
-		Z_TYPE_P(tmpzval) == IS_STRING && Z_STRLEN_P(tmpzval) > 0) {
+		Z_IS_STRING_P(tmpzval) && Z_STRLEN_P(tmpzval) > 0) {
 		if (!(have_header & HTTP_HEADER_CONTENT_LENGTH)) {
 			smart_str_appends(&req_buf, "Content-Length: ");
 			smart_str_append_unsigned(&req_buf, Z_STRLEN_P(tmpzval));

@@ -524,7 +524,7 @@ safe:
 				} else {
 					parameter = &param->parameter;
 				}
-				if (param->param_type == PDO_PARAM_LOB && Z_TYPE_P(parameter) == IS_RESOURCE) {
+				if (param->param_type == PDO_PARAM_LOB && Z_IS_RESOURCE_P(parameter)) {
 					php_stream *stm;
 
 					php_stream_from_zval_no_verify(stm, parameter);
@@ -559,7 +559,7 @@ safe:
 					zend_string *buf = NULL;
 
 					/* assume all types are nullable */
-					if (Z_TYPE_P(parameter) == IS_NULL) {
+					if (Z_IS_NULL_P(parameter)) {
 						param_type = PDO_PARAM_NULL;
 					}
 

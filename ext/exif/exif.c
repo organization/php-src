@@ -4442,7 +4442,7 @@ PHP_FUNCTION(exif_read_data)
 		zend_string_release(z_sections_needed);
 	}
 
-	if (Z_TYPE_P(stream) == IS_RESOURCE) {
+	if (Z_IS_RESOURCE_P(stream)) {
 		php_stream *p_stream = NULL;
 
 		php_stream_from_res(p_stream, Z_RES_P(stream));
@@ -4587,7 +4587,7 @@ PHP_FUNCTION(exif_read_data)
 	exif_discard_imageinfo(&ImageInfo);
 
 #ifdef EXIF_DEBUG
-	php_error_docref1(NULL, (Z_TYPE_P(stream) == IS_RESOURCE ? "<stream>" : Z_STRVAL_P(stream)), E_NOTICE, "Done");
+	php_error_docref1(NULL, (Z_IS_RESOURCE_P(stream) ? "<stream>" : Z_STRVAL_P(stream)), E_NOTICE, "Done");
 #endif
 }
 /* }}} */
@@ -4612,7 +4612,7 @@ PHP_FUNCTION(exif_thumbnail)
 
 	memset(&ImageInfo, 0, sizeof(ImageInfo));
 
-	if (Z_TYPE_P(stream) == IS_RESOURCE) {
+	if (Z_IS_RESOURCE_P(stream)) {
 		php_stream *p_stream = NULL;
 
 		php_stream_from_res(p_stream, Z_RES_P(stream));
@@ -4669,7 +4669,7 @@ PHP_FUNCTION(exif_thumbnail)
 	exif_discard_imageinfo(&ImageInfo);
 
 #ifdef EXIF_DEBUG
-	php_error_docref1(NULL, (Z_TYPE_P(stream) == IS_RESOURCE ? "<stream>" : Z_STRVAL_P(stream)), E_NOTICE, "Done");
+	php_error_docref1(NULL, (Z_IS_RESOURCE_P(stream) ? "<stream>" : Z_STRVAL_P(stream)), E_NOTICE, "Done");
 #endif
 }
 /* }}} */

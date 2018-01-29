@@ -278,7 +278,7 @@ void sdl_set_uri_credentials(sdlCtx *ctx, char *uri)
 		/* another server. clear authentication credentals */
 		php_libxml_switch_context(NULL, &context);
 		php_libxml_switch_context(&context, NULL);
-		if (Z_TYPE(context) != IS_UNDEF) {
+		if (!Z_IS_UNDEF(context)) {
 			zval *context_ptr = &context;
 			ctx->context = php_stream_context_from_zval(context_ptr, 1);
 
@@ -306,7 +306,7 @@ void sdl_set_uri_credentials(sdlCtx *ctx, char *uri)
 
 void sdl_restore_uri_credentials(sdlCtx *ctx)
 {
-	if (Z_TYPE(ctx->old_header) != IS_UNDEF) {
+	if (!Z_IS_UNDEF(ctx->old_header)) {
 	    php_stream_context_set_option(ctx->context, "http", "header", &ctx->old_header);
 	    zval_ptr_dtor(&ctx->old_header);
 		ZVAL_UNDEF(&ctx->old_header);
@@ -3241,16 +3241,16 @@ sdlPtr get_sdl(zval *this_ptr, char *uri, zend_long cache_wsdl)
 	}
 
 	if ((tmp = zend_hash_str_find(Z_OBJPROP_P(this_ptr), "_user_agent", sizeof("_user_agent")-1)) != NULL &&
-	    Z_TYPE_P(tmp) == IS_STRING && Z_STRLEN_P(tmp) > 0) {
+	    Z_IS_STRING_P(tmp) && Z_STRLEN_P(tmp) > 0) {
 		smart_str_appends(&headers, "User-Agent: ");
 		smart_str_appends(&headers, Z_STRVAL_P(tmp));
 		smart_str_appends(&headers, "\r\n");
 	}
 
 	if ((proxy_host = zend_hash_str_find(Z_OBJPROP_P(this_ptr), "_proxy_host", sizeof("_proxy_host")-1)) != NULL &&
-	    Z_TYPE_P(proxy_host) == IS_STRING &&
+	    Z_IS_STRING_P(proxy_host) &&
 	    (proxy_port = zend_hash_str_find(Z_OBJPROP_P(this_ptr), "_proxy_port", sizeof("_proxy_port")-1)) != NULL &&
-	    Z_TYPE_P(proxy_port) == IS_LONG) {
+	    Z_IS_LONG_P(proxy_port)) {
 	        zval str_proxy;
 	    	smart_str proxy = {0};
 		smart_str_appends(&proxy,"tcp://");

@@ -723,9 +723,9 @@ static void _php_mb_regex_ereg_exec(INTERNAL_FUNCTION_PARAMETERS, int icase)
 	}
 
 	/* compile the regular expression from the supplied regex */
-	if (Z_TYPE_P(arg_pattern) != IS_STRING) {
+	if (!Z_IS_STRING_P(arg_pattern)) {
 		/* we convert numbers to integers and treat them as a string */
-		if (Z_TYPE_P(arg_pattern) == IS_DOUBLE) {
+		if (Z_IS_DOUBLE_P(arg_pattern)) {
 			convert_to_long_ex(arg_pattern);	/* get rid of decimal places */
 		}
 		convert_to_string_ex(arg_pattern);
@@ -878,7 +878,7 @@ static void _php_mb_regex_ereg_replace_exec(INTERNAL_FUNCTION_PARAMETERS, OnigOp
 	if (eval && !is_callable) {
 		php_error_docref(NULL, E_DEPRECATED, "The 'e' option is deprecated, use mb_ereg_replace_callback instead");
 	}
-	if (Z_TYPE_P(arg_pattern_zval) == IS_STRING) {
+	if (Z_IS_STRING_P(arg_pattern_zval)) {
 		arg_pattern = Z_STRVAL_P(arg_pattern_zval);
 		arg_pattern_len = Z_STRLEN_P(arg_pattern_zval);
 	} else {
@@ -1243,7 +1243,7 @@ _php_mb_regex_ereg_search_exec(INTERNAL_FUNCTION_PARAMETERS, int mode)
 	pos = MBREX(search_pos);
 	str = NULL;
 	len = 0;
-	if (!Z_ISUNDEF(MBREX(search_str)) && Z_TYPE(MBREX(search_str)) == IS_STRING){
+	if (!Z_ISUNDEF(MBREX(search_str)) && Z_IS_STRING(MBREX(search_str))){
 		str = (OnigUChar *)Z_STRVAL(MBREX(search_str));
 		len = Z_STRLEN(MBREX(search_str));
 	}
@@ -1404,7 +1404,7 @@ PHP_FUNCTION(mb_ereg_search_getregs)
 	int n, i, len, beg, end;
 	OnigUChar *str;
 
-	if (MBREX(search_regs) != NULL && Z_TYPE(MBREX(search_str)) == IS_STRING) {
+	if (MBREX(search_regs) != NULL && Z_IS_STRING(MBREX(search_str))) {
 		array_init(return_value);
 
 		str = (OnigUChar *)Z_STRVAL(MBREX(search_str));
@@ -1444,11 +1444,11 @@ PHP_FUNCTION(mb_ereg_search_setpos)
 	}
 
 	/* Accept negative position if length of search string can be determined */
-	if ((position < 0) && (!Z_ISUNDEF(MBREX(search_str))) && (Z_TYPE(MBREX(search_str)) == IS_STRING)) {
+	if ((position < 0) && (!Z_ISUNDEF(MBREX(search_str))) && (Z_IS_STRING(MBREX(search_str)))) {
 		position += Z_STRLEN(MBREX(search_str));
 	}
 
-	if (position < 0 || (!Z_ISUNDEF(MBREX(search_str)) && Z_TYPE(MBREX(search_str)) == IS_STRING && (size_t)position > Z_STRLEN(MBREX(search_str)))) {
+	if (position < 0 || (!Z_ISUNDEF(MBREX(search_str)) && Z_IS_STRING(MBREX(search_str)) && (size_t)position > Z_STRLEN(MBREX(search_str)))) {
 		php_error_docref(NULL, E_WARNING, "Position is out of range");
 		MBREX(search_pos) = 0;
 		RETURN_FALSE;

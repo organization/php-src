@@ -917,7 +917,7 @@ int php_oci_bind_pre_exec(zval *data, void *result)
 	*(int *)result = 0;
 
 	ZVAL_DEREF(zv);
-	if (Z_TYPE_P(zv) == IS_ARRAY) {
+	if (Z_IS_ARRAY_P(zv)) {
 		/* These checks are currently valid for oci_bind_by_name, not
 		 * oci_bind_array_by_name.  Also bind->type and
 		 * bind->indicator are not used for oci_bind_array_by_name.
@@ -931,7 +931,7 @@ int php_oci_bind_pre_exec(zval *data, void *result)
 		case SQLT_CLOB:
 		case SQLT_BLOB:
 		case SQLT_RDD:
-			if (Z_TYPE_P(zv) != IS_OBJECT) {
+			if (!Z_IS_OBJECT_P(zv)) {
 				php_error_docref(NULL, E_WARNING, "Invalid variable used for bind");
 				*(int *)result = 1;
 			}
@@ -947,14 +947,14 @@ int php_oci_bind_pre_exec(zval *data, void *result)
 		case SQLT_LBI:
 		case SQLT_BIN:
 		case SQLT_LNG:
-			if (Z_TYPE_P(zv) == IS_RESOURCE || Z_TYPE_P(zv) == IS_OBJECT) {
+			if (Z_IS_RESOURCE_P(zv) || Z_IS_OBJECT_P(zv)) {
 				php_error_docref(NULL, E_WARNING, "Invalid variable used for bind");
 				*(int *)result = 1;
 			}
 			break;
 
 		case SQLT_RSET:
-			if (Z_TYPE_P(zv) != IS_RESOURCE) {
+			if (!Z_IS_RESOURCE_P(zv)) {
 				php_error_docref(NULL, E_WARNING, "Invalid variable used for bind");
 				*(int *)result = 1;
 			}
@@ -979,12 +979,12 @@ int php_oci_bind_post_exec(zval *data)
 
 	ZVAL_DEREF(zv);
 	if (bind->indicator == -1) { /* NULL */
-		if (Z_TYPE_P(zv) == IS_STRING) {
+		if (Z_IS_STRING_P(zv)) {
 			*Z_STRVAL_P(zv) = '\0'; /* XXX avoid warning in debug mode */
 		}
 		zval_ptr_dtor(zv);
 		ZVAL_NULL(zv);
-	} else if (Z_TYPE_P(zv) == IS_STRING
+	} else if (Z_IS_STRING_P(zv)
 			   && Z_STRLEN_P(zv) > 0
 			   && Z_STRVAL_P(zv)[ Z_STRLEN_P(zv) ] != '\0') {
 		/* The post- PHP 5.3 feature for "interned" strings disallows
@@ -995,7 +995,7 @@ int php_oci_bind_post_exec(zval *data)
 		 */
 		ZVAL_NEW_STR(zv, zend_string_extend(Z_STR_P(zv), Z_STRLEN_P(zv)+1, 0));
 		Z_STRVAL_P(zv)[ Z_STRLEN_P(zv) ] = '\0';
-	} else if (Z_TYPE_P(zv) == IS_ARRAY) {
+	} else if (Z_IS_ARRAY_P(zv)) {
 		int i;
 		zval *entry = NULL;
 		HashTable *hash;
@@ -1082,7 +1082,7 @@ int php_oci_bind_post_exec(zval *data)
 				}
 				break;
 		}
-	} else if ((Z_TYPE_P(zv) == IS_TRUE) || (Z_TYPE_P(zv) == IS_FALSE)) {
+	} else if ((Z_IS_TRUE_P(zv)) || (Z_IS_FALSE_P(zv))) {
 		/* This convetrsion is done on purpose (ext/oci8 uses LVAL as a temorary value) */
 		if (Z_LVAL_P(zv) == 0)
 			ZVAL_BOOL(zv, FALSE);
@@ -1119,7 +1119,7 @@ int php_oci_bind_by_name(php_oci_statement *statement, char *name, size_t name_l
 		{
 			zval *tmp;
 
-			if (Z_TYPE_P(param) != IS_OBJECT || (tmp = zend_hash_str_find(Z_OBJPROP_P(param), "collection", sizeof("collection")-1)) == NULL) {
+			if (!Z_IS_OBJECT_P(param) || (tmp = zend_hash_str_find(Z_OBJPROP_P(param), "collection", sizeof("collection")-1)) == NULL) {
 				php_error_docref(NULL, E_WARNING, "Unable to find collection property");
 				return 1;
 			}
@@ -1141,7 +1141,7 @@ int php_oci_bind_by_name(php_oci_statement *statement, char *name, size_t name_l
 		{
 			zval *tmp;
 
-			if (Z_TYPE_P(param) != IS_OBJECT || (tmp = zend_hash_str_find(Z_OBJPROP_P(param), "descriptor", sizeof("descriptor")-1)) == NULL) {
+			if (!Z_IS_OBJECT_P(param) || (tmp = zend_hash_str_find(Z_OBJPROP_P(param), "descriptor", sizeof("descriptor")-1)) == NULL) {
 				php_error_docref(NULL, E_WARNING, "Unable to find descriptor property");
 				return 1;
 			}
@@ -1160,7 +1160,7 @@ int php_oci_bind_by_name(php_oci_statement *statement, char *name, size_t name_l
 
 		case SQLT_INT:
 		case SQLT_NUM:
-			if (Z_TYPE_P(param) == IS_RESOURCE || Z_TYPE_P(param) == IS_OBJECT) {
+			if (Z_IS_RESOURCE_P(param) || Z_IS_OBJECT_P(param)) {
 				php_error_docref(NULL, E_WARNING, "Invalid variable used for bind");
 				return 1;
 			}
@@ -1175,17 +1175,17 @@ int php_oci_bind_by_name(php_oci_statement *statement, char *name, size_t name_l
 		case SQLT_LNG:
 		case SQLT_AFC:
 		case SQLT_CHR: /* SQLT_CHR is the default value when type was not specified */
-			if (Z_TYPE_P(param) == IS_RESOURCE || Z_TYPE_P(param) == IS_OBJECT) {
+			if (Z_IS_RESOURCE_P(param) || Z_IS_OBJECT_P(param)) {
 				php_error_docref(NULL, E_WARNING, "Invalid variable used for bind");
 				return 1;
 			}
-			if (Z_TYPE_P(param) != IS_NULL) {
+			if (!Z_IS_NULL_P(param)) {
 				convert_to_string(param);
 			}
 			if ((maxlength == -1) || (maxlength == 0)) {
 				if (type == SQLT_LNG) {
 					value_sz = SB4MAXVAL;
-				} else if (Z_TYPE_P(param) == IS_STRING) {
+				} else if (Z_IS_STRING_P(param)) {
 					value_sz = (sb4) Z_STRLEN_P(param);
 				} else {
 					/* Bug-72524: revert value_sz from PHP_OCI_PIECE_SIZE to 0. This restores PHP 5.6 behavior  */
@@ -1197,7 +1197,7 @@ int php_oci_bind_by_name(php_oci_statement *statement, char *name, size_t name_l
 			break;
 
 		case SQLT_RSET:
-			if (Z_TYPE_P(param) != IS_RESOURCE) {
+			if (!Z_IS_RESOURCE_P(param)) {
 				php_error_docref(NULL, E_WARNING, "Invalid variable used for bind");
 				return 1;
 			}
@@ -1213,15 +1213,15 @@ int php_oci_bind_by_name(php_oci_statement *statement, char *name, size_t name_l
 
 #if defined(OCI_MAJOR_VERSION) && OCI_MAJOR_VERSION >= 12
 		case SQLT_BOL:
-			if (Z_TYPE_P(param) == IS_RESOURCE || Z_TYPE_P(param) == IS_OBJECT) {
+			if (Z_IS_RESOURCE_P(param) || Z_IS_OBJECT_P(param)) {
 				php_error_docref(NULL, E_WARNING, "Invalid variable used for bind");
 				return 1;
 			}
 			convert_to_boolean(param);
 			bind_data = (zend_long *)&Z_LVAL_P(param);
-			if (Z_TYPE_P(param) == IS_TRUE)
+			if (Z_IS_TRUE_P(param))
 				*(zend_long *)bind_data = 1;
-			else if (Z_TYPE_P(param) == IS_FALSE)
+			else if (Z_IS_FALSE_P(param))
 				*(zend_long *)bind_data = 0;
 			else {
 				php_error_docref(NULL, E_WARNING, "Invalid variable used for bind");
@@ -1434,7 +1434,7 @@ sb4 php_oci_bind_out_callback(
 	val = &phpbind->val;
 	ZVAL_DEREF(val);
 
-	if (Z_TYPE_P(val) == IS_RESOURCE) {
+	if (Z_IS_RESOURCE_P(val)) {
 		/* Processing for ref-cursor out binds */
 		if (phpbind->statement != NULL) {
 			*bufpp = phpbind->statement;
@@ -1444,7 +1444,7 @@ sb4 php_oci_bind_out_callback(
 			*indpp = &phpbind->indicator;
 		}
 		retval = OCI_CONTINUE;
-	} else if (Z_TYPE_P(val) == IS_OBJECT) {
+	} else if (Z_IS_OBJECT_P(val)) {
 		zval *tmp;
 		php_oci_descriptor *desc;
 
@@ -1520,7 +1520,7 @@ php_oci_out_column *php_oci_statement_get_column_helper(INTERNAL_FUNCTION_PARAME
 		return NULL;
 	}
 
-	if (Z_TYPE_P(column_index) == IS_STRING) {
+	if (Z_IS_STRING_P(column_index)) {
 		column = php_oci_statement_get_column(statement, -1, Z_STRVAL_P(column_index), (int) Z_STRLEN_P(column_index));
 		if (!column) {
 			php_error_docref(NULL, E_WARNING, "Invalid column name \"%s\"", Z_STRVAL_P(column_index));

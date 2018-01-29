@@ -440,7 +440,7 @@ tail_call:
 	while (1) {
 		end--;
 		zv = &end->val;
-		if (Z_TYPE_P(zv) == IS_INDIRECT) {
+		if (Z_IS_INDIRECT_P(zv)) {
 			zv = Z_INDIRECT_P(zv);
 		}
 		if (Z_REFCOUNTED_P(zv)) {
@@ -450,7 +450,7 @@ tail_call:
 	}
 	while (p != end) {
 		zv = &p->val;
-		if (Z_TYPE_P(zv) == IS_INDIRECT) {
+		if (Z_IS_INDIRECT_P(zv)) {
 			zv = Z_INDIRECT_P(zv);
 		}
 		if (Z_REFCOUNTED_P(zv)) {
@@ -463,7 +463,7 @@ tail_call:
 		p++;
 	}
 	zv = &p->val;
-	if (Z_TYPE_P(zv) == IS_INDIRECT) {
+	if (Z_IS_INDIRECT_P(zv)) {
 		zv = Z_INDIRECT_P(zv);
 	}
 	ref = Z_COUNTED_P(zv);
@@ -544,7 +544,7 @@ tail_call:
 		while (1) {
 			end--;
 			zv = &end->val;
-			if (Z_TYPE_P(zv) == IS_INDIRECT) {
+			if (Z_IS_INDIRECT_P(zv)) {
 				zv = Z_INDIRECT_P(zv);
 			}
 			if (Z_REFCOUNTED_P(zv)) {
@@ -554,7 +554,7 @@ tail_call:
 		}
 		while (p != end) {
 			zv = &p->val;
-			if (Z_TYPE_P(zv) == IS_INDIRECT) {
+			if (Z_IS_INDIRECT_P(zv)) {
 				zv = Z_INDIRECT_P(zv);
 			}
 			if (Z_REFCOUNTED_P(zv)) {
@@ -565,7 +565,7 @@ tail_call:
 			p++;
 		}
 		zv = &p->val;
-		if (Z_TYPE_P(zv) == IS_INDIRECT) {
+		if (Z_IS_INDIRECT_P(zv)) {
 			zv = Z_INDIRECT_P(zv);
 		}
 		ref = Z_COUNTED_P(zv);
@@ -654,7 +654,7 @@ tail_call:
 			while (1) {
 				end--;
 				zv = &end->val;
-				if (Z_TYPE_P(zv) == IS_INDIRECT) {
+				if (Z_IS_INDIRECT_P(zv)) {
 					zv = Z_INDIRECT_P(zv);
 				}
 				if (Z_REFCOUNTED_P(zv)) {
@@ -664,7 +664,7 @@ tail_call:
 			}
 			while (p != end) {
 				zv = &p->val;
-				if (Z_TYPE_P(zv) == IS_INDIRECT) {
+				if (Z_IS_INDIRECT_P(zv)) {
 					zv = Z_INDIRECT_P(zv);
 				}
 				if (Z_REFCOUNTED_P(zv)) {
@@ -674,7 +674,7 @@ tail_call:
 				p++;
 			}
 			zv = &p->val;
-			if (Z_TYPE_P(zv) == IS_INDIRECT) {
+			if (Z_IS_INDIRECT_P(zv)) {
 				zv = Z_INDIRECT_P(zv);
 			}
 			ref = Z_COUNTED_P(zv);
@@ -790,7 +790,7 @@ tail_call:
 					if (!n) return count;
 					while (!Z_REFCOUNTED_P(--end)) {
 						/* count non-refcounted for compatibility ??? */
-						if (Z_TYPE_P(zv) != IS_UNDEF) {
+						if (!Z_IS_UNDEF_P(zv)) {
 							count++;
 						}
 						if (zv == end) return count;
@@ -802,7 +802,7 @@ tail_call:
 						GC_ADDREF(ref);
 						count += gc_collect_white(ref, flags);
 					/* count non-refcounted for compatibility ??? */
-					} else if (Z_TYPE_P(zv) != IS_UNDEF) {
+					} else if (!Z_IS_UNDEF_P(zv)) {
 						count++;
 					}
 					zv++;
@@ -842,21 +842,21 @@ tail_call:
 		while (1) {
 			end--;
 			zv = &end->val;
-			if (Z_TYPE_P(zv) == IS_INDIRECT) {
+			if (Z_IS_INDIRECT_P(zv)) {
 				zv = Z_INDIRECT_P(zv);
 			}
 			if (Z_REFCOUNTED_P(zv)) {
 				break;
 			}
 			/* count non-refcounted for compatibility ??? */
-			if (Z_TYPE_P(zv) != IS_UNDEF) {
+			if (!Z_IS_UNDEF_P(zv)) {
 				count++;
 			}
 			if (p == end) return count;
 		}
 		while (p != end) {
 			zv = &p->val;
-			if (Z_TYPE_P(zv) == IS_INDIRECT) {
+			if (Z_IS_INDIRECT_P(zv)) {
 				zv = Z_INDIRECT_P(zv);
 			}
 			if (Z_REFCOUNTED_P(zv)) {
@@ -864,13 +864,13 @@ tail_call:
 				GC_ADDREF(ref);
 				count += gc_collect_white(ref, flags);
 				/* count non-refcounted for compatibility ??? */
-			} else if (Z_TYPE_P(zv) != IS_UNDEF) {
+			} else if (!Z_IS_UNDEF_P(zv)) {
 				count++;
 			}
 			p++;
 		}
 		zv = &p->val;
-		if (Z_TYPE_P(zv) == IS_INDIRECT) {
+		if (Z_IS_INDIRECT_P(zv)) {
 			zv = Z_INDIRECT_P(zv);
 		}
 		ref = Z_COUNTED_P(zv);
@@ -1003,7 +1003,7 @@ tail_call:
 		while (1) {
 			end--;
 			zv = &end->val;
-			if (Z_TYPE_P(zv) == IS_INDIRECT) {
+			if (Z_IS_INDIRECT_P(zv)) {
 				zv = Z_INDIRECT_P(zv);
 			}
 			if (Z_REFCOUNTED_P(zv)) {
@@ -1013,7 +1013,7 @@ tail_call:
 		}
 		while (p != end) {
 			zv = &p->val;
-			if (Z_TYPE_P(zv) == IS_INDIRECT) {
+			if (Z_IS_INDIRECT_P(zv)) {
 				zv = Z_INDIRECT_P(zv);
 			}
 			if (Z_REFCOUNTED_P(zv)) {
@@ -1023,7 +1023,7 @@ tail_call:
 			p++;
 		}
 		zv = &p->val;
-		if (Z_TYPE_P(zv) == IS_INDIRECT) {
+		if (Z_IS_INDIRECT_P(zv)) {
 			zv = Z_INDIRECT_P(zv);
 		}
 		ref = Z_COUNTED_P(zv);

@@ -92,12 +92,12 @@ PHP_FUNCTION(class_parents)
 		RETURN_FALSE;
 	}
 
-	if (Z_TYPE_P(obj) != IS_OBJECT && Z_TYPE_P(obj) != IS_STRING) {
+	if (!Z_IS_OBJECT_P(obj) && !Z_IS_STRING_P(obj)) {
 		php_error_docref(NULL, E_WARNING, "object or string expected");
 		RETURN_FALSE;
 	}
 
-	if (Z_TYPE_P(obj) == IS_STRING) {
+	if (Z_IS_STRING_P(obj)) {
 		if (NULL == (ce = spl_find_ce_by_name(Z_STR_P(obj), autoload))) {
 			RETURN_FALSE;
 		}
@@ -125,12 +125,12 @@ PHP_FUNCTION(class_implements)
 	if (zend_parse_parameters(ZEND_NUM_ARGS(), "z|b", &obj, &autoload) == FAILURE) {
 		RETURN_FALSE;
 	}
-	if (Z_TYPE_P(obj) != IS_OBJECT && Z_TYPE_P(obj) != IS_STRING) {
+	if (!Z_IS_OBJECT_P(obj) && !Z_IS_STRING_P(obj)) {
 		php_error_docref(NULL, E_WARNING, "object or string expected");
 		RETURN_FALSE;
 	}
 
-	if (Z_TYPE_P(obj) == IS_STRING) {
+	if (Z_IS_STRING_P(obj)) {
 		if (NULL == (ce = spl_find_ce_by_name(Z_STR_P(obj), autoload))) {
 			RETURN_FALSE;
 		}
@@ -154,12 +154,12 @@ PHP_FUNCTION(class_uses)
 	if (zend_parse_parameters(ZEND_NUM_ARGS(), "z|b", &obj, &autoload) == FAILURE) {
 		RETURN_FALSE;
 	}
-	if (Z_TYPE_P(obj) != IS_OBJECT && Z_TYPE_P(obj) != IS_STRING) {
+	if (!Z_IS_OBJECT_P(obj) && !Z_IS_STRING_P(obj)) {
 		php_error_docref(NULL, E_WARNING, "object or string expected");
 		RETURN_FALSE;
 	}
 
-	if (Z_TYPE_P(obj) == IS_STRING) {
+	if (Z_IS_STRING_P(obj)) {
 		if (NULL == (ce = spl_find_ce_by_name(Z_STR_P(obj), autoload))) {
 			RETURN_FALSE;
 		}
@@ -393,7 +393,7 @@ PHP_FUNCTION(spl_autoload_call)
 	zend_string *lc_name, *func_name;
 	autoload_func_info *alfi;
 
-	if (zend_parse_parameters(ZEND_NUM_ARGS(), "z", &class_name) == FAILURE || Z_TYPE_P(class_name) != IS_STRING) {
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "z", &class_name) == FAILURE || !Z_IS_STRING_P(class_name)) {
 		return;
 	}
 
@@ -499,7 +499,7 @@ PHP_FUNCTION(spl_autoload_register)
 			alfi.ce = fcc.calling_scope;
 			alfi.func_ptr = fcc.function_handler;
 			obj_ptr = fcc.object;
-			if (Z_TYPE_P(zcallable) == IS_ARRAY) {
+			if (Z_IS_ARRAY_P(zcallable)) {
 				if (!obj_ptr && alfi.func_ptr && !(alfi.func_ptr->common.fn_flags & ZEND_ACC_STATIC)) {
 					if (do_throw) {
 						zend_throw_exception_ex(spl_ce_LogicException, 0, "Passed array specifies a non static method but no object (%s)", error);
@@ -517,7 +517,7 @@ PHP_FUNCTION(spl_autoload_register)
 				}
 				zend_string_release(func_name);
 				RETURN_FALSE;
-			} else if (Z_TYPE_P(zcallable) == IS_STRING) {
+			} else if (Z_IS_STRING_P(zcallable)) {
 				if (do_throw) {
 					zend_throw_exception_ex(spl_ce_LogicException, 0, "Function '%s' not %s (%s)", ZSTR_VAL(func_name), alfi.func_ptr ? "callable" : "found", error);
 				}
@@ -554,7 +554,7 @@ PHP_FUNCTION(spl_autoload_register)
 			efree(error);
 		}
 
-		if (Z_TYPE_P(zcallable) == IS_OBJECT) {
+		if (Z_IS_OBJECT_P(zcallable)) {
 			ZVAL_COPY(&alfi.closure, zcallable);
 
 			lc_name = zend_string_alloc(ZSTR_LEN(func_name) + sizeof(uint32_t), 0);
@@ -681,7 +681,7 @@ PHP_FUNCTION(spl_autoload_unregister)
 		efree(error);
 	}
 
-	if (Z_TYPE_P(zcallable) == IS_OBJECT) {
+	if (Z_IS_OBJECT_P(zcallable)) {
 		lc_name = zend_string_alloc(ZSTR_LEN(func_name) + sizeof(uint32_t), 0);
 		zend_str_tolower_copy(ZSTR_VAL(lc_name), ZSTR_VAL(func_name), ZSTR_LEN(func_name));
 		memcpy(ZSTR_VAL(lc_name) + ZSTR_LEN(func_name), &Z_OBJ_HANDLE_P(zcallable), sizeof(uint32_t));

@@ -1992,7 +1992,7 @@ static int phar_update_cached_entry(zval *data, void *argument) /* {{{ */
 	entry->filename = estrndup(entry->filename, entry->filename_len);
 	entry->is_persistent = 0;
 
-	if (Z_TYPE(entry->metadata) != IS_UNDEF) {
+	if (!Z_IS_UNDEF(entry->metadata)) {
 		if (entry->metadata_len) {
 			char *buf = estrndup((char *) Z_PTR(entry->metadata), entry->metadata_len);
 			/* assume success, we would have failed before */
@@ -2037,7 +2037,7 @@ static void phar_copy_cached_phar(phar_archive_data **pphar) /* {{{ */
 		phar->signature = estrdup(phar->signature);
 	}
 
-	if (Z_TYPE(phar->metadata) != IS_UNDEF) {
+	if (!Z_IS_UNDEF(phar->metadata)) {
 		/* assume success, we would have failed before */
 		if (phar->metadata_len) {
 			char *buf = estrndup((char *) Z_PTR(phar->metadata), phar->metadata_len);

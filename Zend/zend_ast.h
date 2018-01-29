@@ -232,13 +232,13 @@ static zend_always_inline zval *zend_ast_get_zval(zend_ast *ast) {
 }
 static zend_always_inline zend_string *zend_ast_get_str(zend_ast *ast) {
 	zval *zv = zend_ast_get_zval(ast);
-	ZEND_ASSERT(Z_TYPE_P(zv) == IS_STRING);
+	ZEND_ASSERT(Z_IS_STRING_P(zv));
 	return Z_STR_P(zv);
 }
 
 static zend_always_inline zend_string *zend_ast_get_constant_name(zend_ast *ast) {
 	ZEND_ASSERT(ast->kind == ZEND_AST_CONSTANT);
-	ZEND_ASSERT(Z_TYPE(((zend_ast_zval *) ast)->val) == IS_STRING);
+	ZEND_ASSERT(Z_IS_STRING(((zend_ast_zval *) ast)->val));
 	return Z_STR(((zend_ast_zval *) ast)->val);
 }
 

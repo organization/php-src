@@ -1539,7 +1539,7 @@ PHP_FUNCTION(oci_fetch_object)
 {
 	php_oci_fetch_row(INTERNAL_FUNCTION_PARAM_PASSTHRU, PHP_OCI_ASSOC | PHP_OCI_RETURN_NULLS, 2);
 
-	if (Z_TYPE_P(return_value) == IS_ARRAY) {
+	if (Z_IS_ARRAY_P(return_value)) {
 		object_and_properties_init(return_value, ZEND_STANDARD_CLASS_DEF_PTR, Z_ARRVAL_P(return_value));
 	}
 }

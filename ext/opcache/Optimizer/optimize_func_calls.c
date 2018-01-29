@@ -31,10 +31,10 @@
 
 #define ZEND_OP1_IS_CONST_STRING(opline) \
 	(opline->op1_type == IS_CONST && \
-	Z_TYPE(op_array->literals[(opline)->op1.constant]) == IS_STRING)
+	Z_IS_STRING(op_array->literals[(opline)->op1.constant]))
 #define ZEND_OP2_IS_CONST_STRING(opline) \
 	(opline->op2_type == IS_CONST && \
-	Z_TYPE(op_array->literals[(opline)->op2.constant]) == IS_STRING)
+	Z_IS_STRING(op_array->literals[(opline)->op2.constant]))
 
 typedef struct _optimizer_call_info {
 	zend_function *func;

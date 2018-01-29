@@ -494,7 +494,7 @@ static int php_sqlite3_collation_callback(void *context,
 	if ((ret = zend_call_function(&collation->fc.fci, &collation->fc.fcc)) == FAILURE) {
 		php_error_docref(NULL, E_WARNING, "An error occurred while invoking the callback");
 	} else if (!Z_ISUNDEF(retval)) {
-		if (Z_TYPE(retval) != IS_LONG) {
+		if (!Z_IS_LONG(retval)) {
 			convert_to_long_ex(&retval);
 		}
 		ret = 0;

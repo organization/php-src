@@ -1538,7 +1538,7 @@ php_mysqlnd_rowp_read_binary_protocol(MYSQLND_ROW_BUFFER * row_buffer, zval * fi
 		}
 		MYSQLND_INC_CONN_STATISTIC_W_VALUE2(stats, statistic, 1,
 										STAT_BYTES_RECEIVED_PURE_DATA_PS,
-										(Z_TYPE_P(current_field) == IS_STRING)?
+										(Z_IS_STRING_P(current_field))?
 											Z_STRLEN_P(current_field) : (size_t)(p - orig_p));
 
 		if (!((bit<<=1) & 255)) {
@@ -1681,12 +1681,12 @@ php_mysqlnd_rowp_read_text_protocol_aux(MYSQLND_ROW_BUFFER * row_buffer, zval * 
 				  later in this function there will be an advancement.
 				*/
 				p -= len;
-				if (Z_TYPE_P(current_field) == IS_LONG && !as_int_or_float) {
+				if (Z_IS_LONG_P(current_field) && !as_int_or_float) {
 					/* we are using the text protocol, so convert to string */
 					char tmp[22];
 					const size_t tmp_len = sprintf((char *)&tmp, MYSQLND_LLU_SPEC, (uint64_t) Z_LVAL_P(current_field));
 					ZVAL_STRINGL(current_field, tmp, tmp_len);
-				} else if (Z_TYPE_P(current_field) == IS_STRING) {
+				} else if (Z_IS_STRING_P(current_field)) {
 					/* nothing to do here, as we want a string and ps_fetch_from_1_to_8_bytes() has given us one */
 				}
 			} else if (len == 0) {

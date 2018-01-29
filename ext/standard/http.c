@@ -77,7 +77,7 @@ PHPAPI int php_url_encode_hash_ex(HashTable *ht, smart_str *formstr,
 		}
 
 		ZVAL_DEREF(zdata);
-		if (Z_TYPE_P(zdata) == IS_ARRAY || Z_TYPE_P(zdata) == IS_OBJECT) {
+		if (Z_IS_ARRAY_P(zdata) || Z_IS_OBJECT_P(zdata)) {
 			if (key) {
 				zend_string *ekey;
 				if (enc_type == PHP_QUERY_RFC3986) {
@@ -139,12 +139,12 @@ PHPAPI int php_url_encode_hash_ex(HashTable *ht, smart_str *formstr,
 			if (!(GC_FLAGS(ht) & GC_IMMUTABLE)) {
 				GC_PROTECT_RECURSION(ht);
 			}
-			php_url_encode_hash_ex(HASH_OF(zdata), formstr, NULL, 0, newprefix, newprefix_len, "%5D", 3, (Z_TYPE_P(zdata) == IS_OBJECT ? zdata : NULL), arg_sep, enc_type);
+			php_url_encode_hash_ex(HASH_OF(zdata), formstr, NULL, 0, newprefix, newprefix_len, "%5D", 3, (Z_IS_OBJECT_P(zdata) ? zdata : NULL), arg_sep, enc_type);
 			if (!(GC_FLAGS(ht) & GC_IMMUTABLE)) {
 				GC_UNPROTECT_RECURSION(ht);
 			}
 			efree(newprefix);
-		} else if (Z_TYPE_P(zdata) == IS_NULL || Z_TYPE_P(zdata) == IS_RESOURCE) {
+		} else if (Z_IS_NULL_P(zdata) || Z_IS_RESOURCE_P(zdata)) {
 			/* Skip these types */
 			continue;
 		} else {
@@ -241,12 +241,12 @@ PHP_FUNCTION(http_build_query)
 		Z_PARAM_LONG(enc_type)
 	ZEND_PARSE_PARAMETERS_END_EX(RETURN_FALSE);
 
-	if (Z_TYPE_P(formdata) != IS_ARRAY && Z_TYPE_P(formdata) != IS_OBJECT) {
+	if (!Z_IS_ARRAY_P(formdata) && !Z_IS_OBJECT_P(formdata)) {
 		php_error_docref(NULL, E_WARNING, "Parameter 1 expected to be Array or Object.  Incorrect value given");
 		RETURN_FALSE;
 	}
 
-	if (php_url_encode_hash_ex(HASH_OF(formdata), &formstr, prefix, prefix_len, NULL, 0, NULL, 0, (Z_TYPE_P(formdata) == IS_OBJECT ? formdata : NULL), arg_sep, (int)enc_type) == FAILURE) {
+	if (php_url_encode_hash_ex(HASH_OF(formdata), &formstr, prefix, prefix_len, NULL, 0, NULL, 0, (Z_IS_OBJECT_P(formdata) ? formdata : NULL), arg_sep, (int)enc_type) == FAILURE) {
 		if (formstr.s) {
 			smart_str_free(&formstr);
 		}

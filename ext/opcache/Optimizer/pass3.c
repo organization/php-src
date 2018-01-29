@@ -105,7 +105,7 @@ void zend_optimizer_pass3(zend_op_array *op_array)
 
 						if (opline->opcode != ZEND_ADD
 								|| (opline->op1_type == IS_CONST
-									&& Z_TYPE(ZEND_OP1_LITERAL(opline)) != IS_ARRAY)) {
+									&& !Z_IS_ARRAY(ZEND_OP1_LITERAL(opline)))) {
 							/* protection from array add: $a = array + $a is not commutative! */
 							COPY_NODE(opline->op1, opline->op2);
 							COPY_NODE(opline->op2, tmp);

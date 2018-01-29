@@ -90,7 +90,7 @@ ZEND_API void zend_iterator_dtor(zend_object_iterator *iter)
 
 ZEND_API zend_object_iterator* zend_iterator_unwrap(zval *array_ptr)
 {
-	ZEND_ASSERT(Z_TYPE_P(array_ptr) == IS_OBJECT);
+	ZEND_ASSERT(Z_IS_OBJECT_P(array_ptr));
 	if (Z_OBJ_HT_P(array_ptr) == &iterator_object_handlers) {
 		return (zend_object_iterator *)Z_OBJ_P(array_ptr);
 	}

@@ -212,7 +212,7 @@ PHPAPI void var_destroy(php_unserialize_data_t *var_hashx)
 #endif
 
 			/* Perform delayed __wakeup calls */
-			if (Z_TYPE_P(zv) == IS_OBJECT
+			if (Z_IS_OBJECT_P(zv)
 			 && ((uintptr_t)Z_OBJ_P(zv) & VAR_WAKEUP_FLAG)) {
 				Z_OBJ_P(zv) = (zend_object*)((uintptr_t)Z_OBJ_P(zv) & ~VAR_WAKEUP_FLAG);
 				if (!wakeup_failed) {
@@ -409,7 +409,7 @@ static zend_always_inline int process_nested_data(UNSERIALIZE_PARAMETER, HashTab
 		ZVAL_UNDEF(&d);
 
 		if (!objprops) {
-			if (Z_TYPE(key) == IS_LONG) {
+			if (Z_IS_LONG(key)) {
 				idx = Z_LVAL(key);
 numeric_key:
 				if (UNEXPECTED((old_data = zend_hash_index_find(ht, idx)) != NULL)) {
@@ -419,7 +419,7 @@ numeric_key:
 				} else {
 					data = zend_hash_index_add_new(ht, idx, &d);
 				}
-			} else if (Z_TYPE(key) == IS_STRING) {
+			} else if (Z_IS_STRING(key)) {
 				if (UNEXPECTED(ZEND_HANDLE_NUMERIC(Z_STR(key), idx))) {
 					goto numeric_key;
 				}
@@ -435,9 +435,9 @@ numeric_key:
 				return 0;
 			}
 		} else {
-			if (EXPECTED(Z_TYPE(key) == IS_STRING)) {
+			if (EXPECTED(Z_IS_STRING(key))) {
 string_key:
-				if (Z_TYPE_P(rval) == IS_OBJECT
+				if (Z_IS_OBJECT_P(rval)
 						&& zend_hash_num_elements(&Z_OBJCE_P(rval)->properties_info) > 0) {
 					zend_property_info *existing_propinfo;
 					zend_string *new_key;
@@ -485,7 +485,7 @@ string_key:
 				}
 
 				if ((old_data = zend_hash_find(ht, Z_STR(key))) != NULL) {
-					if (Z_TYPE_P(old_data) == IS_INDIRECT) {
+					if (Z_IS_INDIRECT_P(old_data)) {
 						old_data = Z_INDIRECT_P(old_data);
 					}
 					var_push_dtor(var_hash, old_data);
@@ -493,7 +493,7 @@ string_key:
 				} else {
 					data = zend_hash_add_new(ht, Z_STR(key), &d);
 				}
-			} else if (Z_TYPE(key) == IS_LONG) {
+			} else if (Z_IS_LONG(key)) {
 				/* object properties should include no integers */
 				convert_to_string(&key);
 				goto string_key;
@@ -588,7 +588,7 @@ static inline int object_common2(UNSERIALIZE_PARAMETER, zend_long elements)
 	HashTable *ht;
 	zend_bool has_wakeup;
 
-	if (Z_TYPE_P(rval) != IS_OBJECT) {
+	if (!Z_IS_OBJECT_P(rval)) {
 		return 0;
 	}
 
@@ -1155,7 +1155,7 @@ yy75:
 	}
 
 	ZVAL_DEREF(rval_ref);
-	if (Z_TYPE_P(rval_ref) != IS_OBJECT) {
+	if (!Z_IS_OBJECT_P(rval_ref)) {
 		return 0;
 	}
 

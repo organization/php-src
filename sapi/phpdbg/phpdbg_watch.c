@@ -122,7 +122,7 @@ const phpdbg_command_t phpdbg_watch_commands[] = {
 	PHPDBG_END_COMMAND
 };
 
-#define HT_FROM_ZVP(zvp) (Z_TYPE_P(zvp) == IS_OBJECT ? Z_OBJPROP_P(zvp) : Z_TYPE_P(zvp) == IS_ARRAY ? Z_ARRVAL_P(zvp) : NULL)
+#define HT_FROM_ZVP(zvp) (Z_IS_OBJECT_P(zvp) ? Z_OBJPROP_P(zvp) : Z_IS_ARRAY_P(zvp) ? Z_ARRVAL_P(zvp) : NULL)
 
 #define HT_WATCH_OFFSET (sizeof(zend_refcounted *) + sizeof(uint32_t)) /* we are not interested in gc and flags */
 #define HT_PTR_HT(ptr) ((HashTable *) (((char *) (ptr)) - HT_WATCH_OFFSET))
@@ -162,7 +162,7 @@ void phpdbg_print_watch_diff(phpdbg_watchtype type, zend_string *name, void *old
 		case WATCH_ON_ZVAL:
 			if (Z_REFCOUNTED_P((zval *) oldPtr)) {
 				phpdbg_writeln("watchvalue", "type=\"old\" inaccessible=\"inaccessible\"", "Old value inaccessible or destroyed");
-			} else if (Z_TYPE_P((zval *) oldPtr) == IS_INDIRECT) {
+			} else if (Z_IS_INDIRECT_P((zval *) oldPtr)) {
 				phpdbg_writeln("watchvalue", "type=\"old\" inaccessible=\"inaccessible\"", "Old value inaccessible or destroyed (was indirect)");
 			} else {
 				phpdbg_out("Old value: ");
@@ -172,7 +172,7 @@ void phpdbg_print_watch_diff(phpdbg_watchtype type, zend_string *name, void *old
 				phpdbg_out("\n");
 			}
 
-			while (Z_TYPE_P((zval *) newPtr) == IS_INDIRECT) {
+			while (Z_IS_INDIRECT_P((zval *) newPtr)) {
 				newPtr = Z_INDIRECT_P((zval *) newPtr);
 			}
 
@@ -394,7 +394,7 @@ void phpdbg_update_watch_ref(phpdbg_watchpoint_t *watch) {
 				phpdbg_store_watchpoint_btree(&coll->reference);
 				phpdbg_activate_watchpoint(&coll->reference);
 				phpdbg_watch_backup_data(&coll->reference);
-			} else if (Z_TYPE_P(watch->addr.zv) == IS_STRING) {
+			} else if (Z_IS_STRING_P(watch->addr.zv)) {
 				coll->reference.type = WATCH_ON_STR;
 				phpdbg_set_addr_watchpoint(&Z_STRLEN_P(watch->addr.zv), XtOffsetOf(zend_string, val) - XtOffsetOf(zend_string, len) + Z_STRLEN_P(watch->addr.zv) + 1, &coll->reference);
 				coll->reference.coll = coll;
@@ -410,7 +410,7 @@ void phpdbg_update_watch_ref(phpdbg_watchpoint_t *watch) {
 			zend_hash_index_add_ptr(&PHPDBG_G(watch_collisions), (zend_ulong) watch->ref, coll);
 		}
 		zend_hash_index_add_ptr(&coll->parents, (zend_long) watch, watch);
-	} else if (Z_TYPE_P(watch->addr.zv) == IS_INDIRECT) {
+	} else if (Z_IS_INDIRECT_P(watch->addr.zv)) {
 		if ((zend_refcounted *) Z_INDIRECT_P(watch->addr.zv) == watch->ref) {
 			return;
 		}
@@ -495,7 +495,7 @@ phpdbg_watch_element *phpdbg_add_ht_watch_element(zval *zv, phpdbg_watch_element
 		return NULL;
 	}
 
-	element->flags |= Z_TYPE_P(zv) == IS_ARRAY ? PHPDBG_WATCH_ARRAY : PHPDBG_WATCH_OBJECT;
+	element->flags |= Z_IS_ARRAY_P(zv) ? PHPDBG_WATCH_ARRAY : PHPDBG_WATCH_OBJECT;
 	phpdbg_set_ht_watchpoint(ht, &watch);
 	return phpdbg_add_watch_element(&watch, element);
 }
@@ -543,7 +543,7 @@ void phpdbg_recurse_watch_element(phpdbg_watch_element *element) {
 
 	if (element->watch->type == WATCH_ON_ZVAL || element->watch->type == WATCH_ON_BUCKET) {
 		zv = element->watch->addr.zv;
-		while (Z_TYPE_P(zv) == IS_INDIRECT) {
+		while (Z_IS_INDIRECT_P(zv)) {
 			zv = Z_INDIRECT_P(zv);
 		}
 		ZVAL_DEREF(zv);
@@ -552,7 +552,7 @@ void phpdbg_recurse_watch_element(phpdbg_watch_element *element) {
 			phpdbg_remove_watch_element_recursively(element->child);
 		}
 
-		if ((Z_TYPE_P(zv) != IS_ARRAY && Z_TYPE_P(zv) != IS_OBJECT)
+		if ((!Z_IS_ARRAY_P(zv) && !Z_IS_OBJECT_P(zv))
 		    || phpdbg_is_recursively_watched(HT_WATCH_OFFSET + (char *) HT_FROM_ZVP(zv), element)) {
 			if (element->child) {
 				phpdbg_free_watch_element(element->child);
@@ -683,7 +683,7 @@ zend_bool phpdbg_try_readding_watch_element(zval *parent, phpdbg_watch_element *
 		if (element->flags & PHPDBG_WATCH_IMPLICIT) {
 			zval *next = zv;
 
-			while (Z_TYPE_P(next) == IS_INDIRECT) {
+			while (Z_IS_INDIRECT_P(next)) {
 				next = Z_INDIRECT_P(next);
 			}
 			if (Z_ISREF_P(next)) {
@@ -728,7 +728,7 @@ void phpdbg_dequeue_elements_for_recreation() {
 			if (element->parent) {
 				ZEND_ASSERT(element->parent->watch->type == WATCH_ON_ZVAL || element->parent->watch->type == WATCH_ON_BUCKET);
 				zv = element->parent->watch->addr.zv;
-				while (Z_TYPE_P(zv) == IS_INDIRECT) {
+				while (Z_IS_INDIRECT_P(zv)) {
 					zv = Z_INDIRECT_P(zv);
 				}
 				ZVAL_DEREF(zv);
@@ -1039,7 +1039,7 @@ void phpdbg_check_watchpoint(phpdbg_watchpoint_t *watch) {
 				phpdbg_watch_backup_data(watch);
 				return;
 			}
-		} else if (Z_TYPE_P(watch->addr.zv) == IS_UNDEF) {
+		} else if (Z_IS_UNDEF_P(watch->addr.zv)) {
 			/* dequeuing will take care of appropriate notification about removal */
 			phpdbg_remove_watchpoint(watch);
 			return;
@@ -1196,7 +1196,7 @@ static int phpdbg_create_array_watchpoint(zval *zv, phpdbg_watch_element *elemen
 	zval *orig_zv = zv;
 
 	ZVAL_DEREF(zv);
-	if (Z_TYPE_P(zv) != IS_ARRAY && Z_TYPE_P(zv) != IS_OBJECT) {
+	if (!Z_IS_ARRAY_P(zv) && !Z_IS_OBJECT_P(zv)) {
 		return FAILURE;
 	}
 

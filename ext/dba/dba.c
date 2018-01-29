@@ -203,7 +203,7 @@ ZEND_GET_MODULE(dba)
 /* {{{ php_dba_myke_key */
 static size_t php_dba_make_key(zval *key, char **key_str, char **key_free)
 {
-	if (Z_TYPE_P(key) == IS_ARRAY) {
+	if (Z_IS_ARRAY_P(key)) {
 		zval *group, *name;
 		HashPosition pos;
 		size_t len;
@@ -1114,7 +1114,7 @@ PHP_FUNCTION(dba_key_split)
 		WRONG_PARAM_COUNT;
 	}
 	if (zend_parse_parameters_ex(ZEND_PARSE_PARAMS_QUIET, ZEND_NUM_ARGS(), "z", &zkey) == SUCCESS) {
-		if (Z_TYPE_P(zkey) == IS_NULL || (Z_TYPE_P(zkey) == IS_FALSE)) {
+		if (Z_IS_NULL_P(zkey) || (Z_IS_FALSE_P(zkey))) {
 			RETURN_BOOL(0);
 		}
 	}

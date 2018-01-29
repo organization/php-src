@@ -209,7 +209,7 @@ php_stream_filter_status_t userfilter_filter(
 
 	zval_ptr_dtor(&func_name);
 
-	if (call_result == SUCCESS && Z_TYPE(retval) != IS_UNDEF) {
+	if (call_result == SUCCESS && !Z_IS_UNDEF(retval)) {
 		convert_to_long(&retval);
 		ret = (int)Z_LVAL(retval);
 	} else if (call_result == FAILURE) {
@@ -351,8 +351,8 @@ static php_stream_filter *user_filter_factory_create(const char *filtername,
 			0, NULL,
 			0, NULL);
 
-	if (Z_TYPE(retval) != IS_UNDEF) {
-		if (Z_TYPE(retval) == IS_FALSE) {
+	if (!Z_IS_UNDEF(retval)) {
+		if (Z_IS_FALSE(retval)) {
 			/* User reported filter creation error "return false;" */
 			zval_ptr_dtor(&retval);
 
@@ -449,7 +449,7 @@ static void php_stream_bucket_attach(int append, INTERNAL_FUNCTION_PARAMETERS)
 		RETURN_FALSE;
 	}
 
-	if (NULL != (pzdata = zend_hash_str_find(Z_OBJPROP_P(zobject), "data", sizeof("data")-1)) && Z_TYPE_P(pzdata) == IS_STRING) {
+	if (NULL != (pzdata = zend_hash_str_find(Z_OBJPROP_P(zobject), "data", sizeof("data")-1)) && Z_IS_STRING_P(pzdata)) {
 		if (!bucket->own_buf) {
 			bucket = php_stream_bucket_make_writeable(bucket);
 		}

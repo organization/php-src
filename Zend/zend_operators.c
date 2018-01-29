@@ -147,7 +147,7 @@ ZEND_API zend_long ZEND_FASTCALL zend_atol(const char *str, size_t str_len) /* {
 		} 																					\
 	} else if (Z_OBJ_HT_P(op)->get) {														\
 		zval *newop = Z_OBJ_HT_P(op)->get(op, dst);								\
-		if (Z_TYPE_P(newop) != IS_OBJECT) {													\
+		if (!Z_IS_OBJECT_P(newop)) {													\
 			/* for safety - avoid loop */													\
 			ZVAL_COPY_VALUE(dst, newop);													\
 			conv_func(dst);																	\
@@ -200,7 +200,7 @@ try_again:
 				convert_object_to_type(op, &dst, _IS_NUMBER, convert_scalar_to_number);
 				zval_dtor(op);
 
-				if (Z_TYPE(dst) == IS_LONG || Z_TYPE(dst) == IS_DOUBLE) {
+				if (Z_IS_LONG(dst) || Z_IS_DOUBLE(dst)) {
 					ZVAL_COPY_VALUE(op, &dst);
 				} else {
 					ZVAL_LONG(op, 1);
@@ -219,8 +219,8 @@ ZEND_API void ZEND_FASTCALL convert_scalar_to_number(zval *op) /* {{{ */
 
 /* {{{ zendi_convert_scalar_to_number */
 #define zendi_convert_scalar_to_number(op, holder, result, silent)	\
-	if (Z_TYPE_P(op) != IS_LONG) {									\
-		if (op==result && Z_TYPE_P(op) != IS_OBJECT) {				\
+	if (!Z_IS_LONG_P(op)) {									\
+		if (op==result && !Z_IS_OBJECT_P(op)) {				\
 			_convert_scalar_to_number(op, silent);					\
 		} else {													\
 			switch (Z_TYPE_P(op)) {									\
@@ -260,7 +260,7 @@ ZEND_API void ZEND_FASTCALL convert_scalar_to_number(zval *op) /* {{{ */
 						}											\
 						return FAILURE;								\
 					}												\
-					if (Z_TYPE(holder) == IS_LONG || Z_TYPE(holder) == IS_DOUBLE) { \
+					if (Z_IS_LONG(holder) || Z_IS_DOUBLE(holder)) { \
 						if (op == result) {							\
 							zval_ptr_dtor(op);						\
 							ZVAL_COPY(op, &(holder));				\
@@ -277,10 +277,10 @@ ZEND_API void ZEND_FASTCALL convert_scalar_to_number(zval *op) /* {{{ */
 
 #define convert_op1_op2_long(op1, op1_lval, op2, op2_lval, result, op, op_func) \
 	do {																\
-		if (UNEXPECTED(Z_TYPE_P(op1) != IS_LONG)) {						\
+		if (UNEXPECTED(!Z_IS_LONG_P(op1))) {						\
 			if (Z_ISREF_P(op1)) {										\
 				op1 = Z_REFVAL_P(op1);									\
-				if (Z_TYPE_P(op1) == IS_LONG) {							\
+				if (Z_IS_LONG_P(op1)) {							\
 					op1_lval = Z_LVAL_P(op1);							\
 					break;												\
 				}														\
@@ -298,10 +298,10 @@ ZEND_API void ZEND_FASTCALL convert_scalar_to_number(zval *op) /* {{{ */
 		}																\
 	} while (0);														\
 	do {																\
-		if (UNEXPECTED(Z_TYPE_P(op2) != IS_LONG)) {						\
+		if (UNEXPECTED(!Z_IS_LONG_P(op2))) {						\
 			if (Z_ISREF_P(op2)) {										\
 				op2 = Z_REFVAL_P(op2);									\
-				if (Z_TYPE_P(op2) == IS_LONG) {							\
+				if (Z_IS_LONG_P(op2)) {							\
 					op2_lval = Z_LVAL_P(op2);							\
 					break;												\
 				}														\
@@ -321,7 +321,7 @@ ZEND_API void ZEND_FASTCALL convert_scalar_to_number(zval *op) /* {{{ */
 
 ZEND_API void ZEND_FASTCALL convert_to_long(zval *op) /* {{{ */
 {
-	if (Z_TYPE_P(op) != IS_LONG) {
+	if (!Z_IS_LONG_P(op)) {
 		convert_to_long_base(op, 10);
 	}
 }
@@ -373,7 +373,7 @@ try_again:
 				convert_object_to_type(op, &dst, IS_LONG, convert_to_long);
 				zval_dtor(op);
 
-				if (Z_TYPE(dst) == IS_LONG) {
+				if (Z_IS_LONG(dst)) {
 					ZVAL_COPY_VALUE(op, &dst);
 				} else {
 
@@ -433,7 +433,7 @@ try_again:
 				convert_object_to_type(op, &dst, IS_DOUBLE, convert_to_double);
 				zval_dtor(op);
 
-				if (Z_TYPE(dst) == IS_DOUBLE) {
+				if (Z_IS_DOUBLE(dst)) {
 					ZVAL_COPY_VALUE(op, &dst);
 				} else {
 					ZVAL_DOUBLE(op, 1.0);
@@ -505,7 +505,7 @@ try_again:
 				convert_object_to_type(op, &dst, _IS_BOOL, convert_to_boolean);
 				zval_dtor(op);
 
-				if (Z_TYPE(dst) == IS_FALSE || Z_TYPE(dst) == IS_TRUE) {
+				if (Z_IS_FALSE(dst) || Z_IS_TRUE(dst)) {
 					ZVAL_COPY_VALUE(op, &dst);
 				} else {
 					ZVAL_TRUE(op);
@@ -522,7 +522,7 @@ try_again:
 
 ZEND_API void ZEND_FASTCALL _convert_to_cstring(zval *op ZEND_FILE_LINE_DC) /* {{{ */
 {
-	if (Z_TYPE_P(op) == IS_DOUBLE) {
+	if (Z_IS_DOUBLE_P(op)) {
 		zend_string *str;
 		double dval = Z_DVAL_P(op);
 
@@ -580,7 +580,7 @@ try_again:
 			convert_object_to_type(op, &dst, IS_STRING, convert_to_string);
 			zval_dtor(op);
 
-			if (Z_TYPE(dst) == IS_STRING) {
+			if (Z_IS_STRING(dst)) {
 				ZVAL_COPY_VALUE(op, &dst);
 			} else {
 				ZVAL_NEW_STR(op, zend_string_init("Object", sizeof("Object")-1, 0));
@@ -639,7 +639,7 @@ try_again:
 					zval dst;
 					convert_object_to_type(op, &dst, IS_ARRAY, convert_to_array);
 
-					if (Z_TYPE(dst) == IS_ARRAY) {
+					if (Z_IS_ARRAY(dst)) {
 						zval_dtor(op);
 						ZVAL_COPY_VALUE(op, &dst);
 						return;
@@ -791,7 +791,7 @@ try_again:
 			{
 				zval dst;
 				convert_object_to_type(op, &dst, IS_LONG, convert_to_long);
-				if (Z_TYPE(dst) == IS_LONG) {
+				if (Z_IS_LONG(dst)) {
 					return Z_LVAL(dst);
 				} else {
 					return 1;
@@ -842,7 +842,7 @@ try_again:
 				zval dst;
 				convert_object_to_type(op, &dst, IS_DOUBLE, convert_to_double);
 
-				if (Z_TYPE(dst) == IS_DOUBLE) {
+				if (Z_IS_DOUBLE(dst)) {
 					return Z_DVAL(dst);
 				} else {
 					return 1.0;
@@ -891,7 +891,7 @@ try_again:
 				}
 			} else if (Z_OBJ_HT_P(op)->get) {
 				zval *z = Z_OBJ_HT_P(op)->get(op, &tmp);
-				if (Z_TYPE_P(z) != IS_OBJECT) {
+				if (!Z_IS_OBJECT_P(z)) {
 					zend_string *str = zval_get_string(z);
 					zval_ptr_dtor(z);
 					return str;
@@ -1152,20 +1152,20 @@ ZEND_API int ZEND_FASTCALL pow_function(zval *result, zval *op1, zval *op2) /* {
 				ZEND_TRY_BINARY_OBJECT_OPERATION(ZEND_POW, pow_function);
 
 				if (EXPECTED(op1 != op2)) {
-					if (Z_TYPE_P(op1) == IS_ARRAY) {
+					if (Z_IS_ARRAY_P(op1)) {
 						ZVAL_LONG(result, 0);
 						return SUCCESS;
 					} else {
 						zendi_convert_scalar_to_number(op1, op1_copy, result, 0);
 					}
-					if (Z_TYPE_P(op2) == IS_ARRAY) {
+					if (Z_IS_ARRAY_P(op2)) {
 						ZVAL_LONG(result, 1L);
 						return SUCCESS;
 					} else {
 						zendi_convert_scalar_to_number(op2, op2_copy, result, 0);
 					}
 				} else {
-					if (Z_TYPE_P(op1) == IS_ARRAY) {
+					if (Z_IS_ARRAY_P(op1)) {
 						ZVAL_LONG(result, 0);
 						return SUCCESS;
 					} else {
@@ -1299,17 +1299,17 @@ ZEND_API int ZEND_FASTCALL boolean_xor_function(zval *result, zval *op1, zval *o
 	int op1_val, op2_val;
 
 	do {
-		if (Z_TYPE_P(op1) == IS_FALSE) {
+		if (Z_IS_FALSE_P(op1)) {
 			op1_val = 0;
-		} else if (EXPECTED(Z_TYPE_P(op1) == IS_TRUE)) {
+		} else if (EXPECTED(Z_IS_TRUE_P(op1))) {
 			op1_val = 1;
 		} else {
 			if (Z_ISREF_P(op1)) {
 				op1 = Z_REFVAL_P(op1);
-				if (Z_TYPE_P(op1) == IS_FALSE) {
+				if (Z_IS_FALSE_P(op1)) {
 					op1_val = 0;
 					break;
-				} else if (EXPECTED(Z_TYPE_P(op1) == IS_TRUE)) {
+				} else if (EXPECTED(Z_IS_TRUE_P(op1))) {
 					op1_val = 1;
 					break;
 				}
@@ -1319,17 +1319,17 @@ ZEND_API int ZEND_FASTCALL boolean_xor_function(zval *result, zval *op1, zval *o
 		}
 	} while (0);
 	do {
-		if (Z_TYPE_P(op2) == IS_FALSE) {
+		if (Z_IS_FALSE_P(op2)) {
 			op2_val = 0;
-		} else if (EXPECTED(Z_TYPE_P(op2) == IS_TRUE)) {
+		} else if (EXPECTED(Z_IS_TRUE_P(op2))) {
 			op2_val = 1;
 		} else {
 			if (Z_ISREF_P(op2)) {
 				op2 = Z_REFVAL_P(op2);
-				if (Z_TYPE_P(op2) == IS_FALSE) {
+				if (Z_IS_FALSE_P(op2)) {
 					op2_val = 0;
 					break;
-				} else if (EXPECTED(Z_TYPE_P(op2) == IS_TRUE)) {
+				} else if (EXPECTED(Z_IS_TRUE_P(op2))) {
 					op2_val = 1;
 					break;
 				}
@@ -1348,7 +1348,7 @@ ZEND_API int ZEND_FASTCALL boolean_not_function(zval *result, zval *op1) /* {{{ 
 {
 	if (Z_TYPE_P(op1) < IS_TRUE) {
 		ZVAL_TRUE(result);
-	} else if (EXPECTED(Z_TYPE_P(op1) == IS_TRUE)) {
+	} else if (EXPECTED(Z_IS_TRUE_P(op1))) {
 		ZVAL_FALSE(result);
 	} else {
 		if (Z_ISREF_P(op1)) {
@@ -1356,7 +1356,7 @@ ZEND_API int ZEND_FASTCALL boolean_not_function(zval *result, zval *op1) /* {{{ 
 			if (Z_TYPE_P(op1) < IS_TRUE) {
 				ZVAL_TRUE(result);
 				return SUCCESS;
-			} else if (EXPECTED(Z_TYPE_P(op1) == IS_TRUE)) {
+			} else if (EXPECTED(Z_IS_TRUE_P(op1))) {
 				ZVAL_FALSE(result);
 				return SUCCESS;
 			}
@@ -1413,7 +1413,7 @@ ZEND_API int ZEND_FASTCALL bitwise_or_function(zval *result, zval *op1, zval *op
 {
 	zend_long op1_lval, op2_lval;
 
-	if (EXPECTED(Z_TYPE_P(op1) == IS_LONG) && EXPECTED(Z_TYPE_P(op2) == IS_LONG)) {
+	if (EXPECTED(Z_IS_LONG_P(op1)) && EXPECTED(Z_IS_LONG_P(op2))) {
 		ZVAL_LONG(result, Z_LVAL_P(op1) | Z_LVAL_P(op2));
 		return SUCCESS;
 	}
@@ -1421,7 +1421,7 @@ ZEND_API int ZEND_FASTCALL bitwise_or_function(zval *result, zval *op1, zval *op
 	ZVAL_DEREF(op1);
 	ZVAL_DEREF(op2);
 
-	if (Z_TYPE_P(op1) == IS_STRING && EXPECTED(Z_TYPE_P(op2) == IS_STRING)) {
+	if (Z_IS_STRING_P(op1) && EXPECTED(Z_IS_STRING_P(op2))) {
 		zval *longer, *shorter;
 		zend_string *str;
 		size_t i;
@@ -1454,7 +1454,7 @@ ZEND_API int ZEND_FASTCALL bitwise_or_function(zval *result, zval *op1, zval *op
 		return SUCCESS;
 	}
 
-	if (UNEXPECTED(Z_TYPE_P(op1) != IS_LONG)) {
+	if (UNEXPECTED(!Z_IS_LONG_P(op1))) {
 		ZEND_TRY_BINARY_OP1_OBJECT_OPERATION(ZEND_BW_OR, bitwise_or_function);
 		op1_lval = _zval_get_long_func_noisy(op1);
 		if (UNEXPECTED(EG(exception))) {
@@ -1466,7 +1466,7 @@ ZEND_API int ZEND_FASTCALL bitwise_or_function(zval *result, zval *op1, zval *op
 	} else {
 		op1_lval = Z_LVAL_P(op1);
 	}
-	if (UNEXPECTED(Z_TYPE_P(op2) != IS_LONG)) {
+	if (UNEXPECTED(!Z_IS_LONG_P(op2))) {
 		ZEND_TRY_BINARY_OP2_OBJECT_OPERATION(ZEND_BW_OR);
 		op2_lval = _zval_get_long_func_noisy(op2);
 		if (UNEXPECTED(EG(exception))) {
@@ -1491,7 +1491,7 @@ ZEND_API int ZEND_FASTCALL bitwise_and_function(zval *result, zval *op1, zval *o
 {
 	zend_long op1_lval, op2_lval;
 
-	if (EXPECTED(Z_TYPE_P(op1) == IS_LONG) && EXPECTED(Z_TYPE_P(op2) == IS_LONG)) {
+	if (EXPECTED(Z_IS_LONG_P(op1)) && EXPECTED(Z_IS_LONG_P(op2))) {
 		ZVAL_LONG(result, Z_LVAL_P(op1) & Z_LVAL_P(op2));
 		return SUCCESS;
 	}
@@ -1499,7 +1499,7 @@ ZEND_API int ZEND_FASTCALL bitwise_and_function(zval *result, zval *op1, zval *o
 	ZVAL_DEREF(op1);
 	ZVAL_DEREF(op2);
 
-	if (Z_TYPE_P(op1) == IS_STRING && Z_TYPE_P(op2) == IS_STRING) {
+	if (Z_IS_STRING_P(op1) && Z_IS_STRING_P(op2)) {
 		zval *longer, *shorter;
 		zend_string *str;
 		size_t i;
@@ -1532,7 +1532,7 @@ ZEND_API int ZEND_FASTCALL bitwise_and_function(zval *result, zval *op1, zval *o
 		return SUCCESS;
 	}
 
-	if (UNEXPECTED(Z_TYPE_P(op1) != IS_LONG)) {
+	if (UNEXPECTED(!Z_IS_LONG_P(op1))) {
 		ZEND_TRY_BINARY_OP1_OBJECT_OPERATION(ZEND_BW_AND, bitwise_and_function);
 		op1_lval = _zval_get_long_func_noisy(op1);
 		if (UNEXPECTED(EG(exception))) {
@@ -1544,7 +1544,7 @@ ZEND_API int ZEND_FASTCALL bitwise_and_function(zval *result, zval *op1, zval *o
 	} else {
 		op1_lval = Z_LVAL_P(op1);
 	}
-	if (UNEXPECTED(Z_TYPE_P(op2) != IS_LONG)) {
+	if (UNEXPECTED(!Z_IS_LONG_P(op2))) {
 		ZEND_TRY_BINARY_OP2_OBJECT_OPERATION(ZEND_BW_AND);
 		op2_lval = _zval_get_long_func_noisy(op2);
 		if (UNEXPECTED(EG(exception))) {
@@ -1569,7 +1569,7 @@ ZEND_API int ZEND_FASTCALL bitwise_xor_function(zval *result, zval *op1, zval *o
 {
 	zend_long op1_lval, op2_lval;
 
-	if (EXPECTED(Z_TYPE_P(op1) == IS_LONG) && EXPECTED(Z_TYPE_P(op2) == IS_LONG)) {
+	if (EXPECTED(Z_IS_LONG_P(op1)) && EXPECTED(Z_IS_LONG_P(op2))) {
 		ZVAL_LONG(result, Z_LVAL_P(op1) ^ Z_LVAL_P(op2));
 		return SUCCESS;
 	}
@@ -1577,7 +1577,7 @@ ZEND_API int ZEND_FASTCALL bitwise_xor_function(zval *result, zval *op1, zval *o
 	ZVAL_DEREF(op1);
 	ZVAL_DEREF(op2);
 
-	if (Z_TYPE_P(op1) == IS_STRING && Z_TYPE_P(op2) == IS_STRING) {
+	if (Z_IS_STRING_P(op1) && Z_IS_STRING_P(op2)) {
 		zval *longer, *shorter;
 		zend_string *str;
 		size_t i;
@@ -1610,7 +1610,7 @@ ZEND_API int ZEND_FASTCALL bitwise_xor_function(zval *result, zval *op1, zval *o
 		return SUCCESS;
 	}
 
-	if (UNEXPECTED(Z_TYPE_P(op1) != IS_LONG)) {
+	if (UNEXPECTED(!Z_IS_LONG_P(op1))) {
 		ZEND_TRY_BINARY_OP1_OBJECT_OPERATION(ZEND_BW_XOR, bitwise_xor_function);
 		op1_lval = _zval_get_long_func_noisy(op1);
 		if (UNEXPECTED(EG(exception))) {
@@ -1622,7 +1622,7 @@ ZEND_API int ZEND_FASTCALL bitwise_xor_function(zval *result, zval *op1, zval *o
 	} else {
 		op1_lval = Z_LVAL_P(op1);
 	}
-	if (UNEXPECTED(Z_TYPE_P(op2) != IS_LONG)) {
+	if (UNEXPECTED(!Z_IS_LONG_P(op2))) {
 		ZEND_TRY_BINARY_OP2_OBJECT_OPERATION(ZEND_BW_XOR);
 		op2_lval = _zval_get_long_func_noisy(op2);
 		if (UNEXPECTED(EG(exception))) {
@@ -1722,10 +1722,10 @@ ZEND_API int ZEND_FASTCALL concat_function(zval *result, zval *op1, zval *op2) /
 	int use_copy1 = 0, use_copy2 = 0;
 
 	do {
-	 	if (UNEXPECTED(Z_TYPE_P(op1) != IS_STRING)) {
+	 	if (UNEXPECTED(!Z_IS_STRING_P(op1))) {
 	 		if (Z_ISREF_P(op1)) {
 	 			op1 = Z_REFVAL_P(op1);
-	 			if (Z_TYPE_P(op1) == IS_STRING) break;
+	 			if (Z_IS_STRING_P(op1)) break;
 	 		}
 			ZEND_TRY_BINARY_OBJECT_OPERATION(ZEND_CONCAT, concat_function);
 			use_copy1 = zend_make_printable_zval(op1, &op1_copy);
@@ -1747,10 +1747,10 @@ ZEND_API int ZEND_FASTCALL concat_function(zval *result, zval *op1, zval *op2) /
 		}
 	} while (0);
 	do {
-		if (UNEXPECTED(Z_TYPE_P(op2) != IS_STRING)) {
+		if (UNEXPECTED(!Z_IS_STRING_P(op2))) {
 	 		if (Z_ISREF_P(op2)) {
 	 			op2 = Z_REFVAL_P(op2);
-	 			if (Z_TYPE_P(op2) == IS_STRING) break;
+	 			if (Z_IS_STRING_P(op2)) break;
 	 		}
 			ZEND_TRY_BINARY_OP2_OBJECT_OPERATION(ZEND_CONCAT);
 			use_copy2 = zend_make_printable_zval(op2, &op2_copy);
@@ -1852,8 +1852,8 @@ ZEND_API int ZEND_FASTCALL string_compare_function_ex(zval *op1, zval *op2, zend
 
 ZEND_API int ZEND_FASTCALL string_compare_function(zval *op1, zval *op2) /* {{{ */
 {
-	if (EXPECTED(Z_TYPE_P(op1) == IS_STRING) &&
-	    EXPECTED(Z_TYPE_P(op2) == IS_STRING)) {
+	if (EXPECTED(Z_IS_STRING_P(op1)) &&
+	    EXPECTED(Z_IS_STRING_P(op2))) {
 		if (Z_STR_P(op1) == Z_STR_P(op2)) {
 			return 0;
 		} else {
@@ -1874,8 +1874,8 @@ ZEND_API int ZEND_FASTCALL string_compare_function(zval *op1, zval *op2) /* {{{ 
 
 ZEND_API int ZEND_FASTCALL string_case_compare_function(zval *op1, zval *op2) /* {{{ */
 {
-	if (EXPECTED(Z_TYPE_P(op1) == IS_STRING) &&
-	    EXPECTED(Z_TYPE_P(op2) == IS_STRING)) {
+	if (EXPECTED(Z_IS_STRING_P(op1)) &&
+	    EXPECTED(Z_IS_STRING_P(op2))) {
 		if (Z_STR_P(op1) == Z_STR_P(op2)) {
 			return 0;
 		} else {
@@ -1934,7 +1934,7 @@ static inline void zend_free_obj_get_result(zval *op) /* {{{ */
 
 static void ZEND_FASTCALL convert_compare_result_to_long(zval *result) /* {{{ */
 {
-	if (Z_TYPE_P(result) == IS_DOUBLE) {
+	if (Z_IS_DOUBLE_P(result)) {
 		ZVAL_LONG(result, ZEND_NORMALIZE_BOOL(Z_DVAL_P(result)));
 	} else {
 		convert_to_long(result);
@@ -2027,21 +2027,21 @@ ZEND_API int ZEND_FASTCALL compare_function(zval *result, zval *op1, zval *op2) 
 					continue;
 				}
 
-				if (Z_TYPE_P(op1) == IS_OBJECT && Z_OBJ_HANDLER_P(op1, compare)) {
+				if (Z_IS_OBJECT_P(op1) && Z_OBJ_HANDLER_P(op1, compare)) {
 					ret = Z_OBJ_HANDLER_P(op1, compare)(result, op1, op2);
-					if (UNEXPECTED(Z_TYPE_P(result) != IS_LONG)) {
+					if (UNEXPECTED(!Z_IS_LONG_P(result))) {
 						convert_compare_result_to_long(result);
 					}
 					return ret;
-				} else if (Z_TYPE_P(op2) == IS_OBJECT && Z_OBJ_HANDLER_P(op2, compare)) {
+				} else if (Z_IS_OBJECT_P(op2) && Z_OBJ_HANDLER_P(op2, compare)) {
 					ret = Z_OBJ_HANDLER_P(op2, compare)(result, op1, op2);
-					if (UNEXPECTED(Z_TYPE_P(result) != IS_LONG)) {
+					if (UNEXPECTED(!Z_IS_LONG_P(result))) {
 						convert_compare_result_to_long(result);
 					}
 					return ret;
 				}
 
-				if (Z_TYPE_P(op1) == IS_OBJECT && Z_TYPE_P(op2) == IS_OBJECT) {
+				if (Z_IS_OBJECT_P(op1) && Z_IS_OBJECT_P(op2)) {
 					if (Z_OBJ_P(op1) == Z_OBJ_P(op2)) {
 						/* object handles are identical, apparently this is the same object */
 						ZVAL_LONG(result, 0);
@@ -2052,16 +2052,16 @@ ZEND_API int ZEND_FASTCALL compare_function(zval *result, zval *op1, zval *op2) 
 						return SUCCESS;
 					}
 				}
-				if (Z_TYPE_P(op1) == IS_OBJECT) {
+				if (Z_IS_OBJECT_P(op1)) {
 					if (Z_OBJ_HT_P(op1)->get) {
 						zval rv;
 						op_free = Z_OBJ_HT_P(op1)->get(op1, &rv);
 						ret = compare_function(result, op_free, op2);
 						zend_free_obj_get_result(op_free);
 						return ret;
-					} else if (Z_TYPE_P(op2) != IS_OBJECT && Z_OBJ_HT_P(op1)->cast_object) {
+					} else if (!Z_IS_OBJECT_P(op2) && Z_OBJ_HT_P(op1)->cast_object) {
 						ZVAL_UNDEF(&tmp_free);
-						if (Z_OBJ_HT_P(op1)->cast_object(op1, &tmp_free, ((Z_TYPE_P(op2) == IS_FALSE || Z_TYPE_P(op2) == IS_TRUE) ? _IS_BOOL : Z_TYPE_P(op2))) == FAILURE) {
+						if (Z_OBJ_HT_P(op1)->cast_object(op1, &tmp_free, ((Z_IS_FALSE_P(op2) || Z_IS_TRUE_P(op2)) ? _IS_BOOL : Z_TYPE_P(op2))) == FAILURE) {
 							ZVAL_LONG(result, 1);
 							zend_free_obj_get_result(&tmp_free);
 							return SUCCESS;
@@ -2071,16 +2071,16 @@ ZEND_API int ZEND_FASTCALL compare_function(zval *result, zval *op1, zval *op2) 
 						return ret;
 					}
 				}
-				if (Z_TYPE_P(op2) == IS_OBJECT) {
+				if (Z_IS_OBJECT_P(op2)) {
 					if (Z_OBJ_HT_P(op2)->get) {
 						zval rv;
 						op_free = Z_OBJ_HT_P(op2)->get(op2, &rv);
 						ret = compare_function(result, op1, op_free);
 						zend_free_obj_get_result(op_free);
 						return ret;
-					} else if (Z_TYPE_P(op1) != IS_OBJECT && Z_OBJ_HT_P(op2)->cast_object) {
+					} else if (!Z_IS_OBJECT_P(op1) && Z_OBJ_HT_P(op2)->cast_object) {
 						ZVAL_UNDEF(&tmp_free);
-						if (Z_OBJ_HT_P(op2)->cast_object(op2, &tmp_free, ((Z_TYPE_P(op1) == IS_FALSE || Z_TYPE_P(op1) == IS_TRUE) ? _IS_BOOL : Z_TYPE_P(op1))) == FAILURE) {
+						if (Z_OBJ_HT_P(op2)->cast_object(op2, &tmp_free, ((Z_IS_FALSE_P(op1) || Z_IS_TRUE_P(op1)) ? _IS_BOOL : Z_TYPE_P(op1))) == FAILURE) {
 							ZVAL_LONG(result, -1);
 							zend_free_obj_get_result(&tmp_free);
 							return SUCCESS;
@@ -2088,22 +2088,22 @@ ZEND_API int ZEND_FASTCALL compare_function(zval *result, zval *op1, zval *op2) 
 						ret = compare_function(result, op1, &tmp_free);
 						zend_free_obj_get_result(&tmp_free);
 						return ret;
-					} else if (Z_TYPE_P(op1) == IS_OBJECT) {
+					} else if (Z_IS_OBJECT_P(op1)) {
 						ZVAL_LONG(result, 1);
 						return SUCCESS;
 					}
 				}
 				if (!converted) {
-					if (Z_TYPE_P(op1) == IS_NULL || Z_TYPE_P(op1) == IS_FALSE) {
+					if (Z_IS_NULL_P(op1) || Z_IS_FALSE_P(op1)) {
 						ZVAL_LONG(result, zval_is_true(op2) ? -1 : 0);
 						return SUCCESS;
-					} else if (Z_TYPE_P(op2) == IS_NULL || Z_TYPE_P(op2) == IS_FALSE) {
+					} else if (Z_IS_NULL_P(op2) || Z_IS_FALSE_P(op2)) {
 						ZVAL_LONG(result, zval_is_true(op1) ? 1 : 0);
 						return SUCCESS;
-					} else if (Z_TYPE_P(op1) == IS_TRUE) {
+					} else if (Z_IS_TRUE_P(op1)) {
 						ZVAL_LONG(result, zval_is_true(op2) ? 0 : 1);
 						return SUCCESS;
-					} else if (Z_TYPE_P(op2) == IS_TRUE) {
+					} else if (Z_IS_TRUE_P(op2)) {
 						ZVAL_LONG(result, zval_is_true(op1) ? 0 : -1);
 						return SUCCESS;
 					} else {
@@ -2111,16 +2111,16 @@ ZEND_API int ZEND_FASTCALL compare_function(zval *result, zval *op1, zval *op2) 
 						zendi_convert_scalar_to_number(op2, op2_copy, result, 1);
 						converted = 1;
 					}
-				} else if (Z_TYPE_P(op1)==IS_ARRAY) {
+				} else if (Z_IS_ARRAY_P(op1)) {
 					ZVAL_LONG(result, 1);
 					return SUCCESS;
-				} else if (Z_TYPE_P(op2)==IS_ARRAY) {
+				} else if (Z_IS_ARRAY_P(op2)) {
 					ZVAL_LONG(result, -1);
 					return SUCCESS;
-				} else if (Z_TYPE_P(op1)==IS_OBJECT) {
+				} else if (Z_IS_OBJECT_P(op1)) {
 					ZVAL_LONG(result, 1);
 					return SUCCESS;
-				} else if (Z_TYPE_P(op2)==IS_OBJECT) {
+				} else if (Z_IS_OBJECT_P(op2)) {
 					ZVAL_LONG(result, -1);
 					return SUCCESS;
 				} else {
@@ -2146,7 +2146,7 @@ static int hash_zval_identical_function(zval *z1, zval *z2) /* {{{ */
 	if (is_identical_function(&result, z1, z2)==FAILURE) {
 		return 1;
 	}
-	return Z_TYPE(result) != IS_TRUE;
+	return !Z_IS_TRUE(result);
 }
 /* }}} */
 
@@ -2540,7 +2540,7 @@ ZEND_API int ZEND_FASTCALL zend_object_is_true(zval *op) /* {{{ */
 	if (Z_OBJ_HT_P(op)->cast_object) {
 		zval tmp;
 		if (Z_OBJ_HT_P(op)->cast_object(op, &tmp, _IS_BOOL) == SUCCESS) {
-			return Z_TYPE(tmp) == IS_TRUE;
+			return Z_IS_TRUE(tmp);
 		}
 		zend_error(E_RECOVERABLE_ERROR, "Object of class %s could not be converted to boolean", ZSTR_VAL(Z_OBJ_P(op)->ce->name));
 	} else if (Z_OBJ_HT_P(op)->get) {
@@ -2548,7 +2548,7 @@ ZEND_API int ZEND_FASTCALL zend_object_is_true(zval *op) /* {{{ */
 		zval rv;
 		zval *tmp = Z_OBJ_HT_P(op)->get(op, &rv);
 
-		if (Z_TYPE_P(tmp) != IS_OBJECT) {
+		if (!Z_IS_OBJECT_P(tmp)) {
 			/* for safety - avoid loop */
 			result = i_zend_is_true(tmp);
 			zval_ptr_dtor(tmp);

@@ -1938,11 +1938,11 @@ magiccheck(struct magic_set *ms, struct magic *m)
 				zval_ptr_dtor(&subpats);
 				zval_ptr_dtor(&pattern);
 				return -1;
-			} else if ((Z_LVAL(retval) > 0) && (Z_TYPE(subpats) == IS_ARRAY)) {
+			} else if ((Z_LVAL(retval) > 0) && (Z_IS_ARRAY(subpats))) {
 				/* Need to fetch global match which equals pmatch[0] */
 				zval *pzval;
 				HashTable *ht = Z_ARRVAL(subpats);
-				if ((pzval = zend_hash_index_find(ht, 0)) != NULL && Z_TYPE_P(pzval) == IS_ARRAY) {
+				if ((pzval = zend_hash_index_find(ht, 0)) != NULL && Z_IS_ARRAY_P(pzval)) {
 					/* If everything goes according to the master plan
 					   tmpcopy now contains two elements:
 					   0 = the match
@@ -1950,7 +1950,7 @@ magiccheck(struct magic_set *ms, struct magic *m)
 					zval *match, *offset;
 					if ((match = zend_hash_index_find(Z_ARRVAL_P(pzval), 0)) &&
 							(offset = zend_hash_index_find(Z_ARRVAL_P(pzval), 1))) {
-						if (Z_TYPE_P(match) != IS_STRING && Z_TYPE_P(offset) != IS_LONG) {
+						if (!Z_IS_STRING_P(match) && !Z_IS_LONG_P(offset)) {
 							goto error_out;
 						}
 						ms->search.s += Z_LVAL_P(offset); /* this is where the match starts */

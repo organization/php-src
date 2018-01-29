@@ -31,9 +31,9 @@ PHPAPI extern int php_mail(char *to, char *subject, char *message, char *headers
 
 #define PHP_MAIL_BUILD_HEADER_CHECK(target, s, key, val) \
 do { \
-	if (Z_TYPE_P(val) == IS_STRING) { \
+	if (Z_IS_STRING_P(val)) { \
 		php_mail_build_headers_elem(&s, key, val); \
-	} else if (Z_TYPE_P(val) == IS_ARRAY) { \
+	} else if (Z_IS_ARRAY_P(val)) { \
 		if (!strncasecmp(target, ZSTR_VAL(key), ZSTR_LEN(key))) { \
 			php_error_docref(NULL, E_WARNING, "'%s' header must be at most one header. Array is passed for '%s'", target, target); \
 			continue; \
@@ -47,9 +47,9 @@ do { \
 
 #define PHP_MAIL_BUILD_HEADER_DEFAULT(s, key, val) \
 do { \
-	if (Z_TYPE_P(val) == IS_STRING) { \
+	if (Z_IS_STRING_P(val)) { \
 		php_mail_build_headers_elem(&s, key, val); \
-	} else if (Z_TYPE_P(val) == IS_ARRAY) { \
+	} else if (Z_IS_ARRAY_P(val)) { \
 		php_mail_build_headers_elems(&s, key, val); \
 	} else { \
 		php_error_docref(NULL, E_WARNING, "Extra header element '%s' cannot be other than string or array.", ZSTR_VAL(key)); \

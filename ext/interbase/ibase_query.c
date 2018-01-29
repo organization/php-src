@@ -445,13 +445,13 @@ static int _php_ibase_bind_array(zval *val, char *buf, zend_ulong buf_size, /* {
 		unsigned short i;
 		zval *subval = val;
 
-		if (Z_TYPE_P(val) == IS_ARRAY) {
+		if (Z_IS_ARRAY_P(val)) {
 			zend_hash_internal_pointer_reset(Z_ARRVAL_P(val));
 		}
 
 		for (i = 0; i < dim_len; ++i) {
 
-			if (Z_TYPE_P(val) == IS_ARRAY &&
+			if (Z_IS_ARRAY_P(val) &&
 				(subval = zend_hash_get_current_data(Z_ARRVAL_P(val))) == NULL)
 			{
 				subval = pnull_val;
@@ -463,18 +463,18 @@ static int _php_ibase_bind_array(zval *val, char *buf, zend_ulong buf_size, /* {
 			}
 			buf += slice_size;
 
-			if (Z_TYPE_P(val) == IS_ARRAY) {
+			if (Z_IS_ARRAY_P(val)) {
 				zend_hash_move_forward(Z_ARRVAL_P(val));
 			}
 		}
 
-		if (Z_TYPE_P(val) == IS_ARRAY) {
+		if (Z_IS_ARRAY_P(val)) {
 			zend_hash_internal_pointer_reset(Z_ARRVAL_P(val));
 		}
 
 	} else {
 		/* expect a single value */
-		if (Z_TYPE_P(val) == IS_NULL) {
+		if (Z_IS_NULL_P(val)) {
 			memset(buf, 0, buf_size);
 		} else if (array->ar_desc.array_desc_scale < 0) {
 
@@ -693,7 +693,7 @@ static int _php_ibase_bind(XSQLDA *sqlda, zval *b_vars, BIND_BUF *buf, /* {{{ */
 			case SQL_TIMESTAMP:
 			case SQL_TYPE_DATE:
 			case SQL_TYPE_TIME:
-				if (Z_TYPE_P(b_var) == IS_LONG) {
+				if (Z_IS_LONG_P(b_var)) {
 					struct tm *res;
 					res = php_gmtime_r(&Z_LVAL_P(b_var), &t);
 					if (!res) {
@@ -763,7 +763,7 @@ static int _php_ibase_bind(XSQLDA *sqlda, zval *b_vars, BIND_BUF *buf, /* {{{ */
 
 			case SQL_ARRAY:
 
-				if (Z_TYPE_P(b_var) != IS_ARRAY) {
+				if (!Z_IS_ARRAY_P(b_var)) {
 					convert_to_string(b_var);
 
 					if (Z_STRLEN_P(b_var) != BLOB_ID_LEN ||
@@ -1670,7 +1670,7 @@ PHP_FUNCTION(ibase_fetch_object)
 {
 	_php_ibase_fetch_hash(INTERNAL_FUNCTION_PARAM_PASSTHRU, FETCH_ARRAY);
 
-	if (Z_TYPE_P(return_value) == IS_ARRAY) {
+	if (Z_IS_ARRAY_P(return_value)) {
 		convert_to_object(return_value);
 	}
 }

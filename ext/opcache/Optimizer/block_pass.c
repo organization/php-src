@@ -80,7 +80,7 @@ int zend_optimizer_get_persistent_constant(zend_string *name, zval *result, int 
 #define SET_VAR_SOURCE(opline) Tsource[VAR_NUM(opline->result.var)] = opline
 
 #define convert_to_string_safe(v) \
-	if (Z_TYPE_P((v)) == IS_NULL) { \
+	if (Z_IS_NULL_P((v))) { \
 		ZVAL_STRINGL((v), "", 0); \
 	} else { \
 		convert_to_string((v)); \
@@ -143,15 +143,15 @@ static void strip_nops(zend_op_array *op_array, zend_basic_block *b)
 static int get_const_switch_target(zend_cfg *cfg, zend_op_array *op_array, zend_basic_block *block, zend_op *opline, zval *val) {
 	HashTable *jumptable = Z_ARRVAL(ZEND_OP2_LITERAL(opline));
 	zval *zv;
-	if ((opline->opcode == ZEND_SWITCH_LONG && Z_TYPE_P(val) != IS_LONG)
-			|| (opline->opcode == ZEND_SWITCH_STRING && Z_TYPE_P(val) != IS_STRING)) {
+	if ((opline->opcode == ZEND_SWITCH_LONG && !Z_IS_LONG_P(val))
+			|| (opline->opcode == ZEND_SWITCH_STRING && !Z_IS_STRING_P(val))) {
 		/* fallback to next block */
 		return block->successors[block->successors_count - 1];
 	}
-	if (Z_TYPE_P(val) == IS_LONG) {
+	if (Z_IS_LONG_P(val)) {
 		zv = zend_hash_index_find(jumptable, Z_LVAL_P(val));
 	} else {
-		ZEND_ASSERT(Z_TYPE_P(val) == IS_STRING);
+		ZEND_ASSERT(Z_IS_STRING_P(val));
 		zv = zend_hash_find(jumptable, Z_STR_P(val));
 	}
 	if (!zv) {
@@ -287,18 +287,18 @@ static void zend_optimize_block(zend_basic_block *block, zend_op_array *op_array
 			if (opline->op1_type == IS_CONST) {
 				if (last_op && last_op->opcode == ZEND_ECHO &&
 				    last_op->op1_type == IS_CONST &&
-				    Z_TYPE(ZEND_OP1_LITERAL(opline)) != IS_DOUBLE &&
-				    Z_TYPE(ZEND_OP1_LITERAL(last_op)) != IS_DOUBLE) {
+				    !Z_IS_DOUBLE(ZEND_OP1_LITERAL(opline)) &&
+				    !Z_IS_DOUBLE(ZEND_OP1_LITERAL(last_op))) {
 					/* compress consecutive ECHO's.
 					 * Float to string conversion may be affected by current
 					 * locale setting.
 					 */
 					int l, old_len;
 
-					if (Z_TYPE(ZEND_OP1_LITERAL(opline)) != IS_STRING) {
+					if (!Z_IS_STRING(ZEND_OP1_LITERAL(opline))) {
 						convert_to_string_safe(&ZEND_OP1_LITERAL(opline));
 					}
-					if (Z_TYPE(ZEND_OP1_LITERAL(last_op)) != IS_STRING) {
+					if (!Z_IS_STRING(ZEND_OP1_LITERAL(last_op))) {
 						convert_to_string_safe(&ZEND_OP1_LITERAL(last_op));
 					}
 					old_len = Z_STRLEN(ZEND_OP1_LITERAL(last_op));
@@ -370,7 +370,7 @@ static void zend_optimize_block(zend_basic_block *block, zend_op_array *op_array
 			zend_op *fcall = VAR_SOURCE(opline->op1);
 			zend_op *sv = fcall-1;
 			if(sv >= block->start_opline && sv->opcode == ZEND_SEND_VAL &&
-			   sv->op1_type == IS_CONST && Z_TYPE(OPLINE_OP1_LITERAL(sv)) == IS_STRING &&
+			   sv->op1_type == IS_CONST && Z_IS_STRING(OPLINE_OP1_LITERAL(sv)) &&
 			   Z_LVAL(OPLINE_OP2_LITERAL(sv)) == 1
 			   ) {
 				zval *arg = &OPLINE_OP1_LITERAL(sv);
@@ -459,8 +459,8 @@ static void zend_optimize_block(zend_basic_block *block, zend_op_array *op_array
 		         * CASE(FALSE, X)      => BOOL_NOT(X)
 		         */
 				if (opline->op1_type == IS_CONST &&
-					(Z_TYPE(ZEND_OP1_LITERAL(opline)) == IS_FALSE ||
-					 Z_TYPE(ZEND_OP1_LITERAL(opline)) == IS_TRUE)) {
+					(Z_IS_FALSE(ZEND_OP1_LITERAL(opline)) ||
+					 Z_IS_TRUE(ZEND_OP1_LITERAL(opline)))) {
 					/* Optimization of comparison with "null" is not safe,
 					 * because ("0" == null) is not equal to !("0")
 					 */
@@ -471,8 +471,8 @@ static void zend_optimize_block(zend_basic_block *block, zend_op_array *op_array
 					SET_UNUSED(opline->op2);
 					goto optimize_bool;
 				} else if (opline->op2_type == IS_CONST &&
-				           (Z_TYPE(ZEND_OP2_LITERAL(opline)) == IS_FALSE ||
-				            Z_TYPE(ZEND_OP2_LITERAL(opline)) == IS_TRUE)) {
+				           (Z_IS_FALSE(ZEND_OP2_LITERAL(opline)) ||
+				            Z_IS_TRUE(ZEND_OP2_LITERAL(opline)))) {
 					/* Optimization of comparison with "null" is not safe,
 					 * because ("0" == null) is not equal to !("0")
 					 */
@@ -665,10 +665,10 @@ static void zend_optimize_block(zend_basic_block *block, zend_op_array *op_array
 						/* compress consecutive CONCATs */
 						int l, old_len;
 
-						if (Z_TYPE(ZEND_OP2_LITERAL(opline)) != IS_STRING) {
+						if (!Z_IS_STRING(ZEND_OP2_LITERAL(opline))) {
 							convert_to_string_safe(&ZEND_OP2_LITERAL(opline));
 						}
-						if (Z_TYPE(ZEND_OP2_LITERAL(src)) != IS_STRING) {
+						if (!Z_IS_STRING(ZEND_OP2_LITERAL(src))) {
 							convert_to_string_safe(&ZEND_OP2_LITERAL(src));
 						}
 
@@ -719,7 +719,7 @@ static void zend_optimize_block(zend_basic_block *block, zend_op_array *op_array
 					}
 				}
 				if (opline->op1_type == IS_CONST &&
-				    Z_TYPE(ZEND_OP1_LITERAL(opline)) == IS_STRING &&
+				    Z_IS_STRING(ZEND_OP1_LITERAL(opline)) &&
 				    Z_STRLEN(ZEND_OP1_LITERAL(opline)) == 0) {
 					/* convert CONCAT('', X) => CAST(STRING, X) */
 					literal_dtor(&ZEND_OP1_LITERAL(opline));
@@ -729,7 +729,7 @@ static void zend_optimize_block(zend_basic_block *block, zend_op_array *op_array
 					opline->op2_type = IS_UNUSED;
 					opline->op2.var = 0;
 				} else if (opline->op2_type == IS_CONST &&
-			           Z_TYPE(ZEND_OP2_LITERAL(opline)) == IS_STRING &&
+			           Z_IS_STRING(ZEND_OP2_LITERAL(opline)) &&
 			           Z_STRLEN(ZEND_OP2_LITERAL(opline)) == 0) {
 					/* convert CONCAT(X, '') => CAST(STRING, X) */
 					literal_dtor(&ZEND_OP2_LITERAL(opline));

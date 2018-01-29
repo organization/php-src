@@ -251,7 +251,7 @@ typedef struct _gmp_temp {
 	((__GNU_MP_VERSION >= 6) || (__GNU_MP_VERSION >= 5 && __GNU_MP_VERSION_MINOR >= 1))
 
 #define IS_GMP(zval) \
-	(Z_TYPE_P(zval) == IS_OBJECT && instanceof_function(Z_OBJCE_P(zval), gmp_ce))
+	(Z_IS_OBJECT_P(zval) && instanceof_function(Z_OBJCE_P(zval), gmp_ce))
 
 #define GET_GMP_OBJECT_FROM_OBJ(obj) \
 	php_gmp_object_from_zend_object(obj)
@@ -559,7 +559,7 @@ static int gmp_do_operation(zend_uchar opcode, zval *result, zval *op1, zval *op
 static int gmp_compare(zval *result, zval *op1, zval *op2) /* {{{ */
 {
 	gmp_cmp(result, op1, op2);
-	if (Z_TYPE_P(result) == IS_FALSE) {
+	if (Z_IS_FALSE_P(result)) {
 		ZVAL_LONG(result, 1);
 	}
 	return SUCCESS;
@@ -612,7 +612,7 @@ static int gmp_unserialize(zval *object, zend_class_entry *ce, const unsigned ch
 
 	zv = var_tmp_var(&unserialize_data);
 	if (!php_var_unserialize(zv, &p, max, &unserialize_data)
-		|| Z_TYPE_P(zv) != IS_STRING
+		|| !Z_IS_STRING_P(zv)
 		|| convert_to_gmp(gmpnum, zv, 10) == FAILURE
 	) {
 		zend_throw_exception(NULL, "Could not unserialize number", 0);
@@ -621,7 +621,7 @@ static int gmp_unserialize(zval *object, zend_class_entry *ce, const unsigned ch
 
 	zv = var_tmp_var(&unserialize_data);
 	if (!php_var_unserialize(zv, &p, max, &unserialize_data)
-		|| Z_TYPE_P(zv) != IS_ARRAY
+		|| !Z_IS_ARRAY_P(zv)
 	) {
 		zend_throw_exception(NULL, "Could not unserialize properties", 0);
 		goto exit;
@@ -802,7 +802,7 @@ static void gmp_cmp(zval *return_value, zval *a_arg, zval *b_arg) /* {{{ */
 
 	FETCH_GMP_ZVAL(gmpnum_a, a_arg, temp_a);
 
-	if (Z_TYPE_P(b_arg) == IS_LONG) {
+	if (Z_IS_LONG_P(b_arg)) {
 		use_si = 1;
 		temp_b.is_used = 0;
 	} else {
@@ -833,7 +833,7 @@ static inline void gmp_zval_binary_ui_op(zval *return_value, zval *a_arg, zval *
 
 	FETCH_GMP_ZVAL(gmpnum_a, a_arg, temp_a);
 
-	if (gmp_ui_op && Z_TYPE_P(b_arg) == IS_LONG && Z_LVAL_P(b_arg) >= 0) {
+	if (gmp_ui_op && Z_IS_LONG_P(b_arg) && Z_LVAL_P(b_arg) >= 0) {
 		use_ui = 1;
 		temp_b.is_used = 0;
 	} else {
@@ -881,7 +881,7 @@ static inline void gmp_zval_binary_ui_op2(zval *return_value, zval *a_arg, zval 
 
 	FETCH_GMP_ZVAL(gmpnum_a, a_arg, temp_a);
 
-	if (gmp_ui_op && Z_TYPE_P(b_arg) == IS_LONG && Z_LVAL_P(b_arg) >= 0) {
+	if (gmp_ui_op && Z_IS_LONG_P(b_arg) && Z_LVAL_P(b_arg) >= 0) {
 		/* use _ui function */
 		use_ui = 1;
 		temp_b.is_used = 0;
@@ -1377,7 +1377,7 @@ ZEND_FUNCTION(gmp_fact)
 	} else {
 		/* Use convert_to_number first to detect getting non-integer */
 		convert_scalar_to_number(a_arg);
-		if (Z_TYPE_P(a_arg) != IS_LONG) {
+		if (!Z_IS_LONG_P(a_arg)) {
 			convert_to_long(a_arg);
 			if (Z_LVAL_P(a_arg) >= 0) {
 				/* Only warn if we'll make it past the non-negative check */
@@ -1412,7 +1412,7 @@ ZEND_FUNCTION(gmp_binomial)
 	}
 
 	INIT_GMP_RETVAL(gmpnum_result);
-	if (Z_TYPE_P(n_arg) == IS_LONG && Z_LVAL_P(n_arg) >= 0) {
+	if (Z_IS_LONG_P(n_arg) && Z_LVAL_P(n_arg) >= 0) {
 		mpz_bin_uiui(gmpnum_result, (gmp_ulong) Z_LVAL_P(n_arg), (gmp_ulong) k);
 	} else {
 		mpz_ptr gmpnum_n;
@@ -1442,7 +1442,7 @@ ZEND_FUNCTION(gmp_pow)
 		RETURN_FALSE;
 	}
 
-	if (Z_TYPE_P(base_arg) == IS_LONG && Z_LVAL_P(base_arg) >= 0) {
+	if (Z_IS_LONG_P(base_arg) && Z_LVAL_P(base_arg) >= 0) {
 		INIT_GMP_RETVAL(gmpnum_result);
 		mpz_ui_pow_ui(gmpnum_result, Z_LVAL_P(base_arg), exp);
 	} else {
@@ -1469,7 +1469,7 @@ ZEND_FUNCTION(gmp_powm)
 
 	FETCH_GMP_ZVAL(gmpnum_base, base_arg, temp_base);
 
-	if (Z_TYPE_P(exp_arg) == IS_LONG && Z_LVAL_P(exp_arg) >= 0) {
+	if (Z_IS_LONG_P(exp_arg) && Z_LVAL_P(exp_arg) >= 0) {
 		use_ui = 1;
 		temp_exp.is_used = 0;
 	} else {
@@ -1805,14 +1805,14 @@ ZEND_FUNCTION(gmp_kronecker)
 		return;
 	}
 
-	if (Z_TYPE_P(a_arg) == IS_LONG && Z_TYPE_P(b_arg) != IS_LONG) {
+	if (Z_IS_LONG_P(a_arg) && !Z_IS_LONG_P(b_arg)) {
 		use_a_si = 1;
 		temp_a.is_used = 0;
 	} else {
 		FETCH_GMP_ZVAL(gmpnum_a, a_arg, temp_a);
 	}
 
-	if (Z_TYPE_P(b_arg) == IS_LONG) {
+	if (Z_IS_LONG_P(b_arg)) {
 		use_b_si = 1;
 		temp_b.is_used = 0;
 	} else {
@@ -1917,7 +1917,7 @@ ZEND_FUNCTION(gmp_random_seed)
 
 	gmp_init_random();
 
-	if (Z_TYPE_P(seed) == IS_LONG && Z_LVAL_P(seed) >= 0) {
+	if (Z_IS_LONG_P(seed) && Z_LVAL_P(seed) >= 0) {
 		gmp_randseed_ui(GMPG(rand_state), Z_LVAL_P(seed));
 	}
 	else {
@@ -1970,7 +1970,7 @@ ZEND_FUNCTION(gmp_random_range)
 
 	FETCH_GMP_ZVAL(gmpnum_max, max_arg, temp_a);
 
-	if (Z_TYPE_P(min_arg) == IS_LONG && Z_LVAL_P(min_arg) >= 0) {
+	if (Z_IS_LONG_P(min_arg) && Z_LVAL_P(min_arg) >= 0) {
 		if (mpz_cmp_ui(gmpnum_max, Z_LVAL_P(min_arg)) <= 0) {
 			FREE_GMP_TEMP(temp_a);
 			php_error_docref(NULL, E_WARNING, "The minimum value must be less than the maximum value");

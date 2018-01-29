@@ -161,7 +161,7 @@ ZEND_METHOD(Closure, call)
 	fci.retval = &closure_result;
 	fci.no_separation = 1;
 
-	if (zend_call_function(&fci, &fci_cache) == SUCCESS && Z_TYPE(closure_result) != IS_UNDEF) {
+	if (zend_call_function(&fci, &fci_cache) == SUCCESS && !Z_IS_UNDEF(closure_result)) {
 		if (Z_ISREF(closure_result)) {
 			zend_unwrap_reference(&closure_result);
 		}
@@ -192,9 +192,9 @@ ZEND_METHOD(Closure, bind)
 	closure = (zend_closure *)Z_OBJ_P(zclosure);
 
 	if (scope_arg != NULL) { /* scope argument was given */
-		if (Z_TYPE_P(scope_arg) == IS_OBJECT) {
+		if (Z_IS_OBJECT_P(scope_arg)) {
 			ce = Z_OBJCE_P(scope_arg);
-		} else if (Z_TYPE_P(scope_arg) == IS_NULL) {
+		} else if (Z_IS_NULL_P(scope_arg)) {
 			ce = NULL;
 		} else {
 			zend_string *tmp_class_name;
@@ -306,7 +306,7 @@ ZEND_METHOD(Closure, fromCallable)
 		return;
 	}
 
-	if (Z_TYPE_P(callable) == IS_OBJECT && instanceof_function(Z_OBJCE_P(callable), zend_ce_closure)) {
+	if (Z_IS_OBJECT_P(callable) && instanceof_function(Z_OBJCE_P(callable), zend_ce_closure)) {
 		/* It's already a closure */
 		RETURN_ZVAL(callable, 1, 0);
 	}
@@ -441,7 +441,7 @@ static void zend_closure_free_storage(zend_object *object) /* {{{ */
 		destroy_op_array(&closure->func.op_array);
 	}
 
-	if (Z_TYPE(closure->this_ptr) != IS_UNDEF) {
+	if (!Z_IS_UNDEF(closure->this_ptr)) {
 		zval_ptr_dtor(&closure->this_ptr);
 	}
 }
@@ -478,7 +478,7 @@ int zend_closure_get_closure(zval *obj, zend_class_entry **ce_ptr, zend_function
 	*fptr_ptr = &closure->func;
 	*ce_ptr = closure->called_scope;
 
-	if (Z_TYPE(closure->this_ptr) != IS_UNDEF) {
+	if (!Z_IS_UNDEF(closure->this_ptr)) {
 		*obj_ptr = Z_OBJ(closure->this_ptr);
 	} else {
 		*obj_ptr = NULL;
@@ -506,7 +506,7 @@ static HashTable *zend_closure_get_debug_info(zval *object, int *is_temp) /* {{{
 		zend_hash_update(debug_info, ZSTR_KNOWN(ZEND_STR_STATIC), &val);
 	}
 
-	if (Z_TYPE(closure->this_ptr) != IS_UNDEF) {
+	if (!Z_IS_UNDEF(closure->this_ptr)) {
 		Z_ADDREF(closure->this_ptr);
 		zend_hash_update(debug_info, ZSTR_KNOWN(ZEND_STR_THIS), &closure->this_ptr);
 	}
@@ -556,8 +556,8 @@ static HashTable *zend_closure_get_gc(zval *obj, zval **table, int *n) /* {{{ */
 {
 	zend_closure *closure = (zend_closure *)Z_OBJ_P(obj);
 
-	*table = Z_TYPE(closure->this_ptr) != IS_NULL ? &closure->this_ptr : NULL;
-	*n = Z_TYPE(closure->this_ptr) != IS_NULL ? 1 : 0;
+	*table = !Z_IS_NULL(closure->this_ptr) ? &closure->this_ptr : NULL;
+	*n = !Z_IS_NULL(closure->this_ptr) ? 1 : 0;
 	return (closure->func.type == ZEND_USER_FUNCTION) ?
 		closure->func.op_array.static_variables : NULL;
 }
@@ -645,7 +645,7 @@ ZEND_API void zend_create_closure(zval *res, zend_function *func, zend_class_ent
 
 	closure = (zend_closure *)Z_OBJ_P(res);
 
-	if ((scope == NULL) && this_ptr && (Z_TYPE_P(this_ptr) != IS_UNDEF)) {
+	if ((scope == NULL) && this_ptr && (!Z_IS_UNDEF_P(this_ptr))) {
 		/* use dummy scope if we're binding an object without specifying a scope */
 		/* maybe it would be better to create one for this purpose */
 		scope = zend_ce_closure;
@@ -707,7 +707,7 @@ ZEND_API void zend_create_closure(zval *res, zend_function *func, zend_class_ent
 	closure->called_scope = called_scope;
 	if (scope) {
 		closure->func.common.fn_flags |= ZEND_ACC_PUBLIC;
-		if (this_ptr && Z_TYPE_P(this_ptr) == IS_OBJECT && (closure->func.common.fn_flags & ZEND_ACC_STATIC) == 0) {
+		if (this_ptr && Z_IS_OBJECT_P(this_ptr) && (closure->func.common.fn_flags & ZEND_ACC_STATIC) == 0) {
 			ZVAL_COPY(&closure->this_ptr, this_ptr);
 		}
 	}

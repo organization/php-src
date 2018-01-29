@@ -733,7 +733,7 @@ static void zend_ast_export_name(smart_str *str, zend_ast *ast, int priority, in
 	if (ast->kind == ZEND_AST_ZVAL) {
 		zval *zv = zend_ast_get_zval(ast);
 
-		if (Z_TYPE_P(zv) == IS_STRING) {
+		if (Z_IS_STRING_P(zv)) {
 			smart_str_append(str, Z_STR_P(zv));
 			return;
 		}
@@ -746,7 +746,7 @@ static void zend_ast_export_ns_name(smart_str *str, zend_ast *ast, int priority,
 	if (ast->kind == ZEND_AST_ZVAL) {
 		zval *zv = zend_ast_get_zval(ast);
 
-		if (Z_TYPE_P(zv) == IS_STRING) {
+		if (Z_IS_STRING_P(zv)) {
 		    if (ast->attr == ZEND_NAME_FQ) {
 				smart_str_appendc(str, '\\');
 		    } else if (ast->attr == ZEND_NAME_RELATIVE) {
@@ -802,7 +802,7 @@ static void zend_ast_export_var(smart_str *str, zend_ast *ast, int priority, int
 {
 	if (ast->kind == ZEND_AST_ZVAL) {
 		zval *zv = zend_ast_get_zval(ast);
-		if (Z_TYPE_P(zv) == IS_STRING &&
+		if (Z_IS_STRING_P(zv) &&
 		    zend_ast_valid_var_name(Z_STRVAL_P(zv), Z_STRLEN_P(zv))) {
 			smart_str_append(str, Z_STR_P(zv));
 			return;
@@ -839,7 +839,7 @@ static void zend_ast_export_encaps_list(smart_str *str, char quote, zend_ast_lis
 		if (ast->kind == ZEND_AST_ZVAL) {
 			zval *zv = zend_ast_get_zval(ast);
 
-			ZEND_ASSERT(Z_TYPE_P(zv) == IS_STRING);
+			ZEND_ASSERT(Z_IS_STRING_P(zv));
 			zend_ast_export_qstr(str, quote, Z_STR_P(zv));
 		} else if (ast->kind == ZEND_AST_VAR &&
 		           ast->child[0]->kind == ZEND_AST_ZVAL &&
@@ -1305,7 +1305,7 @@ simple_list:
 				zval *zv;
 				ZEND_ASSERT(ast->child[0]->kind == ZEND_AST_ZVAL);
 				zv = zend_ast_get_zval(ast->child[0]);
-				ZEND_ASSERT(Z_TYPE_P(zv) == IS_STRING);
+				ZEND_ASSERT(Z_IS_STRING_P(zv));
 				zend_ast_export_qstr(str, '`', Z_STR_P(zv));
 			}
 			smart_str_appendc(str, '`');

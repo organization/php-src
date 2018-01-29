@@ -585,7 +585,7 @@ mysqlnd_stmt_execute_prepare_param_types(MYSQLND_STMT_DATA * stmt, zval ** copie
 		ZVAL_DEREF(parameter);
 		if (!Z_ISNULL_P(parameter) && (current_type == MYSQL_TYPE_LONG || current_type == MYSQL_TYPE_LONGLONG)) {
 			/* always copy the var, because we do many conversions */
-			if (Z_TYPE_P(parameter) != IS_LONG &&
+			if (!Z_IS_LONG_P(parameter) &&
 				PASS != mysqlnd_stmt_copy_it(copies_param, parameter, stmt->param_count, i))
 			{
 				SET_OOM_ERROR(stmt->error_info);
@@ -595,7 +595,7 @@ mysqlnd_stmt_execute_prepare_param_types(MYSQLND_STMT_DATA * stmt, zval ** copie
 			  if it doesn't fit in a long send it as a string.
 			  Check bug #52891 : Wrong data inserted with mysqli/mysqlnd when using bind_param, value > LONG_MAX
 			*/
-			if (Z_TYPE_P(parameter) != IS_LONG) {
+			if (!Z_IS_LONG_P(parameter)) {
 				zval *tmp_data = (*copies_param && !Z_ISUNDEF((*copies_param)[i]))? &(*copies_param)[i]: parameter;
 				/*
 				  Because converting to double and back to long can lead
@@ -645,13 +645,13 @@ mysqlnd_stmt_execute_store_types(MYSQLND_STMT_DATA * stmt, zval * copies, zend_u
 			  if it doesn't fit in a long send it as a string.
 			  Check bug #52891 : Wrong data inserted with mysqli/mysqlnd when using bind_param, value > LONG_MAX
 			*/
-			if (Z_TYPE_P(parameter) != IS_LONG) {
+			if (!Z_IS_LONG_P(parameter)) {
 				const zval *tmp_data = (copies && !Z_ISUNDEF(copies[i]))? &copies[i] : parameter;
 				/*
 				  In case of IS_LONG we do nothing, it is ok, in case of string, we just need to set current_type.
 				  The actual transformation has been performed several dozens line above.
 				*/
-				if (Z_TYPE_P(tmp_data) == IS_STRING) {
+				if (Z_IS_STRING_P(tmp_data)) {
 					current_type = MYSQL_TYPE_VAR_STRING;
 					/*
 					  don't change stmt->param_bind[i].type to MYSQL_TYPE_VAR_STRING
@@ -682,7 +682,7 @@ mysqlnd_stmt_execute_calculate_param_values_size(MYSQLND_STMT_DATA * stmt, zval 
 
 		bind_var = the_var;
 		ZVAL_DEREF(the_var);
-		if ((stmt->param_bind[i].type != MYSQL_TYPE_LONG_BLOB && Z_TYPE_P(the_var) == IS_NULL)) {
+		if ((stmt->param_bind[i].type != MYSQL_TYPE_LONG_BLOB && Z_IS_NULL_P(the_var))) {
 			continue;
 		}
 
@@ -704,7 +704,7 @@ mysqlnd_stmt_execute_calculate_param_values_size(MYSQLND_STMT_DATA * stmt, zval 
 		switch (stmt->param_bind[i].type) {
 			case MYSQL_TYPE_DOUBLE:
 				*data_size += 8;
-				if (Z_TYPE_P(the_var) != IS_DOUBLE) {
+				if (!Z_IS_DOUBLE_P(the_var)) {
 					if (!*copies_param || Z_ISUNDEF((*copies_param)[i])) {
 						if (PASS != mysqlnd_stmt_copy_it(copies_param, the_var, stmt->param_count, i)) {
 							SET_OOM_ERROR(stmt->error_info);
@@ -719,7 +719,7 @@ mysqlnd_stmt_execute_calculate_param_values_size(MYSQLND_STMT_DATA * stmt, zval 
 			case MYSQL_TYPE_LONG:
 				{
 					zval *tmp_data = (*copies_param && !Z_ISUNDEF((*copies_param)[i]))? &(*copies_param)[i]: the_var;
-					if (Z_TYPE_P(tmp_data) == IS_STRING) {
+					if (Z_IS_STRING_P(tmp_data)) {
 						goto use_string;
 					}
 					convert_to_long_ex(tmp_data);
@@ -739,7 +739,7 @@ mysqlnd_stmt_execute_calculate_param_values_size(MYSQLND_STMT_DATA * stmt, zval 
 			case MYSQL_TYPE_VAR_STRING:
 use_string:
 				*data_size += 8; /* max 8 bytes for size */
-				if (Z_TYPE_P(the_var) != IS_STRING) {
+				if (!Z_IS_STRING_P(the_var)) {
 					if (!*copies_param || Z_ISUNDEF((*copies_param)[i])) {
 						if (PASS != mysqlnd_stmt_copy_it(copies_param, the_var, stmt->param_count, i)) {
 							SET_OOM_ERROR(stmt->error_info);
@@ -771,7 +771,7 @@ mysqlnd_stmt_execute_store_param_values(MYSQLND_STMT_DATA * stmt, zval * copies,
 		ZVAL_DEREF(parameter);
 		data = (copies && !Z_ISUNDEF(copies[i]))? &copies[i]: parameter;
 		/* Handle long data */
-		if (!Z_ISUNDEF_P(parameter) && Z_TYPE_P(data) == IS_NULL) {
+		if (!Z_ISUNDEF_P(parameter) && Z_IS_NULL_P(data)) {
 			(buf + null_byte_offset)[i/8] |= (zend_uchar) (1 << (i & 7));
 		} else {
 			switch (stmt->param_bind[i].type) {
@@ -781,7 +781,7 @@ mysqlnd_stmt_execute_store_param_values(MYSQLND_STMT_DATA * stmt, zval * copies,
 					(*p) += 8;
 					break;
 				case MYSQL_TYPE_LONGLONG:
-					if (Z_TYPE_P(data) == IS_STRING) {
+					if (Z_IS_STRING_P(data)) {
 						goto send_string;
 					}
 					/* data has alreade been converted to long */
@@ -789,7 +789,7 @@ mysqlnd_stmt_execute_store_param_values(MYSQLND_STMT_DATA * stmt, zval * copies,
 					(*p) += 8;
 					break;
 				case MYSQL_TYPE_LONG:
-					if (Z_TYPE_P(data) == IS_STRING) {
+					if (Z_IS_STRING_P(data)) {
 						goto send_string;
 					}
 					/* data has alreade been converted to long */

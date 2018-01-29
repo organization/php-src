@@ -413,7 +413,7 @@ php_formatted_print(zend_execute_data *execute_data, int use_array, int format_o
 
 		z_format = &args[format_offset];
 		array = &args[1 + format_offset];
-		if (Z_TYPE_P(array) != IS_ARRAY) {
+		if (!Z_IS_ARRAY_P(array)) {
 			convert_to_array(array);
 		}
 

@@ -887,7 +887,7 @@ static int php_sqlite3_callback_compare(void *coll, int a_len, const void *a, in
 
 	if (EG(exception)) {
 		ret = 0;
-	} else if (Z_TYPE(retval) != IS_LONG){
+	} else if (!Z_IS_LONG(retval)){
 		//retval ought to contain a ZVAL_LONG by now
 		// (the result of a comparison, i.e. most likely -1, 0, or 1)
 		//I suppose we could accept any scalar return type, though.
@@ -1577,7 +1577,7 @@ PHP_METHOD(sqlite3stmt, execute)
 			}
 
 			/* If the ZVAL is null then it should be bound as that */
-			if (Z_TYPE_P(parameter) == IS_NULL) {
+			if (Z_IS_NULL_P(parameter)) {
 				sqlite3_bind_null(stmt_obj->stmt, param->param_number);
 				continue;
 			}
@@ -1601,7 +1601,7 @@ PHP_METHOD(sqlite3stmt, execute)
 				{
 					php_stream *stream = NULL;
 					zend_string *buffer = NULL;
-					if (Z_TYPE_P(parameter) == IS_RESOURCE) {
+					if (Z_IS_RESOURCE_P(parameter)) {
 						php_stream_from_zval_no_verify(stream, parameter);
 						if (stream == NULL) {
 							php_sqlite3_error(stmt_obj->db_obj, "Unable to read stream for parameter %ld", param->param_number);

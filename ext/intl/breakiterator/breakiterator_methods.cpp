@@ -264,7 +264,7 @@ U_CFUNC PHP_FUNCTION(breakiter_next)
 		zval *arg;
 		int res = zend_parse_parameters(ZEND_NUM_ARGS(), "z", &arg);
 		assert(res == SUCCESS);
-		if (Z_TYPE_P(arg) == IS_NULL) {
+		if (Z_IS_NULL_P(arg)) {
 			no_arg_version = true;
 			ZEND_NUM_ARGS() = 0; /* pretend we don't have any argument */
 		} else {

@@ -1348,7 +1348,7 @@ PHP_FUNCTION(odbc_execute)
 
 			otype = Z_TYPE_P(tmp);
 			convert_to_string_ex(tmp);
-			if (Z_TYPE_P(tmp) != IS_STRING) {
+			if (!Z_IS_STRING_P(tmp)) {
 				php_error_docref(NULL, E_WARNING,"Error converting parameter");
 				SQLFreeStmt(result->stmt, SQL_RESET_PARAMS);
 				for (i = 0; i < result->numparams; i++) {
@@ -1831,7 +1831,7 @@ static void php_odbc_fetch_hash(INTERNAL_FUNCTION_PARAMETERS, int result_type)
 		if (result_type & ODBC_NUM) {
 			zend_hash_index_update(Z_ARRVAL_P(return_value), i, &tmp);
 		} else {
-			if (!*(result->values[i].name) && Z_TYPE(tmp) == IS_STRING) {
+			if (!*(result->values[i].name) && Z_IS_STRING(tmp)) {
 				zend_hash_update(Z_ARRVAL_P(return_value), Z_STR(tmp), &tmp);
 			} else {
 				zend_hash_str_update(Z_ARRVAL_P(return_value), result->values[i].name, strlen(result->values[i].name), &tmp);
@@ -1850,7 +1850,7 @@ static void php_odbc_fetch_hash(INTERNAL_FUNCTION_PARAMETERS, int result_type)
 PHP_FUNCTION(odbc_fetch_object)
 {
 	php_odbc_fetch_hash(INTERNAL_FUNCTION_PARAM_PASSTHRU, ODBC_OBJECT);
-	if (Z_TYPE_P(return_value) == IS_ARRAY) {
+	if (Z_IS_ARRAY_P(return_value)) {
 		object_and_properties_init(return_value, ZEND_STANDARD_CLASS_DEF_PTR, Z_ARRVAL_P(return_value));
 	}
 }
@@ -1903,7 +1903,7 @@ PHP_FUNCTION(odbc_fetch_into)
 		RETURN_FALSE;
 	}
 
-	if (Z_TYPE_P(pv_res_arr) != IS_ARRAY) {
+	if (!Z_IS_ARRAY_P(pv_res_arr)) {
 		array_init(pv_res_arr);
 	}
 
@@ -2100,7 +2100,7 @@ PHP_FUNCTION(odbc_result)
 		return;
 	}
 
-	if (Z_TYPE_P(pv_field) == IS_STRING) {
+	if (Z_IS_STRING_P(pv_field)) {
 		field = Z_STRVAL_P(pv_field);
 	} else {
 		convert_to_long_ex(pv_field);

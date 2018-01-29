@@ -131,7 +131,7 @@ PHP_FUNCTION(header_register_callback)
 		RETURN_FALSE;
 	}
 
-	if (Z_TYPE(SG(callback_func)) != IS_UNDEF) {
+	if (!Z_IS_UNDEF(SG(callback_func))) {
 		zval_ptr_dtor(&SG(callback_func));
 		SG(fci_cache) = empty_fcall_info_cache;
 	}
@@ -876,7 +876,7 @@ SAPI_API int sapi_send_headers(void)
 		SG(sapi_headers).send_default_content_type = 0;
 	}
 
-	if (Z_TYPE(SG(callback_func)) != IS_UNDEF) {
+	if (!Z_IS_UNDEF(SG(callback_func))) {
 		zval cb;
 		ZVAL_COPY_VALUE(&cb, &SG(callback_func));
 		ZVAL_UNDEF(&SG(callback_func));

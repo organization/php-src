@@ -297,9 +297,9 @@ PHP_FUNCTION(abs)
 
 	convert_scalar_to_number_ex(value);
 
-	if (Z_TYPE_P(value) == IS_DOUBLE) {
+	if (Z_IS_DOUBLE_P(value)) {
 		RETURN_DOUBLE(fabs(Z_DVAL_P(value)));
-	} else if (Z_TYPE_P(value) == IS_LONG) {
+	} else if (Z_IS_LONG_P(value)) {
 		if (Z_LVAL_P(value) == ZEND_LONG_MIN) {
 			RETURN_DOUBLE(-(double)ZEND_LONG_MIN);
 		} else {
@@ -322,9 +322,9 @@ PHP_FUNCTION(ceil)
 
 	convert_scalar_to_number_ex(value);
 
-	if (Z_TYPE_P(value) == IS_DOUBLE) {
+	if (Z_IS_DOUBLE_P(value)) {
 		RETURN_DOUBLE(ceil(Z_DVAL_P(value)));
-	} else if (Z_TYPE_P(value) == IS_LONG) {
+	} else if (Z_IS_LONG_P(value)) {
 		RETURN_DOUBLE(zval_get_double(value));
 	}
 	RETURN_FALSE;
@@ -343,9 +343,9 @@ PHP_FUNCTION(floor)
 
 	convert_scalar_to_number_ex(value);
 
-	if (Z_TYPE_P(value) == IS_DOUBLE) {
+	if (Z_IS_DOUBLE_P(value)) {
 		RETURN_DOUBLE(floor(Z_DVAL_P(value)));
-	} else if (Z_TYPE_P(value) == IS_LONG) {
+	} else if (Z_IS_LONG_P(value)) {
 		RETURN_DOUBLE(zval_get_double(value));
 	}
 	RETURN_FALSE;
@@ -391,7 +391,7 @@ PHP_FUNCTION(round)
 			/* break omitted intentionally */
 
 		case IS_DOUBLE:
-			return_val = (Z_TYPE_P(value) == IS_LONG) ? (double)Z_LVAL_P(value) : Z_DVAL_P(value);
+			return_val = (Z_IS_LONG_P(value)) ? (double)Z_LVAL_P(value) : Z_DVAL_P(value);
 			return_val = _php_math_round(return_val, (int)places, (int)mode);
 			RETURN_DOUBLE(return_val);
 			break;
@@ -810,7 +810,7 @@ PHPAPI zend_long _php_math_basetolong(zval *arg, int base)
 	zend_long i;
 	char c, *s;
 
-	if (Z_TYPE_P(arg) != IS_STRING || base < 2 || base > 36) {
+	if (!Z_IS_STRING_P(arg) || base < 2 || base > 36) {
 		return 0;
 	}
 
@@ -858,7 +858,7 @@ PHPAPI int _php_math_basetozval(zval *arg, int base, zval *ret)
 	zend_long cutoff;
 	int cutlim;
 
-	if (Z_TYPE_P(arg) != IS_STRING || base < 2 || base > 36) {
+	if (!Z_IS_STRING_P(arg) || base < 2 || base > 36) {
 		return FAILURE;
 	}
 
@@ -919,7 +919,7 @@ PHPAPI zend_string * _php_math_longtobase(zval *arg, int base)
 	char *ptr, *end;
 	zend_ulong value;
 
-	if (Z_TYPE_P(arg) != IS_LONG || base < 2 || base > 36) {
+	if (!Z_IS_LONG_P(arg) || base < 2 || base > 36) {
 		return ZSTR_EMPTY_ALLOC();
 	}
 
@@ -947,11 +947,11 @@ PHPAPI zend_string * _php_math_zvaltobase(zval *arg, int base)
 {
 	static char digits[] = "0123456789abcdefghijklmnopqrstuvwxyz";
 
-	if ((Z_TYPE_P(arg) != IS_LONG && Z_TYPE_P(arg) != IS_DOUBLE) || base < 2 || base > 36) {
+	if ((!Z_IS_LONG_P(arg) && !Z_IS_DOUBLE_P(arg)) || base < 2 || base > 36) {
 		return ZSTR_EMPTY_ALLOC();
 	}
 
-	if (Z_TYPE_P(arg) == IS_DOUBLE) {
+	if (Z_IS_DOUBLE_P(arg)) {
 		double fvalue = floor(Z_DVAL_P(arg)); /* floor it just in case */
 		char *ptr, *end;
 		char buf[(sizeof(double) << 3) + 1];

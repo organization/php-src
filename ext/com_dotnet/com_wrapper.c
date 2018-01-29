@@ -621,7 +621,7 @@ PHP_COM_DOTNET_API IDispatch *php_com_wrapper_export(zval *val)
 {
 	php_dispatchex *disp = NULL;
 
-	if (Z_TYPE_P(val) != IS_OBJECT) {
+	if (!Z_IS_OBJECT_P(val)) {
 		return NULL;
 	}
 

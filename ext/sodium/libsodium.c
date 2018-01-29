@@ -383,12 +383,12 @@ static void sodium_remove_param_values_from_backtrace(zend_object *obj) {
 
 	ZVAL_OBJ(&obj_zv, obj);
 	trace = zend_read_property(zend_get_exception_base(&obj_zv), &obj_zv, "trace", sizeof("trace")-1, 0, &rv);
-	if (trace && Z_TYPE_P(trace) == IS_ARRAY) {
+	if (trace && Z_IS_ARRAY_P(trace)) {
 		zval *frame;
 		ZEND_HASH_FOREACH_VAL(Z_ARRVAL_P(trace), frame) {
-			if (Z_TYPE_P(frame) == IS_ARRAY) {
+			if (Z_IS_ARRAY_P(frame)) {
 				zval *args = zend_hash_str_find(Z_ARRVAL_P(frame), "args", sizeof("args")-1);
-				if (args && Z_TYPE_P(frame) == IS_ARRAY) {
+				if (args && Z_IS_ARRAY_P(frame)) {
 					zend_hash_clean(Z_ARRVAL_P(args));
 				}
 			}
@@ -403,7 +403,7 @@ static zend_object *sodium_exception_create_object(zend_class_entry *ce) {
 }
 
 static void sodium_separate_string(zval *zv) {
-	ZEND_ASSERT(Z_TYPE_P(zv) == IS_STRING);
+	ZEND_ASSERT(Z_IS_STRING_P(zv));
 	if (!Z_REFCOUNTED_P(zv) || Z_REFCOUNT_P(zv) > 1) {
 		zend_string *copy = zend_string_init(Z_STRVAL_P(zv), Z_STRLEN_P(zv), 0);
 		Z_TRY_DELREF_P(zv);
@@ -659,7 +659,7 @@ PHP_FUNCTION(sodium_memzero)
 		return;
 	}
 	ZVAL_DEREF(buf_zv);
-	if (Z_TYPE_P(buf_zv) != IS_STRING) {
+	if (!Z_IS_STRING_P(buf_zv)) {
 		zend_throw_exception(sodium_exception_ce, "a PHP string is required", 0);
 		return;
 	}
@@ -685,7 +685,7 @@ PHP_FUNCTION(sodium_increment)
 		return;
 	}
 	ZVAL_DEREF(val_zv);
-	if (Z_TYPE_P(val_zv) != IS_STRING) {
+	if (!Z_IS_STRING_P(val_zv)) {
 		zend_throw_exception(sodium_exception_ce, "a PHP string is required", 0);
 		return;
 	}
@@ -710,7 +710,7 @@ PHP_FUNCTION(sodium_add)
 		return;
 	}
 	ZVAL_DEREF(val_zv);
-	if (Z_TYPE_P(val_zv) != IS_STRING) {
+	if (!Z_IS_STRING_P(val_zv)) {
 		zend_throw_exception(sodium_exception_ce, "PHP strings are required", 0);
 		return;
 	}
@@ -962,7 +962,7 @@ PHP_FUNCTION(sodium_crypto_generichash_update)
 		return;
 	}
 	ZVAL_DEREF(state_zv);
-	if (Z_TYPE_P(state_zv) != IS_STRING) {
+	if (!Z_IS_STRING_P(state_zv)) {
 		zend_throw_exception(sodium_exception_ce, "a reference to a state is required", 0);
 		return;
 	}
@@ -1001,7 +1001,7 @@ PHP_FUNCTION(sodium_crypto_generichash_final)
 		return;
 	}
 	ZVAL_DEREF(state_zv);
-	if (Z_TYPE_P(state_zv) != IS_STRING) {
+	if (!Z_IS_STRING_P(state_zv)) {
 		zend_throw_exception(sodium_exception_ce, "a reference to a state is required", 0);
 		return;
 	}
@@ -3559,7 +3559,7 @@ PHP_FUNCTION(sodium_crypto_secretstream_xchacha20poly1305_push)
 		return;
 	}
 	ZVAL_DEREF(state_zv);
-	if (Z_TYPE_P(state_zv) != IS_STRING) {
+	if (!Z_IS_STRING_P(state_zv)) {
 		zend_throw_exception(sodium_exception_ce, "a reference to a state is required", 0);
 		return;
 	}
@@ -3655,7 +3655,7 @@ PHP_FUNCTION(sodium_crypto_secretstream_xchacha20poly1305_pull)
 		return;
 	}
 	ZVAL_DEREF(state_zv);
-	if (Z_TYPE_P(state_zv) != IS_STRING) {
+	if (!Z_IS_STRING_P(state_zv)) {
 		zend_throw_exception(sodium_exception_ce, "a reference to a state is required", 0);
 		return;
 	}
@@ -3700,7 +3700,7 @@ PHP_FUNCTION(sodium_crypto_secretstream_xchacha20poly1305_rekey)
 		return;
 	}
 	ZVAL_DEREF(state_zv);
-	if (Z_TYPE_P(state_zv) != IS_STRING) {
+	if (!Z_IS_STRING_P(state_zv)) {
 		zend_throw_exception(sodium_exception_ce, "a reference to a state is required", 0);
 		return;
 	}

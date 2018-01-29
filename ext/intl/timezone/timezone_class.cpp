@@ -134,7 +134,7 @@ U_CFUNC TimeZone *timezone_process_timezone_argument(zval *zv_timezone,
 	char		*message = NULL;
 	TimeZone	*timeZone;
 
-	if (zv_timezone == NULL || Z_TYPE_P(zv_timezone) == IS_NULL) {
+	if (zv_timezone == NULL || Z_IS_NULL_P(zv_timezone)) {
 		timelib_tzinfo *tzinfo = get_timezone_info();
 		ZVAL_STRING(&local_zv_tz, tzinfo->name);
 		zv_timezone = &local_zv_tz;
@@ -142,7 +142,7 @@ U_CFUNC TimeZone *timezone_process_timezone_argument(zval *zv_timezone,
 		ZVAL_NULL(&local_zv_tz);
 	}
 
-	if (Z_TYPE_P(zv_timezone) == IS_OBJECT &&
+	if (Z_IS_OBJECT_P(zv_timezone) &&
 			instanceof_function(Z_OBJCE_P(zv_timezone), TimeZone_ce_ptr)) {
 		TimeZone_object *to = Z_INTL_TIMEZONE_P(zv_timezone);
 		if (to->utimezone == NULL) {
@@ -165,7 +165,7 @@ U_CFUNC TimeZone *timezone_process_timezone_argument(zval *zv_timezone,
 			zval_dtor(&local_zv_tz);
 			return NULL;
 		}
-	} else if (Z_TYPE_P(zv_timezone) == IS_OBJECT &&
+	} else if (Z_IS_OBJECT_P(zv_timezone) &&
 			instanceof_function(Z_OBJCE_P(zv_timezone), php_date_get_timezone_ce())) {
 
 		php_timezone_obj *tzobj = Z_PHPTIMEZONE_P(zv_timezone);

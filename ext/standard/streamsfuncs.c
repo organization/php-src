@@ -621,7 +621,7 @@ static int stream_array_to_fd_set(zval *stream_array, fd_set *fds, php_socket_t 
 	php_stream *stream;
 	int cnt = 0;
 
-	if (Z_TYPE_P(stream_array) != IS_ARRAY) {
+	if (!Z_IS_ARRAY_P(stream_array)) {
 		return 0;
 	}
 
@@ -663,7 +663,7 @@ static int stream_array_from_fd_set(zval *stream_array, fd_set *fds)
 	zend_string *key;
 	zend_ulong num_ind;
 
-	if (Z_TYPE_P(stream_array) != IS_ARRAY) {
+	if (!Z_IS_ARRAY_P(stream_array)) {
 		return 0;
 	}
 	ht = zend_new_array(zend_hash_num_elements(Z_ARRVAL_P(stream_array)));
@@ -712,7 +712,7 @@ static int stream_array_emulate_read_fd_set(zval *stream_array)
 	php_stream *stream;
 	int ret = 0;
 
-	if (Z_TYPE_P(stream_array) != IS_ARRAY) {
+	if (!Z_IS_ARRAY_P(stream_array)) {
 		return 0;
 	}
 	ht = zend_new_array(zend_hash_num_elements(Z_ARRVAL_P(stream_array)));
@@ -886,7 +886,7 @@ static void user_space_stream_notifier(php_stream_context *context, int notifyco
 
 static void user_space_stream_notifier_dtor(php_stream_notifier *notifier)
 {
-	if (notifier && Z_TYPE(notifier->ptr) != IS_UNDEF) {
+	if (notifier && !Z_IS_UNDEF(notifier->ptr)) {
 		zval_ptr_dtor(&notifier->ptr);
 		ZVAL_UNDEF(&notifier->ptr);
 	}
@@ -900,7 +900,7 @@ static int parse_context_options(php_stream_context *context, zval *options)
 
 	ZEND_HASH_FOREACH_STR_KEY_VAL(Z_ARRVAL_P(options), wkey, wval) {
 		ZVAL_DEREF(wval);
-		if (wkey && Z_TYPE_P(wval) == IS_ARRAY) {
+		if (wkey && Z_IS_ARRAY_P(wval)) {
 			ZEND_HASH_FOREACH_STR_KEY_VAL(Z_ARRVAL_P(wval), okey, oval) {
 				if (okey) {
 					php_stream_context_set_option(context, ZSTR_VAL(wkey), ZSTR_VAL(okey), oval);
@@ -932,7 +932,7 @@ static int parse_context_params(php_stream_context *context, zval *params)
 		context->notifier->dtor = user_space_stream_notifier_dtor;
 	}
 	if (NULL != (tmp = zend_hash_str_find(Z_ARRVAL_P(params), "options", sizeof("options")-1))) {
-		if (Z_TYPE_P(tmp) == IS_ARRAY) {
+		if (Z_IS_ARRAY_P(tmp)) {
 			parse_context_options(context, tmp);
 		} else {
 			php_error_docref(NULL, E_WARNING, "Invalid stream/context parameter");
@@ -1078,7 +1078,7 @@ PHP_FUNCTION(stream_context_get_params)
 	}
 
 	array_init(return_value);
-	if (context->notifier && Z_TYPE(context->notifier->ptr) != IS_UNDEF && context->notifier->func == user_space_stream_notifier) {
+	if (context->notifier && !Z_IS_UNDEF(context->notifier->ptr) && context->notifier->func == user_space_stream_notifier) {
 		Z_TRY_ADDREF(context->notifier->ptr);
 		add_assoc_zval_ex(return_value, "notification", sizeof("notification")-1, &context->notifier->ptr);
 	}
@@ -1582,7 +1582,7 @@ PHP_FUNCTION(stream_is_local)
 		Z_PARAM_ZVAL(zstream)
 	ZEND_PARSE_PARAMETERS_END_EX(RETURN_FALSE);
 
-	if (Z_TYPE_P(zstream) == IS_RESOURCE) {
+	if (Z_IS_RESOURCE_P(zstream)) {
 		php_stream_from_zval(stream, zstream);
 		if (stream == NULL) {
 			RETURN_FALSE;

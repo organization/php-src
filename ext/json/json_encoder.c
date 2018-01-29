@@ -132,7 +132,7 @@ static int php_json_encode_array(smart_str *buf, zval *val, int options, php_jso
 	int i, r, need_comma = 0;
 	HashTable *myht;
 
-	if (Z_TYPE_P(val) == IS_ARRAY) {
+	if (Z_IS_ARRAY_P(val)) {
 		myht = Z_ARRVAL_P(val);
 		r = (options & PHP_JSON_FORCE_OBJECT) ? PHP_JSON_OUTPUT_OBJECT : php_json_determine_array_type(val);
 	} else {
@@ -175,7 +175,7 @@ static int php_json_encode_array(smart_str *buf, zval *val, int options, php_jso
 				php_json_pretty_print_indent(buf, options, encoder);
 			} else if (r == PHP_JSON_OUTPUT_OBJECT) {
 				if (key) {
-					if (ZSTR_VAL(key)[0] == '\0' && ZSTR_LEN(key) > 0 && Z_TYPE_P(val) == IS_OBJECT) {
+					if (ZSTR_VAL(key)[0] == '\0' && ZSTR_LEN(key) > 0 && Z_IS_OBJECT_P(val)) {
 						/* Skip protected and private members. */
 						continue;
 					}
@@ -462,7 +462,7 @@ static int php_json_encode_serializable_object(smart_str *buf, zval *val, int op
 
 	ZVAL_STRING(&fname, "jsonSerialize");
 
-	if (FAILURE == call_user_function_ex(EG(function_table), val, &fname, &retval, 0, NULL, 1, NULL) || Z_TYPE(retval) == IS_UNDEF) {
+	if (FAILURE == call_user_function_ex(EG(function_table), val, &fname, &retval, 0, NULL, 1, NULL) || Z_IS_UNDEF(retval)) {
 		if (!EG(exception)) {
 			zend_throw_exception_ex(NULL, 0, "Failed calling %s::jsonSerialize()", ZSTR_VAL(ce->name));
 		}
@@ -487,7 +487,7 @@ static int php_json_encode_serializable_object(smart_str *buf, zval *val, int op
 		return FAILURE;
 	}
 
-	if ((Z_TYPE(retval) == IS_OBJECT) &&
+	if ((Z_IS_OBJECT(retval)) &&
 		(Z_OBJ(retval) == Z_OBJ_P(val))) {
 		/* Handle the case where jsonSerialize does: return $this; by going straight to encode array */
 		PHP_JSON_HASH_UNPROTECT_RECURSION(myht);

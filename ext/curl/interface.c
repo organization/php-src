@@ -1636,7 +1636,7 @@ static size_t curl_read(char *data, size_t size, size_t nmemb, void *ctx)
 				length = CURL_READFUNC_ABORT;
 			} else if (!Z_ISUNDEF(retval)) {
 				_php_curl_verify_handlers(ch, 1);
-				if (Z_TYPE(retval) == IS_STRING) {
+				if (Z_IS_STRING(retval)) {
 					length = MIN((int) (size * nmemb), Z_STRLEN(retval));
 					memcpy(data, Z_STRVAL(retval), length);
 				}
@@ -1755,7 +1755,7 @@ static size_t curl_passwd(void *ctx, char *prompt, char *buf, int buflen)
 	error = call_user_function(EG(function_table), NULL, func, &retval, 2, argv);
 	if (error == FAILURE) {
 		php_error_docref(NULL, E_WARNING, "Could not call the CURLOPT_PASSWDFUNCTION");
-	} else if (Z_TYPE(retval) == IS_STRING) {
+	} else if (Z_IS_STRING(retval)) {
 		if (Z_STRLEN(retval) > buflen) {
 			php_error_docref(NULL, E_WARNING, "Returned password is too long for libcurl to handle");
 		} else {
@@ -2453,7 +2453,7 @@ static int _php_curl_setopt(php_curl *ch, zend_long option, zval *zvalue) /* {{{
 			FILE *fp = NULL;
 			php_stream *what = NULL;
 
-			if (Z_TYPE_P(zvalue) != IS_NULL) {
+			if (!Z_IS_NULL_P(zvalue)) {
 				what = (php_stream *)zend_fetch_resource2_ex(zvalue, "File-Handle", php_file_le_stream(), php_file_le_pstream());
 				if (!what) {
 					return FAILURE;
@@ -2663,7 +2663,7 @@ static int _php_curl_setopt(php_curl *ch, zend_long option, zval *zvalue) /* {{{
 			break;
 
 		case CURLOPT_POSTFIELDS:
-			if (Z_TYPE_P(zvalue) == IS_ARRAY || Z_TYPE_P(zvalue) == IS_OBJECT) {
+			if (Z_IS_ARRAY_P(zvalue) || Z_IS_OBJECT_P(zvalue)) {
 				zval *current;
 				HashTable *postfields;
 				zend_string *string_key;
@@ -2688,14 +2688,14 @@ static int _php_curl_setopt(php_curl *ch, zend_long option, zval *zvalue) /* {{{
 					}
 
 					ZVAL_DEREF(current);
-					if (Z_TYPE_P(current) == IS_OBJECT &&
+					if (Z_IS_OBJECT_P(current) &&
 							instanceof_function(Z_OBJCE_P(current), curl_CURLFile_class)) {
 						/* new-style file upload */
 						zval *prop, rv;
 						char *type = NULL, *filename = NULL;
 
 						prop = zend_read_property(curl_CURLFile_class, current, "name", sizeof("name")-1, 0, &rv);
-						if (Z_TYPE_P(prop) != IS_STRING) {
+						if (!Z_IS_STRING_P(prop)) {
 							php_error_docref(NULL, E_WARNING, "Invalid filename for key %s", ZSTR_VAL(string_key));
 						} else {
 							postval = Z_STR_P(prop);
@@ -2705,11 +2705,11 @@ static int _php_curl_setopt(php_curl *ch, zend_long option, zval *zvalue) /* {{{
 							}
 
 							prop = zend_read_property(curl_CURLFile_class, current, "mime", sizeof("mime")-1, 0, &rv);
-							if (Z_TYPE_P(prop) == IS_STRING && Z_STRLEN_P(prop) > 0) {
+							if (Z_IS_STRING_P(prop) && Z_STRLEN_P(prop) > 0) {
 								type = Z_STRVAL_P(prop);
 							}
 							prop = zend_read_property(curl_CURLFile_class, current, "postname", sizeof("postname")-1, 0, &rv);
-							if (Z_TYPE_P(prop) == IS_STRING && Z_STRLEN_P(prop) > 0) {
+							if (Z_IS_STRING_P(prop) && Z_STRLEN_P(prop) > 0) {
 								filename = Z_STRVAL_P(prop);
 							}
 							form_error = curl_formadd(&first, &last,

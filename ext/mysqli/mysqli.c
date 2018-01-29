@@ -306,7 +306,7 @@ zval *mysqli_read_property(zval *object, zval *member, int type, void **cache_sl
 
 	obj = Z_MYSQLI_P(object);
 
-	if (Z_TYPE_P(member) != IS_STRING) {
+	if (!Z_IS_STRING_P(member)) {
 		ZVAL_STR(&tmp_member, zval_get_string_func(member));
 		member = &tmp_member;
 	}
@@ -340,7 +340,7 @@ void mysqli_write_property(zval *object, zval *member, zval *value, void **cache
 	mysqli_object *obj;
 	mysqli_prop_handler *hnd = NULL;
 
-	if (Z_TYPE_P(member) != IS_STRING) {
+	if (!Z_IS_STRING_P(member)) {
 		ZVAL_STR(&tmp_member, zval_get_string_func(member));
 		member = &tmp_member;
 	}
@@ -392,7 +392,7 @@ static int mysqli_object_has_property(zval *object, zval *member, int has_set_ex
 				zval *value = mysqli_read_property(object, member, BP_VAR_IS, cache_slot, &rv);
 				if (value != &EG(uninitialized_zval)) {
 					convert_to_boolean(value);
-					ret = Z_TYPE_P(value) == IS_TRUE ? 1 : 0;
+					ret = Z_IS_TRUE_P(value) ? 1 : 0;
 				}
 				break;
 			}
@@ -400,7 +400,7 @@ static int mysqli_object_has_property(zval *object, zval *member, int has_set_ex
 				zval rv;
 				zval *value = mysqli_read_property(object, member, BP_VAR_IS, cache_slot, &rv);
 				if (value != &EG(uninitialized_zval)) {
-					ret = Z_TYPE_P(value) != IS_NULL? 1 : 0;
+					ret = !Z_IS_NULL_P(value)? 1 : 0;
 					zval_ptr_dtor(value);
 				}
 				break;
@@ -483,7 +483,7 @@ PHP_MYSQLI_EXPORT(zend_object *) mysqli_objects_new(zend_class_entry *class_type
 #include "ext/mysqlnd/mysqlnd_reverse_api.h"
 static MYSQLND *mysqli_convert_zv_to_mysqlnd(zval * zv)
 {
-	if (Z_TYPE_P(zv) == IS_OBJECT && instanceof_function(Z_OBJCE_P(zv), mysqli_link_class_entry)) {
+	if (Z_IS_OBJECT_P(zv) && instanceof_function(Z_OBJCE_P(zv), mysqli_link_class_entry)) {
 		MY_MYSQL *mysql;
 		MYSQLI_RESOURCE  *my_res;
 		mysqli_object *intern = Z_MYSQLI_P(zv);
@@ -1266,7 +1266,7 @@ void php_mysqli_fetch_into_hash(INTERNAL_FUNCTION_PARAMETERS, int override_flags
 
 	php_mysqli_fetch_into_hash_aux(return_value, result, fetchtype);
 
-	if (into_object && Z_TYPE_P(return_value) == IS_ARRAY) {
+	if (into_object && Z_IS_ARRAY_P(return_value)) {
 		zval dataset, retval;
 		zend_fcall_info fci;
 		zend_fcall_info_cache fcc;
@@ -1290,7 +1290,7 @@ void php_mysqli_fetch_into_hash(INTERNAL_FUNCTION_PARAMETERS, int override_flags
 			fci.param_count = 0;
 			fci.no_separation = 1;
 
-			if (ctor_params && Z_TYPE_P(ctor_params) != IS_NULL) {
+			if (ctor_params && !Z_IS_NULL_P(ctor_params)) {
 				if (zend_fcall_info_args(&fci, ctor_params) == FAILURE) {
 					/* Two problems why we throw exceptions here: PHP is typeless
 					 * and hence passing one argument that's not an array could be

@@ -147,7 +147,7 @@ static PHP_MINFO_FUNCTION(ctype)
 	ZEND_PARSE_PARAMETERS_START(1, 1); \
 		Z_PARAM_ZVAL(c) \
 	ZEND_PARSE_PARAMETERS_END(); \
-	if (Z_TYPE_P(c) == IS_LONG) { \
+	if (Z_IS_LONG_P(c)) { \
 		if (Z_LVAL_P(c) <= 255 && Z_LVAL_P(c) >= 0) { \
 			RETURN_BOOL(iswhat((int)Z_LVAL_P(c))); \
 		} else if (Z_LVAL_P(c) >= -128 && Z_LVAL_P(c) < 0) { \
@@ -157,19 +157,19 @@ static PHP_MINFO_FUNCTION(ctype)
 	} else { \
 		ZVAL_COPY_VALUE(&tmp, c); \
 	} \
-	if (Z_TYPE(tmp) == IS_STRING) { \
+	if (Z_IS_STRING(tmp)) { \
 		char *p = Z_STRVAL(tmp), *e = Z_STRVAL(tmp) + Z_STRLEN(tmp); \
 		if (e == p) {	\
-			if (Z_TYPE_P(c) == IS_LONG) zval_dtor(&tmp); \
+			if (Z_IS_LONG_P(c)) zval_dtor(&tmp); \
 			RETURN_FALSE;	\
 		}	\
 		while (p < e) { \
 			if(!iswhat((int)*(unsigned char *)(p++))) { \
-				if (Z_TYPE_P(c) == IS_LONG) zval_dtor(&tmp); \
+				if (Z_IS_LONG_P(c)) zval_dtor(&tmp); \
 				RETURN_FALSE; \
 			} \
 		} \
-		if (Z_TYPE_P(c) == IS_LONG) zval_dtor(&tmp); \
+		if (Z_IS_LONG_P(c)) zval_dtor(&tmp); \
 		RETURN_TRUE; \
 	} else { \
 		RETURN_FALSE; \

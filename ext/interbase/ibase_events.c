@@ -56,7 +56,7 @@ void _php_ibase_free_event(ibase_event *event) /* {{{ */
 		*node = event->event_next;
 	}
 
-	if (Z_TYPE(event->callback) != IS_UNDEF) {
+	if (!Z_IS_UNDEF(event->callback)) {
 		zval_dtor(&event->callback);
 		ZVAL_UNDEF(&event->callback);
 
@@ -144,7 +144,7 @@ PHP_FUNCTION(ibase_wait_event)
 		return;
 	}
 
-	if (Z_TYPE(args[0]) == IS_RESOURCE) {
+	if (Z_IS_RESOURCE(args[0])) {
 		if ((ib_link = (ibase_db_link *)zend_fetch_resource2_ex(&args[0], "InterBase link", le_link, le_plink)) == NULL) {
 			RETURN_FALSE;
 		}
@@ -238,7 +238,7 @@ static isc_callback  _php_ibase_callback(ibase_event *event, /* {{{ */
 				break;
 			}
 
-			if (Z_TYPE(return_value) == IS_FALSE) {
+			if (Z_IS_FALSE(return_value)) {
 				event->state = DEAD;
 				break;
 			}
@@ -283,7 +283,7 @@ PHP_FUNCTION(ibase_set_event_handler)
 	}
 
 	/* get a working link */
-	if (Z_TYPE(args[0]) != IS_STRING) {
+	if (!Z_IS_STRING(args[0])) {
 		/* resource, callback, event_1 [, ... event_15]
 		 * No more than 15 events
 		 */

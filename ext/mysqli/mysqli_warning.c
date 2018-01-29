@@ -134,7 +134,7 @@ MYSQLI_WARNING * php_get_warnings(MYSQLND_CONN_DATA * mysql)
 		int errno;
 
 		mysqlnd_fetch_into(result, MYSQLND_FETCH_NUM, &row, MYSQLND_MYSQLI);
-		if (Z_TYPE(row) != IS_ARRAY) {
+		if (!Z_IS_ARRAY(row)) {
 			zval_ptr_dtor(&row);
 			break;
 		}

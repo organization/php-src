@@ -122,7 +122,7 @@ static int spl_object_storage_get_hash(zend_hash_key *key, spl_SplObjectStorage 
 		zval rv;
 		zend_call_method_with_1_params(this, intern->std.ce, &intern->fptr_get_hash, "getHash", &rv, obj);
 		if (!Z_ISUNDEF(rv)) {
-			if (Z_TYPE(rv) == IS_STRING) {
+			if (Z_IS_STRING(rv)) {
 				key->key = Z_STR(rv);
 				return SUCCESS;
 			} else {
@@ -781,7 +781,7 @@ SPL_METHOD(SplObjectStorage, unserialize)
 	++p;
 
 	pcount = var_tmp_var(&var_hash);
-	if (!php_var_unserialize(pcount, &p, s + buf_len, &var_hash) || Z_TYPE_P(pcount) != IS_LONG) {
+	if (!php_var_unserialize(pcount, &p, s + buf_len, &var_hash) || !Z_IS_LONG_P(pcount)) {
 		goto outexcept;
 	}
 
@@ -813,7 +813,7 @@ SPL_METHOD(SplObjectStorage, unserialize)
 				goto outexcept;
 			}
 		}
-		if (Z_TYPE(entry) != IS_OBJECT) {
+		if (!Z_IS_OBJECT(entry)) {
 			zval_ptr_dtor(&entry);
 			zval_ptr_dtor(&inf);
 			goto outexcept;
@@ -855,7 +855,7 @@ SPL_METHOD(SplObjectStorage, unserialize)
 	++p;
 
 	pmembers = var_tmp_var(&var_hash);
-	if (!php_var_unserialize(pmembers, &p, s + buf_len, &var_hash) || Z_TYPE_P(pmembers) != IS_ARRAY) {
+	if (!php_var_unserialize(pmembers, &p, s + buf_len, &var_hash) || !Z_IS_ARRAY_P(pmembers)) {
 		goto outexcept;
 	}
 
@@ -997,7 +997,7 @@ SPL_METHOD(MultipleIterator, attachIterator)
 	if (info != NULL) {
 		spl_SplObjectStorageElement *element;
 
-		if (Z_TYPE_P(info) != IS_LONG && Z_TYPE_P(info) != IS_STRING) {
+		if (!Z_IS_LONG_P(info) && !Z_IS_STRING_P(info)) {
 			zend_throw_exception(spl_ce_InvalidArgumentException, "Info must be NULL, integer or string", 0);
 			return;
 		}
@@ -1089,7 +1089,7 @@ SPL_METHOD(MultipleIterator, valid)
 		zend_call_method_with_0_params(it, Z_OBJCE_P(it), &Z_OBJCE_P(it)->iterator_funcs.zf_valid, "valid", &retval);
 
 		if (!Z_ISUNDEF(retval)) {
-			valid = (Z_TYPE(retval) == IS_TRUE);
+			valid = (Z_IS_TRUE(retval));
 			zval_ptr_dtor(&retval);
 		} else {
 			valid = 0;
@@ -1125,7 +1125,7 @@ static void spl_multiple_iterator_get_all(spl_SplObjectStorage *intern, int get_
 		zend_call_method_with_0_params(it, Z_OBJCE_P(it), &Z_OBJCE_P(it)->iterator_funcs.zf_valid, "valid", &retval);
 
 		if (!Z_ISUNDEF(retval)) {
-			valid = Z_TYPE(retval) == IS_TRUE;
+			valid = Z_IS_TRUE(retval);
 			zval_ptr_dtor(&retval);
 		} else {
 			valid = 0;

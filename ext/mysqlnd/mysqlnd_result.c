@@ -69,7 +69,7 @@ MYSQLND_METHOD(mysqlnd_result_buffered_zval, initialize_result_set_rest)(MYSQLND
 				  String of zero size, definitely can't be the next max_length.
 				  Thus for NULL and zero-length we are quite efficient.
 				*/
-				if (Z_TYPE(data_cursor[i]) == IS_STRING) {
+				if (Z_IS_STRING(data_cursor[i])) {
 					const size_t len = Z_STRLEN(data_cursor[i]);
 					if (meta->fields[i].max_length < len) {
 						meta->fields[i].max_length = len;
@@ -126,7 +126,7 @@ MYSQLND_METHOD(mysqlnd_result_buffered_c, initialize_result_set_rest)(MYSQLND_RE
 				  String of zero size, definitely can't be the next max_length.
 				  Thus for NULL and zero-length we are quite efficient.
 				*/
-				if (Z_TYPE(current_row[i]) == IS_STRING) {
+				if (Z_IS_STRING(current_row[i])) {
 					const size_t len = Z_STRLEN(current_row[i]);
 					if (meta->fields[i].max_length < len) {
 						meta->fields[i].max_length = len;
@@ -704,10 +704,10 @@ MYSQLND_METHOD(mysqlnd_result_unbuffered, fetch_row_c)(MYSQLND_RES * result, voi
 
 					for (i = 0; i < field_count; i++, field++) {
 						zval * data = &result->unbuf->last_row_data[i];
-						const size_t len = (Z_TYPE_P(data) == IS_STRING)? Z_STRLEN_P(data) : 0;
+						const size_t len = (Z_IS_STRING_P(data))? Z_STRLEN_P(data) : 0;
 
 /* BEGIN difference between normal normal fetch and _c */
-						if (Z_TYPE_P(data) != IS_NULL) {
+						if (!Z_IS_NULL_P(data)) {
 							convert_to_string(data);
 							(*row)[i] = Z_STRVAL_P(data);
 						} else {
@@ -824,7 +824,7 @@ MYSQLND_METHOD(mysqlnd_result_unbuffered, fetch_row)(MYSQLND_RES * result, void 
 
 				for (i = 0; i < field_count; i++, field++) {
 					zval * data = &result->unbuf->last_row_data[i];
-					const size_t len = (Z_TYPE_P(data) == IS_STRING)? Z_STRLEN_P(data) : 0;
+					const size_t len = (Z_IS_STRING_P(data))? Z_STRLEN_P(data) : 0;
 
 					if (flags & MYSQLND_FETCH_NUM) {
 						Z_TRY_ADDREF_P(data);
@@ -976,7 +976,7 @@ MYSQLND_METHOD(mysqlnd_result_buffered, fetch_row_c)(MYSQLND_RES * result, void 
 					  String of zero size, definitely can't be the next max_length.
 					  Thus for NULL and zero-length we are quite efficient.
 					*/
-					if (Z_TYPE(current_row[i]) == IS_STRING) {
+					if (Z_IS_STRING(current_row[i])) {
 						const size_t len = Z_STRLEN(current_row[i]);
 						if (meta->fields[i].max_length < len) {
 							meta->fields[i].max_length = len;
@@ -992,9 +992,9 @@ MYSQLND_METHOD(mysqlnd_result_buffered, fetch_row_c)(MYSQLND_RES * result, void 
 				for (i = 0; i < field_count; ++i) {
 					zval * data = &current_row[i];
 
-					set->lengths[i] = (Z_TYPE_P(data) == IS_STRING)? Z_STRLEN_P(data) : 0;
+					set->lengths[i] = (Z_IS_STRING_P(data))? Z_STRLEN_P(data) : 0;
 
-					if (Z_TYPE_P(data) != IS_NULL) {
+					if (!Z_IS_NULL_P(data)) {
 						convert_to_string(data);
 						(*row)[i] = Z_STRVAL_P(data);
 					} else {
@@ -1066,7 +1066,7 @@ MYSQLND_METHOD(mysqlnd_result_buffered_zval, fetch_row)(MYSQLND_RES * result, vo
 				  String of zero size, definitely can't be the next max_length.
 				  Thus for NULL and zero-length we are quite efficient.
 				*/
-				if (Z_TYPE(current_row[i]) == IS_STRING) {
+				if (Z_IS_STRING(current_row[i])) {
 					const size_t len = Z_STRLEN(current_row[i]);
 					if (meta->fields[i].max_length < len) {
 						meta->fields[i].max_length = len;
@@ -1078,7 +1078,7 @@ MYSQLND_METHOD(mysqlnd_result_buffered_zval, fetch_row)(MYSQLND_RES * result, vo
 		for (i = 0; i < field_count; ++i) {
 			zval * data = &current_row[i];
 
-			set->lengths[i] = (Z_TYPE_P(data) == IS_STRING)? Z_STRLEN_P(data) : 0;
+			set->lengths[i] = (Z_IS_STRING_P(data))? Z_STRLEN_P(data) : 0;
 
 			if (flags & MYSQLND_FETCH_NUM) {
 				Z_TRY_ADDREF_P(data);
@@ -1162,7 +1162,7 @@ MYSQLND_METHOD(mysqlnd_result_buffered_c, fetch_row)(MYSQLND_RES * result, void 
 				  String of zero size, definitely can't be the next max_length.
 				  Thus for NULL and zero-length we are quite efficient.
 				*/
-				if (Z_TYPE(current_row[i]) == IS_STRING) {
+				if (Z_IS_STRING(current_row[i])) {
 					const size_t len = Z_STRLEN(current_row[i]);
 					if (meta->fields[i].max_length < len) {
 						meta->fields[i].max_length = len;
@@ -1174,7 +1174,7 @@ MYSQLND_METHOD(mysqlnd_result_buffered_c, fetch_row)(MYSQLND_RES * result, void 
 		for (i = 0; i < field_count; ++i) {
 			zval * data = &current_row[i];
 
-			set->lengths[i] = (Z_TYPE_P(data) == IS_STRING)? Z_STRLEN_P(data) : 0;
+			set->lengths[i] = (Z_IS_STRING_P(data))? Z_STRLEN_P(data) : 0;
 
 			if (flags & MYSQLND_FETCH_NUM) {
 				Z_TRY_ADDREF_P(data);
@@ -1784,7 +1784,7 @@ MYSQLND_METHOD(mysqlnd_res, fetch_all)(MYSQLND_RES * result, const unsigned int 
 
 	do {
 		mysqlnd_fetch_into(result, flags, &row, MYSQLND_MYSQLI);
-		if (Z_TYPE(row) != IS_ARRAY) {
+		if (!Z_IS_ARRAY(row)) {
 			zval_ptr_dtor_nogc(&row);
 			break;
 		}
@@ -1811,7 +1811,7 @@ MYSQLND_METHOD(mysqlnd_res, fetch_field_data)(MYSQLND_RES * result, unsigned int
 	  extend and rehash the hash constantly.
 	*/
 	mysqlnd_fetch_into(result, MYSQLND_FETCH_NUM, &row, MYSQLND_MYSQL);
-	if (Z_TYPE(row) != IS_ARRAY) {
+	if (!Z_IS_ARRAY(row)) {
 		zval_dtor(&row);
 		RETVAL_NULL();
 		DBG_VOID_RETURN;

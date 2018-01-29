@@ -483,7 +483,7 @@ fprintf(stderr, "stream_free: %s:%p[%s] preserve_handle=%d release_cast=%d remov
 			stream->wrapper = NULL;
 		}
 
-		if (Z_TYPE(stream->wrapperdata) != IS_UNDEF) {
+		if (!Z_IS_UNDEF(stream->wrapperdata)) {
 			zval_ptr_dtor(&stream->wrapperdata);
 			ZVAL_UNDEF(&stream->wrapperdata);
 		}
@@ -2147,7 +2147,7 @@ PHPAPI void php_stream_notification_notify(php_stream_context *context, int noti
 
 PHPAPI void php_stream_context_free(php_stream_context *context)
 {
-	if (Z_TYPE(context->options) != IS_UNDEF) {
+	if (!Z_IS_UNDEF(context->options)) {
 		zval_ptr_dtor(&context->options);
 		ZVAL_UNDEF(&context->options);
 	}

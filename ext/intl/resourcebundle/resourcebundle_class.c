@@ -187,11 +187,11 @@ static void resourcebundle_array_fetch(zval *object, zval *offset, zval *return_
 	intl_error_reset( NULL );
 	RESOURCEBUNDLE_METHOD_FETCH_OBJECT;
 
-	if(Z_TYPE_P(offset) == IS_LONG) {
+	if(Z_IS_LONG_P(offset)) {
 		is_numeric = 1;
 		meindex = (int32_t)Z_LVAL_P(offset);
 		rb->child = ures_getByIndex( rb->me, meindex, rb->child, &INTL_DATA_ERROR_CODE(rb) );
-	} else if(Z_TYPE_P(offset) == IS_STRING) {
+	} else if(Z_IS_STRING_P(offset)) {
 		mekey = Z_STRVAL_P(offset);
 		rb->child = ures_getByKey(rb->me, mekey, rb->child, &INTL_DATA_ERROR_CODE(rb) );
 	} else {

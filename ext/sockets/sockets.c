@@ -850,7 +850,7 @@ static int php_sock_array_to_fd_set(zval *sock_array, fd_set *fds, PHP_SOCKET *m
 	php_socket	*php_sock;
 	int			num = 0;
 
-	if (Z_TYPE_P(sock_array) != IS_ARRAY) return 0;
+	if (!Z_IS_ARRAY_P(sock_array)) return 0;
 
 	ZEND_HASH_FOREACH_VAL(Z_ARRVAL_P(sock_array), element) {
 		php_sock = (php_socket*) zend_fetch_resource_ex(element, le_socket_name, le_socket);
@@ -877,7 +877,7 @@ static int php_sock_array_from_fd_set(zval *sock_array, fd_set *fds) /* {{{ */
 	zend_ulong       num_key;
 	zend_string *key;
 
-	if (Z_TYPE_P(sock_array) != IS_ARRAY) return 0;
+	if (!Z_IS_ARRAY_P(sock_array)) return 0;
 
 	array_init(&new_hash);
 	ZEND_HASH_FOREACH_KEY_VAL(Z_ARRVAL_P(sock_array), num_key, key, element) {
@@ -2151,7 +2151,7 @@ PHP_FUNCTION(socket_set_option)
 		}
 #ifdef SO_BINDTODEVICE
 		case SO_BINDTODEVICE: {
-			if (Z_TYPE_P(arg4) == IS_STRING) {
+			if (Z_IS_STRING_P(arg4)) {
 				opt_ptr = Z_STRVAL_P(arg4);
 				optlen = Z_STRLEN_P(arg4);
 			} else {

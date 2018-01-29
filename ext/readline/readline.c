@@ -193,7 +193,7 @@ PHP_RSHUTDOWN_FUNCTION(readline)
 	zval_ptr_dtor(&_readline_completion);
 	ZVAL_UNDEF(&_readline_completion);
 #if HAVE_RL_CALLBACK_READ_CHAR
-	if (Z_TYPE(_prepped_callback) != IS_UNDEF) {
+	if (!Z_IS_UNDEF(_prepped_callback)) {
 		rl_callback_handler_remove();
 		zval_ptr_dtor(&_prepped_callback);
 		ZVAL_UNDEF(&_prepped_callback);
@@ -498,7 +498,7 @@ static char **_readline_completion_cb(const char *text, int start, int end)
 	_readline_long_zval(&params[2], end);
 
 	if (call_user_function(CG(function_table), NULL, &_readline_completion, &_readline_array, 3, params) == SUCCESS) {
-		if (Z_TYPE(_readline_array) == IS_ARRAY) {
+		if (Z_IS_ARRAY(_readline_array)) {
 			if (zend_hash_num_elements(Z_ARRVAL(_readline_array))) {
 				matches = rl_completion_matches(text,_readline_command_generator);
 			} else {
@@ -583,7 +583,7 @@ PHP_FUNCTION(readline_callback_handler_install)
 		RETURN_FALSE;
 	}
 
-	if (Z_TYPE(_prepped_callback) != IS_UNDEF) {
+	if (!Z_IS_UNDEF(_prepped_callback)) {
 		rl_callback_handler_remove();
 		zval_ptr_dtor(&_prepped_callback);
 	}
@@ -600,7 +600,7 @@ PHP_FUNCTION(readline_callback_handler_install)
    Informs the readline callback interface that a character is ready for input */
 PHP_FUNCTION(readline_callback_read_char)
 {
-	if (Z_TYPE(_prepped_callback) != IS_UNDEF) {
+	if (!Z_IS_UNDEF(_prepped_callback)) {
 		rl_callback_read_char();
 	}
 }
@@ -610,7 +610,7 @@ PHP_FUNCTION(readline_callback_read_char)
    Removes a previously installed callback handler and restores terminal settings */
 PHP_FUNCTION(readline_callback_handler_remove)
 {
-	if (Z_TYPE(_prepped_callback) != IS_UNDEF) {
+	if (!Z_IS_UNDEF(_prepped_callback)) {
 		rl_callback_handler_remove();
 		zval_ptr_dtor(&_prepped_callback);
 		ZVAL_UNDEF(&_prepped_callback);

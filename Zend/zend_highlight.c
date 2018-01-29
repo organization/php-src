@@ -127,7 +127,7 @@ ZEND_API void zend_highlight(zend_syntax_highlighter_ini *syntax_highlighter_ini
 				continue;
 				break;
 			default:
-				if (Z_TYPE(token) == IS_UNDEF) {
+				if (Z_IS_UNDEF(token)) {
 					next_color = syntax_highlighter_ini->highlight_keyword;
 				} else {
 					next_color = syntax_highlighter_ini->highlight_default;
@@ -147,7 +147,7 @@ ZEND_API void zend_highlight(zend_syntax_highlighter_ini *syntax_highlighter_ini
 
 		zend_html_puts((char*)LANG_SCNG(yy_text), LANG_SCNG(yy_leng));
 
-		if (Z_TYPE(token) == IS_STRING) {
+		if (Z_IS_STRING(token)) {
 			switch (token_type) {
 				case T_OPEN_TAG:
 				case T_OPEN_TAG_WITH_ECHO:
@@ -210,7 +210,7 @@ ZEND_API void zend_strip(void)
 				break;
 		}
 
-		if (Z_TYPE(token) == IS_STRING) {
+		if (Z_IS_STRING(token)) {
 			switch (token_type) {
 				case T_OPEN_TAG:
 				case T_OPEN_TAG_WITH_ECHO:

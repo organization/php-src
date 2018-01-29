@@ -547,7 +547,7 @@ static int php_stream_temp_set_option(php_stream *stream, int option, int value,
 
 	switch(option) {
 		case PHP_STREAM_OPTION_META_DATA_API:
-			if (Z_TYPE(ts->meta) != IS_UNDEF) {
+			if (!Z_IS_UNDEF(ts->meta)) {
 				zend_hash_copy(Z_ARRVAL_P((zval*)ptrparam), Z_ARRVAL(ts->meta), zval_add_ref);
 			}
 			return PHP_STREAM_OPTION_RETURN_OK;

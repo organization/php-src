@@ -471,7 +471,7 @@ PHPDBG_API int phpdbg_parse_variable_with_arg(char *input, size_t len, HashTable
 			zend_ulong numkey;
 			zend_string *strkey;
 			ZEND_HASH_FOREACH_KEY_PTR(parent, numkey, strkey, zv) {
-				while (Z_TYPE_P(zv) == IS_INDIRECT) {
+				while (Z_IS_INDIRECT_P(zv)) {
 					zv = Z_INDIRECT_P(zv);
 				}
 
@@ -494,7 +494,7 @@ PHPDBG_API int phpdbg_parse_variable_with_arg(char *input, size_t len, HashTable
 					}
 
 					ret = callback(name, namelen, keyname, index_len, parent, zv, arg) == SUCCESS || ret == SUCCESS?SUCCESS:FAILURE;
-				} else retry_ref: if (Z_TYPE_P(zv) == IS_OBJECT) {
+				} else retry_ref: if (Z_IS_OBJECT_P(zv)) {
 					if (step_cb) {
 						char *name = estrndup(input, i);
 						char *keyname = estrndup(last_index, index_len);
@@ -503,7 +503,7 @@ PHPDBG_API int phpdbg_parse_variable_with_arg(char *input, size_t len, HashTable
 					}
 
 					phpdbg_parse_variable_with_arg(input, len, Z_OBJPROP_P(zv), i, callback, step_cb, silent, arg);
-				} else if (Z_TYPE_P(zv) == IS_ARRAY) {
+				} else if (Z_IS_ARRAY_P(zv)) {
 					if (step_cb) {
 						char *name = estrndup(input, i);
 						char *keyname = estrndup(last_index, index_len);
@@ -536,7 +536,7 @@ PHPDBG_API int phpdbg_parse_variable_with_arg(char *input, size_t len, HashTable
 				}
 				return FAILURE;
 			}
-			while (Z_TYPE_P(zv) == IS_INDIRECT) {
+			while (Z_IS_INDIRECT_P(zv)) {
 				zv = Z_INDIRECT_P(zv);
 			}
 
@@ -546,7 +546,7 @@ PHPDBG_API int phpdbg_parse_variable_with_arg(char *input, size_t len, HashTable
 				char *keyname = estrndup(last_index, index_len);
 
 				ret = callback(name, i, keyname, index_len, parent, zv, arg) == SUCCESS || ret == SUCCESS?SUCCESS:FAILURE;
-			} else retry_ref_end: if (Z_TYPE_P(zv) == IS_OBJECT) {
+			} else retry_ref_end: if (Z_IS_OBJECT_P(zv)) {
 				if (step_cb) {
 					char *name = estrndup(input, i);
 					char *keyname = estrndup(last_index, index_len);
@@ -555,7 +555,7 @@ PHPDBG_API int phpdbg_parse_variable_with_arg(char *input, size_t len, HashTable
 				}
 
 				parent = Z_OBJPROP_P(zv);
-			} else if (Z_TYPE_P(zv) == IS_ARRAY) {
+			} else if (Z_IS_ARRAY_P(zv)) {
 				if (step_cb) {
 					char *name = estrndup(input, i);
 					char *keyname = estrndup(last_index, index_len);
@@ -722,7 +722,7 @@ head_done:
 						efree(myht);
 					}
 				}
-				if (Z_TYPE_P(zv) == IS_ARRAY) {
+				if (Z_IS_ARRAY_P(zv)) {
 					phpdbg_xml("</array>");
 				} else {
 					phpdbg_xml("</object>");

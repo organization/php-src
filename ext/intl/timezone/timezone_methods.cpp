@@ -156,9 +156,9 @@ U_CFUNC PHP_FUNCTION(intltz_create_enumeration)
 		RETURN_FALSE;
 	}
 
-	if (arg == NULL || Z_TYPE_P(arg) == IS_NULL) {
+	if (arg == NULL || Z_IS_NULL_P(arg)) {
 		se = TimeZone::createEnumeration();
-	} else if (Z_TYPE_P(arg) == IS_LONG) {
+	} else if (Z_IS_LONG_P(arg)) {
 int_offset:
 		if (Z_LVAL_P(arg) < (zend_long)INT32_MIN ||
 				Z_LVAL_P(arg) > (zend_long)INT32_MAX) {
@@ -168,11 +168,11 @@ int_offset:
 		} else {
 			se = TimeZone::createEnumeration((int32_t) Z_LVAL_P(arg));
 		}
-	} else if (Z_TYPE_P(arg) == IS_DOUBLE) {
+	} else if (Z_IS_DOUBLE_P(arg)) {
 double_offset:
 		convert_to_long_ex(arg);
 		goto int_offset;
-	} else if (Z_TYPE_P(arg) == IS_OBJECT || Z_TYPE_P(arg) == IS_STRING) {
+	} else if (Z_IS_OBJECT_P(arg) || Z_IS_STRING_P(arg)) {
 		zend_long lval;
 		double dval;
 		convert_to_string_ex(arg);

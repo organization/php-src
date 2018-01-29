@@ -80,7 +80,7 @@ static int php_mysqli_result_iterator_valid(zend_object_iterator *iter)
 {
 	php_mysqli_result_iterator *iterator = (php_mysqli_result_iterator*) iter;
 
-	return Z_TYPE(iterator->current_row) == IS_ARRAY ? SUCCESS : FAILURE;
+	return Z_IS_ARRAY(iterator->current_row) ? SUCCESS : FAILURE;
 }
 /* }}} */
 
@@ -105,7 +105,7 @@ static void php_mysqli_result_iterator_move_forward(zend_object_iterator *iter)
 
 	zval_ptr_dtor(&iterator->current_row);
 	php_mysqli_fetch_into_hash_aux(&iterator->current_row, result, MYSQLI_ASSOC);
-	if (Z_TYPE(iterator->current_row) == IS_ARRAY) {
+	if (Z_IS_ARRAY(iterator->current_row)) {
 		iterator->row_num++;
 	}
 }

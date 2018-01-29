@@ -251,7 +251,7 @@ static zval *sxe_prop_dim_read(zval *object, zval *member, zend_bool elements, z
 		goto long_dim;
 	} else {
 		ZVAL_DEREF(member);
-		if (Z_TYPE_P(member) == IS_LONG) {
+		if (Z_IS_LONG_P(member)) {
 			if (sxe->iter.type != SXE_ITER_ATTRLIST) {
 long_dim:
 				attribs = 0;
@@ -259,7 +259,7 @@ long_dim:
 			}
 			name = NULL;
 		} else {
-			if (Z_TYPE_P(member) != IS_STRING) {
+			if (!Z_IS_STRING_P(member)) {
 				ZVAL_STR(&tmp_zv, zval_get_string_func(member));
 				member = &tmp_zv;
 			}
@@ -291,8 +291,8 @@ long_dim:
 
 	if (node) {
 		if (attribs) {
-			if (Z_TYPE_P(member) != IS_LONG || sxe->iter.type == SXE_ITER_ATTRLIST) {
-				if (Z_TYPE_P(member) == IS_LONG) {
+			if (!Z_IS_LONG_P(member) || sxe->iter.type == SXE_ITER_ATTRLIST) {
+				if (Z_IS_LONG_P(member)) {
 					while (attr && nodendx <= Z_LVAL_P(member)) {
 						if ((!test || !xmlStrcmp(attr->name, sxe->iter.name)) && match_ns(sxe, (xmlNodePtr) attr, sxe->iter.nsprefix, sxe->iter.isprefix)) {
 							if (nodendx == Z_LVAL_P(member)) {
@@ -319,7 +319,7 @@ long_dim:
 			if (!sxe->node) {
 				php_libxml_increment_node_ptr((php_libxml_node_object *)sxe, node, NULL);
 			}
-			if (!member || Z_TYPE_P(member) == IS_LONG) {
+			if (!member || Z_IS_LONG_P(member)) {
 				zend_long cnt = 0;
 				xmlNodePtr mynode = node;
 
@@ -455,14 +455,14 @@ static int sxe_prop_dim_write(zval *object, zval *member, zval *value, zend_bool
 		goto long_dim;
 	} else {
 		ZVAL_DEREF(member);
-		if (Z_TYPE_P(member) == IS_LONG) {
+		if (Z_IS_LONG_P(member)) {
 			if (sxe->iter.type != SXE_ITER_ATTRLIST) {
 long_dim:
 				attribs = 0;
 				elements = 1;
 			}
 		} else {
-			if (Z_TYPE_P(member) != IS_STRING) {
+			if (!Z_IS_STRING_P(member)) {
 				trim_str = zval_get_string_func(member);
 				ZVAL_STR(&tmp_zv, php_trim(trim_str, NULL, 0, 3));
 				zend_string_release(trim_str);
@@ -516,7 +516,7 @@ long_dim:
 			case IS_TRUE:
 			case IS_DOUBLE:
 			case IS_NULL:
-				if (Z_TYPE_P(value) != IS_STRING) {
+				if (!Z_IS_STRING_P(value)) {
 					ZVAL_STR(&zval_copy, zval_get_string_func(value));
 					value = &zval_copy;
 					new_value = 1;
@@ -542,7 +542,7 @@ long_dim:
 
 	if (node) {
 		if (attribs) {
-			if (Z_TYPE_P(member) == IS_LONG) {
+			if (Z_IS_LONG_P(member)) {
 				while (attr && nodendx <= Z_LVAL_P(member)) {
 					if ((!test || !xmlStrcmp(attr->name, sxe->iter.name)) && match_ns(sxe, (xmlNodePtr) attr, sxe->iter.nsprefix, sxe->iter.isprefix)) {
 						if (nodendx == Z_LVAL_P(member)) {
@@ -568,7 +568,7 @@ long_dim:
 		}
 
 		if (elements) {
-			if (!member || Z_TYPE_P(member) == IS_LONG) {
+			if (!member || Z_IS_LONG_P(member)) {
 				if (node->type == XML_ATTRIBUTE_NODE) {
 					zend_throw_error(NULL, "Cannot create duplicate attribute");
 					if (new_value) {
@@ -622,12 +622,12 @@ next_iter:
 			retval = FAILURE;
 		} else if (elements) {
 			if (!node) {
-				if (!member || Z_TYPE_P(member) == IS_LONG) {
+				if (!member || Z_IS_LONG_P(member)) {
 					newnode = xmlNewTextChild(mynode->parent, mynode->ns, mynode->name, value ? (xmlChar *)Z_STRVAL_P(value) : NULL);
 				} else {
 					newnode = xmlNewTextChild(mynode, mynode->ns, (xmlChar *)Z_STRVAL_P(member), value ? (xmlChar *)Z_STRVAL_P(value) : NULL);
 				}
-			} else if (!member || Z_TYPE_P(member) == IS_LONG) {
+			} else if (!member || Z_IS_LONG_P(member)) {
 				if (member && cnt < Z_LVAL_P(member)) {
 					php_error_docref(NULL, E_WARNING, "Cannot add element %s number " ZEND_LONG_FMT " when only " ZEND_LONG_FMT " such elements exist", mynode->name, Z_LVAL_P(member), cnt);
 					retval = FAILURE;
@@ -635,7 +635,7 @@ next_iter:
 				newnode = xmlNewTextChild(mynode->parent, mynode->ns, mynode->name, value ? (xmlChar *)Z_STRVAL_P(value) : NULL);
 			}
 		} else if (attribs) {
-			if (Z_TYPE_P(member) == IS_LONG) {
+			if (Z_IS_LONG_P(member)) {
 				php_error_docref(NULL, E_WARNING, "Cannot change attribute number " ZEND_LONG_FMT " when only %d attributes exist", Z_LVAL_P(member), nodendx);
 				retval = FAILURE;
 			} else {
@@ -719,7 +719,7 @@ static int sxe_prop_dim_exists(zval *object, zval *member, int check_empty, zend
 	int             test = 0;
 	zval            tmp_zv;
 
-	if (Z_TYPE_P(member) != IS_STRING && Z_TYPE_P(member) != IS_LONG) {
+	if (!Z_IS_STRING_P(member) && !Z_IS_LONG_P(member)) {
 		ZVAL_STR(&tmp_zv, zval_get_string_func(member));
 		member = &tmp_zv;
 	}
@@ -728,7 +728,7 @@ static int sxe_prop_dim_exists(zval *object, zval *member, int check_empty, zend
 
 	GET_NODE(sxe, node);
 
-	if (Z_TYPE_P(member) == IS_LONG) {
+	if (Z_IS_LONG_P(member)) {
 		if (sxe->iter.type != SXE_ITER_ATTRLIST) {
 			attribs = 0;
 			elements = 1;
@@ -752,7 +752,7 @@ static int sxe_prop_dim_exists(zval *object, zval *member, int check_empty, zend
 
 	if (node) {
 		if (attribs) {
-			if (Z_TYPE_P(member) == IS_LONG) {
+			if (Z_IS_LONG_P(member)) {
 				int	nodendx = 0;
 
 				while (attr && nodendx <= Z_LVAL_P(member)) {
@@ -783,7 +783,7 @@ static int sxe_prop_dim_exists(zval *object, zval *member, int check_empty, zend
 		}
 
 		if (elements) {
-			if (Z_TYPE_P(member) == IS_LONG) {
+			if (Z_IS_LONG_P(member)) {
 				if (sxe->iter.type == SXE_ITER_CHILD) {
 					node = php_sxe_get_first_node(sxe, node);
 				}
@@ -838,7 +838,7 @@ static void sxe_prop_dim_delete(zval *object, zval *member, zend_bool elements, 
 	zval            tmp_zv;
 	int             test = 0;
 
-	if (Z_TYPE_P(member) != IS_STRING && Z_TYPE_P(member) != IS_LONG) {
+	if (!Z_IS_STRING_P(member) && !Z_IS_LONG_P(member)) {
 		ZVAL_STR(&tmp_zv, zval_get_string_func(member));
 		member = &tmp_zv;
 	}
@@ -847,7 +847,7 @@ static void sxe_prop_dim_delete(zval *object, zval *member, zend_bool elements, 
 
 	GET_NODE(sxe, node);
 
-	if (Z_TYPE_P(member) == IS_LONG) {
+	if (Z_IS_LONG_P(member)) {
 		if (sxe->iter.type != SXE_ITER_ATTRLIST) {
 			attribs = 0;
 			elements = 1;
@@ -871,7 +871,7 @@ static void sxe_prop_dim_delete(zval *object, zval *member, zend_bool elements, 
 
 	if (node) {
 		if (attribs) {
-			if (Z_TYPE_P(member) == IS_LONG) {
+			if (Z_IS_LONG_P(member)) {
 				int	nodendx = 0;
 
 				while (attr && nodendx <= Z_LVAL_P(member)) {
@@ -899,7 +899,7 @@ static void sxe_prop_dim_delete(zval *object, zval *member, zend_bool elements, 
 		}
 
 		if (elements) {
-			if (Z_TYPE_P(member) == IS_LONG) {
+			if (Z_IS_LONG_P(member)) {
 				if (sxe->iter.type == SXE_ITER_CHILD) {
 					node = php_sxe_get_first_node(sxe, node);
 				}
@@ -1002,7 +1002,7 @@ static void sxe_properties_add(HashTable *rv, char *name, int namelen, zval *val
 
 	key = zend_string_init(name, namelen, 0);
 	if ((data_ptr = zend_hash_find(rv, key)) != NULL) {
-		if (Z_TYPE_P(data_ptr) == IS_ARRAY) {
+		if (Z_IS_ARRAY_P(data_ptr)) {
 			zend_hash_next_index_insert_new(Z_ARRVAL_P(data_ptr), value);
 		} else {
 			array_init(&newptr);

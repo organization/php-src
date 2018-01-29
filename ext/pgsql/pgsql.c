@@ -1317,7 +1317,7 @@ static void php_pgsql_do_connect(INTERNAL_FUNCTION_PARAMETERS, int persistent)
 		/* make sure that the PGSQL_CONNECT_FORCE_NEW bit is not part of the hash so that subsequent connections
 		 * can re-use this connection. Bug #39979
 		 */
-		if (i == 1 && ZEND_NUM_ARGS() == 2 && Z_TYPE(args[i]) == IS_LONG) {
+		if (i == 1 && ZEND_NUM_ARGS() == 2 && Z_IS_LONG(args[i])) {
 			if (Z_LVAL(args[1]) == PGSQL_CONNECT_FORCE_NEW) {
 				continue;
 			} else if (Z_LVAL(args[1]) & PGSQL_CONNECT_FORCE_NEW) {
@@ -1500,7 +1500,7 @@ static void php_pgsql_do_connect(INTERNAL_FUNCTION_PARAMETERS, int persistent)
 		PGG(num_links)++;
 	}
 	/* set notice processor */
-	if (! PGG(ignore_notices) && Z_TYPE_P(return_value) == IS_RESOURCE) {
+	if (! PGG(ignore_notices) && Z_IS_RESOURCE_P(return_value)) {
 		PQsetNoticeProcessor(pgsql, _php_pgsql_notice_handler, (void*)(zend_uintptr_t)Z_RES_HANDLE_P(return_value));
 	}
 	php_pgsql_set_default_link(Z_RES_P(return_value));
@@ -1971,14 +1971,14 @@ PHP_FUNCTION(pg_query_params)
 
 		ZEND_HASH_FOREACH_VAL(Z_ARRVAL_P(pv_param_arr), tmp) {
 			ZVAL_DEREF(tmp);
-			if (Z_TYPE_P(tmp) == IS_NULL) {
+			if (Z_IS_NULL_P(tmp)) {
 				params[i] = NULL;
 			} else {
 				zval tmp_val;
 
 				ZVAL_COPY(&tmp_val, tmp);
 				convert_to_cstring(&tmp_val);
-				if (Z_TYPE(tmp_val) != IS_STRING) {
+				if (!Z_IS_STRING(tmp_val)) {
 					php_error_docref(NULL, E_WARNING,"Error converting parameter");
 					zval_ptr_dtor(&tmp_val);
 					_php_pgsql_free_params(params, num_params);
@@ -2174,7 +2174,7 @@ PHP_FUNCTION(pg_execute)
 
 		ZEND_HASH_FOREACH_VAL(Z_ARRVAL_P(pv_param_arr), tmp) {
 
-			if (Z_TYPE_P(tmp) == IS_NULL) {
+			if (Z_IS_NULL_P(tmp)) {
 				params[i] = NULL;
 			} else {
 				zend_string *tmp_str;
@@ -2820,7 +2820,7 @@ static void php_pgsql_fetch_hash(INTERNAL_FUNCTION_PARAMETERS, zend_long result_
 			fci.param_count = 0;
 			fci.no_separation = 1;
 
-			if (ctor_params && Z_TYPE_P(ctor_params) != IS_NULL) {
+			if (ctor_params && !Z_IS_NULL_P(ctor_params)) {
 				if (zend_fcall_info_args(&fci, ctor_params) == FAILURE) {
 					/* Two problems why we throw exceptions here: PHP is typeless
 					 * and hence passing one argument that's not an array could be
@@ -3225,7 +3225,7 @@ PHP_FUNCTION(pg_lo_create)
 		return;
 	}
 
-	if ((argc == 1) && (Z_TYPE_P(pgsql_link) != IS_RESOURCE)) {
+	if ((argc == 1) && (!Z_IS_RESOURCE_P(pgsql_link))) {
 		oid = pgsql_link;
 		pgsql_link = NULL;
 	}
@@ -3233,7 +3233,7 @@ PHP_FUNCTION(pg_lo_create)
 	if (pgsql_link == NULL) {
 		link = FETCH_DEFAULT_LINK();
 		CHECK_DEFAULT_LINK(link);
-	} else if ((Z_TYPE_P(pgsql_link) == IS_RESOURCE)) {
+	} else if ((Z_IS_RESOURCE_P(pgsql_link))) {
 		link = Z_RES_P(pgsql_link);
 	} else {
 		link = NULL;
@@ -4986,7 +4986,7 @@ PHP_FUNCTION(pg_send_query_params)
 
 		ZEND_HASH_FOREACH_VAL(Z_ARRVAL_P(pv_param_arr), tmp) {
 
-			if (Z_TYPE_P(tmp) == IS_NULL) {
+			if (Z_IS_NULL_P(tmp)) {
 				params[i] = NULL;
 			} else {
 				zend_string *tmp_str;
@@ -5157,13 +5157,13 @@ PHP_FUNCTION(pg_send_execute)
 
 		ZEND_HASH_FOREACH_VAL(Z_ARRVAL_P(pv_param_arr), tmp) {
 
-			if (Z_TYPE_P(tmp) == IS_NULL) {
+			if (Z_IS_NULL_P(tmp)) {
 				params[i] = NULL;
 			} else {
 				zval tmp_val;
 				ZVAL_COPY(&tmp_val, tmp);
 				convert_to_string(&tmp_val);
-				if (Z_TYPE(tmp_val) != IS_STRING) {
+				if (!Z_IS_STRING(tmp_val)) {
 					php_error_docref(NULL, E_WARNING,"Error converting parameter");
 					zval_ptr_dtor(&tmp_val);
 					_php_pgsql_free_params(params, num_params);
@@ -5799,7 +5799,7 @@ static int php_pgsql_add_quotes(zval *src, zend_bool should_free)
 {
 	smart_str str = {0};
 
-	assert(Z_TYPE_P(src) == IS_STRING);
+	assert(Z_IS_STRING_P(src));
 	assert(should_free == 1 || should_free == 0);
 
 	smart_str_appendc(&str, 'E');
@@ -5818,14 +5818,14 @@ static int php_pgsql_add_quotes(zval *src, zend_bool should_free)
 /* }}} */
 
 #define PGSQL_CONV_CHECK_IGNORE() \
-	if (!err && Z_TYPE(new_val) == IS_STRING && !strcmp(Z_STRVAL(new_val), "NULL")) { \
+	if (!err && Z_IS_STRING(new_val) && !strcmp(Z_STRVAL(new_val), "NULL")) { \
 		/* if new_value is string "NULL" and field has default value, remove element to use default value */ \
-		if (!(opt & PGSQL_CONV_IGNORE_DEFAULT) && Z_TYPE_P(has_default) == IS_TRUE) { \
+		if (!(opt & PGSQL_CONV_IGNORE_DEFAULT) && Z_IS_TRUE_P(has_default)) { \
 			zval_ptr_dtor(&new_val); \
 			skip_field = 1; \
 		} \
 		/* raise error if it's not null and cannot be ignored */ \
-		else if (!(opt & PGSQL_CONV_IGNORE_NOT_NULL) && Z_TYPE_P(not_null) == IS_TRUE) { \
+		else if (!(opt & PGSQL_CONV_IGNORE_NOT_NULL) && Z_IS_TRUE_P(not_null)) { \
 			php_error_docref(NULL, E_NOTICE, "Detected NULL for 'NOT NULL' field '%s'", ZSTR_VAL(field)); \
 			err = 1; \
 		} \
@@ -5842,8 +5842,8 @@ PHP_PGSQL_API int php_pgsql_convert(PGconn *pg_link, const char *table_name, con
 	php_pgsql_data_type data_type;
 
 	assert(pg_link != NULL);
-	assert(Z_TYPE_P(values) == IS_ARRAY);
-	assert(Z_TYPE_P(result) == IS_ARRAY);
+	assert(Z_IS_ARRAY_P(values));
+	assert(Z_IS_ARRAY_P(result));
 	assert(!(opt & ~PGSQL_CONV_OPTS));
 
 	if (!table_name) {
@@ -5886,7 +5886,7 @@ PHP_PGSQL_API int php_pgsql_convert(PGconn *pg_link, const char *table_name, con
 			php_error_docref(NULL, E_NOTICE, "Detected broken meta data. Missing 'is enum'");
 			err = 1;
 		}
-		if (!err && (Z_TYPE_P(val) == IS_ARRAY || Z_TYPE_P(val) == IS_OBJECT)) {
+		if (!err && (Z_IS_ARRAY_P(val) || Z_IS_OBJECT_P(val))) {
 			php_error_docref(NULL, E_NOTICE, "Expects scalar values as field values");
 			err = 1;
 		}
@@ -5895,7 +5895,7 @@ PHP_PGSQL_API int php_pgsql_convert(PGconn *pg_link, const char *table_name, con
 		}
 
 		convert_to_boolean(is_enum);
-		if (Z_TYPE_P(is_enum) == IS_TRUE) {
+		if (Z_IS_TRUE_P(is_enum)) {
 			/* enums need to be treated like strings */
 			data_type = PG_TEXT;
 		} else {
@@ -6590,7 +6590,7 @@ PHP_PGSQL_API int php_pgsql_insert(PGconn *pg_link, const char *table, zval *var
 
 	assert(pg_link != NULL);
 	assert(table != NULL);
-	assert(Z_TYPE_P(var_array) == IS_ARRAY);
+	assert(Z_IS_ARRAY_P(var_array));
 
 	ZVAL_UNDEF(&converted);
 	if (zend_hash_num_elements(Z_ARRVAL_P(var_array)) == 0) {
@@ -6798,7 +6798,7 @@ static inline int build_assignment_string(PGconn *pg_link, smart_str *querystr, 
 		} else {
 			smart_str_appendl(querystr, ZSTR_VAL(fld), ZSTR_LEN(fld));
 		}
-		if (where_cond && (Z_TYPE_P(val) == IS_TRUE || Z_TYPE_P(val) == IS_FALSE || (Z_TYPE_P(val) == IS_STRING && !strcmp(Z_STRVAL_P(val), "NULL")))) {
+		if (where_cond && (Z_IS_TRUE_P(val) || Z_IS_FALSE_P(val) || (Z_IS_STRING_P(val) && !strcmp(Z_STRVAL_P(val), "NULL")))) {
 			smart_str_appends(querystr, " IS ");
 		} else {
 			smart_str_appendc(querystr, '=');
@@ -6851,8 +6851,8 @@ PHP_PGSQL_API int php_pgsql_update(PGconn *pg_link, const char *table, zval *var
 
 	assert(pg_link != NULL);
 	assert(table != NULL);
-	assert(Z_TYPE_P(var_array) == IS_ARRAY);
-	assert(Z_TYPE_P(ids_array) == IS_ARRAY);
+	assert(Z_IS_ARRAY_P(var_array));
+	assert(Z_IS_ARRAY_P(ids_array));
 	assert(!(opt & ~(PGSQL_CONV_OPTS|PGSQL_DML_NO_CONV|PGSQL_DML_EXEC|PGSQL_DML_STRING|PGSQL_DML_ESCAPE)));
 
 	if (zend_hash_num_elements(Z_ARRVAL_P(var_array)) == 0
@@ -6957,7 +6957,7 @@ PHP_PGSQL_API int php_pgsql_delete(PGconn *pg_link, const char *table, zval *ids
 
 	assert(pg_link != NULL);
 	assert(table != NULL);
-	assert(Z_TYPE_P(ids_array) == IS_ARRAY);
+	assert(Z_IS_ARRAY_P(ids_array));
 	assert(!(opt & ~(PGSQL_CONV_FORCE_NULL|PGSQL_DML_EXEC|PGSQL_DML_STRING|PGSQL_DML_ESCAPE)));
 
 	if (zend_hash_num_elements(Z_ARRVAL_P(ids_array)) == 0) {
@@ -7048,7 +7048,7 @@ PHP_PGSQL_API int php_pgsql_result2array(PGresult *pg_result, zval *ret_array, l
 	size_t num_fields;
 	int pg_numrows, pg_row;
 	uint32_t i;
-	assert(Z_TYPE_P(ret_array) == IS_ARRAY);
+	assert(Z_IS_ARRAY_P(ret_array));
 
 	if ((pg_numrows = PQntuples(pg_result)) <= 0) {
 		return FAILURE;
@@ -7094,8 +7094,8 @@ PHP_PGSQL_API int php_pgsql_result2array(PGresult *pg_result, zval *ret_array, l
 
 	assert(pg_link != NULL);
 	assert(table != NULL);
-	assert(Z_TYPE_P(ids_array) == IS_ARRAY);
-	assert(Z_TYPE_P(ret_array) == IS_ARRAY);
+	assert(Z_IS_ARRAY_P(ids_array));
+	assert(Z_IS_ARRAY_P(ret_array));
 	assert(!(opt & ~(PGSQL_CONV_OPTS|PGSQL_DML_NO_CONV|PGSQL_DML_EXEC|PGSQL_DML_ASYNC|PGSQL_DML_STRING|PGSQL_DML_ESCAPE)));
 
 	if (zend_hash_num_elements(Z_ARRVAL_P(ids_array)) == 0) {

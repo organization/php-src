@@ -62,7 +62,7 @@ static void copy_zend_constant(zval *zv)
 
 	c = Z_PTR_P(zv);
 	c->name = zend_string_copy(c->name);
-	if (Z_TYPE(c->value) == IS_STRING) {
+	if (Z_IS_STRING(c->value)) {
 		Z_STR(c->value) = zend_string_dup(Z_STR(c->value), 1);
 	}
 }

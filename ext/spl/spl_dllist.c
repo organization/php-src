@@ -818,7 +818,7 @@ SPL_METHOD(SplDoublyLinkedList, offsetSet)
 
 	intern = Z_SPLDLLIST_P(getThis());
 
-	if (Z_TYPE_P(zindex) == IS_NULL) {
+	if (Z_IS_NULL_P(zindex)) {
 		/* $obj[] = ... */
 		spl_ptr_llist_push(intern->llist, value);
 	} else {
@@ -1195,7 +1195,7 @@ SPL_METHOD(SplDoublyLinkedList, unserialize)
 
 	/* flags */
 	flags = var_tmp_var(&var_hash);
-	if (!php_var_unserialize(flags, &p, s + buf_len, &var_hash) || Z_TYPE_P(flags) != IS_LONG) {
+	if (!php_var_unserialize(flags, &p, s + buf_len, &var_hash) || !Z_IS_LONG_P(flags)) {
 		goto error;
 	}
 

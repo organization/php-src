@@ -1738,7 +1738,7 @@ static void dom_canonicalization(INTERNAL_FUNCTION_PARAMETERS, int mode) /* {{{ 
 		char *xquery;
 
 		tmp = zend_hash_str_find(ht, "query", sizeof("query")-1);
-		if (tmp && Z_TYPE_P(tmp) == IS_STRING) {
+		if (tmp && Z_IS_STRING_P(tmp)) {
 			xquery = Z_STRVAL_P(tmp);
 		} else {
 			php_error_docref(NULL, E_WARNING, "'query' missing from xpath array or is not a string");
@@ -1749,12 +1749,12 @@ static void dom_canonicalization(INTERNAL_FUNCTION_PARAMETERS, int mode) /* {{{ 
 		ctxp->node = nodep;
 
 		tmp = zend_hash_str_find(ht, "namespaces", sizeof("namespaces")-1);
-		if (tmp && Z_TYPE_P(tmp) == IS_ARRAY) {
+		if (tmp && Z_IS_ARRAY_P(tmp)) {
 			zval *tmpns;
 			zend_string *prefix;
 
 			ZEND_HASH_FOREACH_STR_KEY_VAL(Z_ARRVAL_P(tmp), prefix, tmpns) {
-				if (Z_TYPE_P(tmpns) == IS_STRING) {
+				if (Z_IS_STRING_P(tmpns)) {
 					if (prefix) {
 						xmlXPathRegisterNs(ctxp, (xmlChar *) ZSTR_VAL(prefix), (xmlChar *) Z_STRVAL_P(tmpns));
 					}
@@ -1784,7 +1784,7 @@ static void dom_canonicalization(INTERNAL_FUNCTION_PARAMETERS, int mode) /* {{{ 
 			inclusive_ns_prefixes = safe_emalloc(zend_hash_num_elements(Z_ARRVAL_P(ns_prefixes)) + 1,
 				sizeof(xmlChar *), 0);
 			ZEND_HASH_FOREACH_VAL(Z_ARRVAL_P(ns_prefixes), tmpns) {
-				if (Z_TYPE_P(tmpns) == IS_STRING) {
+				if (Z_IS_STRING_P(tmpns)) {
 					inclusive_ns_prefixes[nscount++] = (xmlChar *) Z_STRVAL_P(tmpns);
 				}
 			} ZEND_HASH_FOREACH_END();

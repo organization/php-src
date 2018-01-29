@@ -41,7 +41,7 @@
 	{ \
 		if (opline->opN##_type == IS_CONST) { \
 			zval *zv = CRT_CONSTANT_EX(op_array, opline, opline->opN, ssa->rt_constants); \
-			return (Z_TYPE_P(zv) == IS_LONG || Z_TYPE_P(zv) == IS_TRUE || Z_TYPE_P(zv) == IS_FALSE || Z_TYPE_P(zv) == IS_NULL); \
+			return (Z_IS_LONG_P(zv) || Z_IS_TRUE_P(zv) || Z_IS_FALSE_P(zv) || Z_IS_NULL_P(zv)); \
 		} else { \
 			return (opline->opN##_type != IS_UNUSED && \
 		        ssa->ops && \
@@ -57,13 +57,13 @@
 	{ \
 		if (opline->opN##_type == IS_CONST) { \
 			zval *zv = CRT_CONSTANT_EX(op_array, opline, opline->opN, ssa->rt_constants); \
-			if (Z_TYPE_P(zv) == IS_LONG) { \
+			if (Z_IS_LONG_P(zv)) { \
 				return Z_LVAL_P(zv); \
-			} else if (Z_TYPE_P(zv) == IS_TRUE) { \
+			} else if (Z_IS_TRUE_P(zv)) { \
 				return 1; \
-			} else if (Z_TYPE_P(zv) == IS_FALSE) { \
+			} else if (Z_IS_FALSE_P(zv)) { \
 				return 0; \
-			} else if (Z_TYPE_P(zv) == IS_NULL) { \
+			} else if (Z_IS_NULL_P(zv)) { \
 				return 0; \
 			} \
 		} else if (opline->opN##_type != IS_UNUSED && \
@@ -81,13 +81,13 @@
 	{ \
 		if (opline->opN##_type == IS_CONST) { \
 			zval *zv = CRT_CONSTANT_EX(op_array, opline, opline->opN, ssa->rt_constants); \
-			if (Z_TYPE_P(zv) == IS_LONG) { \
+			if (Z_IS_LONG_P(zv)) { \
 				return Z_LVAL_P(zv); \
-			} else if (Z_TYPE_P(zv) == IS_TRUE) { \
+			} else if (Z_IS_TRUE_P(zv)) { \
 				return 1; \
-			} else if (Z_TYPE_P(zv) == IS_FALSE) { \
+			} else if (Z_IS_FALSE_P(zv)) { \
 				return 0; \
-			} else if (Z_TYPE_P(zv) == IS_NULL) { \
+			} else if (Z_IS_NULL_P(zv)) { \
 				return 0; \
 			} \
 		} else if (opline->opN##_type != IS_UNUSED && \
@@ -105,7 +105,7 @@
 	{ \
 		if (opline->opN##_type == IS_CONST) { \
 			zval *zv = CRT_CONSTANT_EX(op_array, opline, opline->opN, ssa->rt_constants); \
-			if (Z_TYPE_P(zv) == IS_LONG || Z_TYPE_P(zv) == IS_TRUE || Z_TYPE_P(zv) == IS_FALSE || Z_TYPE_P(zv) == IS_NULL) { \
+			if (Z_IS_LONG_P(zv) || Z_IS_TRUE_P(zv) || Z_IS_FALSE_P(zv) || Z_IS_NULL_P(zv)) { \
 				return 0; \
 			} \
 		} else if (opline->opN##_type != IS_UNUSED && \
@@ -123,7 +123,7 @@
 	{ \
 		if (opline->opN##_type == IS_CONST) { \
 			zval *zv = CRT_CONSTANT_EX(op_array, opline, opline->opN, ssa->rt_constants); \
-			if (Z_TYPE_P(zv) == IS_LONG || Z_TYPE_P(zv) == IS_TRUE || Z_TYPE_P(zv) == IS_FALSE || Z_TYPE_P(zv) == IS_NULL) { \
+			if (Z_IS_LONG_P(zv) || Z_IS_TRUE_P(zv) || Z_IS_FALSE_P(zv) || Z_IS_NULL_P(zv)) { \
 				return 0; \
 			} \
 		} else if (opline->opN##_type != IS_UNUSED && \
@@ -161,7 +161,7 @@ DEFINE_SSA_OP_RANGE_OVERFLOW(op2)
 static zend_always_inline uint32_t _const_op_type(const zval *zv) {
 	if (Z_TYPE_P(zv) == IS_CONSTANT_AST) {
 		return MAY_BE_RC1 | MAY_BE_RCN | MAY_BE_ANY | MAY_BE_ARRAY_KEY_ANY | MAY_BE_ARRAY_OF_ANY;
-	} else if (Z_TYPE_P(zv) == IS_ARRAY) {
+	} else if (Z_IS_ARRAY_P(zv)) {
 		HashTable *ht = Z_ARRVAL_P(zv);
 		uint32_t tmp = MAY_BE_ARRAY;
 		zend_string *str;
@@ -187,7 +187,7 @@ static zend_always_inline uint32_t _const_op_type(const zval *zv) {
 
 		if (Z_REFCOUNTED_P(zv)) {
 			tmp |= MAY_BE_RC1 | MAY_BE_RCN;
-		} else if (Z_TYPE_P(zv) == IS_STRING) {
+		} else if (Z_IS_STRING_P(zv)) {
 			tmp |= MAY_BE_RCN;
 		}
 		return tmp;

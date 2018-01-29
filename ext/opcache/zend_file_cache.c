@@ -267,7 +267,7 @@ static void zend_file_cache_serialize_hash(HashTable                *ht,
 	UNSERIALIZE_PTR(p);
 	end = p + ht->nNumUsed;
 	while (p < end) {
-		if (Z_TYPE(p->val) != IS_UNDEF) {
+		if (!Z_IS_UNDEF(p->val)) {
 			SERIALIZE_STR(p->key);
 			func(&p->val, script, info, buf);
 		}
@@ -891,7 +891,7 @@ static void zend_file_cache_unserialize_hash(HashTable               *ht,
 	p = ht->arData;
 	end = p + ht->nNumUsed;
 	while (p < end) {
-		if (Z_TYPE(p->val) != IS_UNDEF) {
+		if (!Z_IS_UNDEF(p->val)) {
 			UNSERIALIZE_STR(p->key);
 			func(&p->val, script, buf);
 		}

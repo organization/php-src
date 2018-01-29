@@ -985,7 +985,7 @@ int php_posix_group_to_array(struct group *g, zval *array_group) /* {{{ */
 	if (NULL == g)
 		return 0;
 
-	if (array_group == NULL || Z_TYPE_P(array_group) != IS_ARRAY)
+	if (array_group == NULL || !Z_IS_ARRAY_P(array_group))
 		return 0;
 
 	array_init(&array_members);
@@ -1163,7 +1163,7 @@ int php_posix_passwd_to_array(struct passwd *pw, zval *return_value) /* {{{ */
 {
 	if (NULL == pw)
 		return 0;
-	if (NULL == return_value || Z_TYPE_P(return_value) != IS_ARRAY)
+	if (NULL == return_value || !Z_IS_ARRAY_P(return_value))
 		return 0;
 
 	add_assoc_string(return_value, "name",      pw->pw_name);

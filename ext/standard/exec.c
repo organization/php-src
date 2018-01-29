@@ -234,7 +234,7 @@ static void php_exec_ex(INTERNAL_FUNCTION_PARAMETERS, int mode) /* {{{ */
 	if (!ret_array) {
 		ret = php_exec(mode, cmd, NULL, return_value);
 	} else {
-		if (Z_TYPE_P(ret_array) != IS_ARRAY) {
+		if (!Z_IS_ARRAY_P(ret_array)) {
 			zval_ptr_dtor(ret_array);
 			array_init(ret_array);
 		} else if (Z_REFCOUNT_P(ret_array) > 1) {

@@ -341,7 +341,7 @@ static int pgsql_stmt_param_hook(pdo_stmt_t *stmt, struct pdo_bound_param_data *
 					}
 
 					if (PDO_PARAM_TYPE(param->param_type) == PDO_PARAM_LOB &&
-							Z_TYPE_P(parameter) == IS_RESOURCE) {
+							Z_IS_RESOURCE_P(parameter)) {
 						php_stream *stm;
 						php_stream_from_zval_no_verify(stm, parameter);
 						if (stm) {
@@ -376,11 +376,11 @@ static int pgsql_stmt_param_hook(pdo_stmt_t *stmt, struct pdo_bound_param_data *
 					}
 
 					if (PDO_PARAM_TYPE(param->param_type) == PDO_PARAM_NULL ||
-							Z_TYPE_P(parameter) == IS_NULL) {
+							Z_IS_NULL_P(parameter)) {
 						S->param_values[param->paramno] = NULL;
 						S->param_lengths[param->paramno] = 0;
-					} else if (Z_TYPE_P(parameter) == IS_FALSE || Z_TYPE_P(parameter) == IS_TRUE) {
-						S->param_values[param->paramno] = Z_TYPE_P(parameter) == IS_TRUE ? "t" : "f";
+					} else if (Z_IS_FALSE_P(parameter) || Z_IS_TRUE_P(parameter)) {
+						S->param_values[param->paramno] = Z_IS_TRUE_P(parameter) ? "t" : "f";
 						S->param_lengths[param->paramno] = 1;
 						S->param_formats[param->paramno] = 0;
 					} else {

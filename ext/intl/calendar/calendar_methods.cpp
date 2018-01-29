@@ -420,7 +420,7 @@ U_CFUNC PHP_FUNCTION(intlcal_set)
 		args++;
 	}
 	variant = ZEND_NUM_ARGS() - (getThis() ? 0 : 1);
-	while (variant > 2 && Z_TYPE(args[variant - 1]) == IS_NULL) {
+	while (variant > 2 && Z_IS_NULL(args[variant - 1])) {
 		variant--;
 	}
 
@@ -481,7 +481,7 @@ U_CFUNC PHP_FUNCTION(intlcal_roll)
 	if (!getThis()) {
 		args++;
 	}
-	if (!Z_ISUNDEF(args[1]) && (Z_TYPE(args[1]) == IS_TRUE || Z_TYPE(args[1]) == IS_FALSE)) {
+	if (!Z_ISUNDEF(args[1]) && (Z_IS_TRUE(args[1]) || Z_IS_FALSE(args[1]))) {
 		if (zend_parse_method_parameters(ZEND_NUM_ARGS(), getThis(),
 				"Olb", &object, Calendar_ce_ptr, &field, &bool_variant_val)
 				== FAILURE) {
@@ -489,7 +489,7 @@ U_CFUNC PHP_FUNCTION(intlcal_roll)
 				"intlcal_roll: bad arguments", 0);
 			RETURN_FALSE;
 		}
-		bool_variant_val = Z_TYPE(args[1]) == IS_TRUE? 1 : 0;
+		bool_variant_val = Z_IS_TRUE(args[1])? 1 : 0;
 	} else if (zend_parse_method_parameters(ZEND_NUM_ARGS(), getThis(),
 			"Oll", &object, Calendar_ce_ptr, &field, &value) == FAILURE) {
 		intl_error_set(NULL, U_ILLEGAL_ARGUMENT_ERROR,
@@ -1136,7 +1136,7 @@ U_CFUNC PHP_FUNCTION(intlcal_from_date_time)
 		RETURN_NULL();
 	}
 
-	if (!(Z_TYPE_P(zv_arg) == IS_OBJECT && instanceof_function(
+	if (!(Z_IS_OBJECT_P(zv_arg) && instanceof_function(
 			Z_OBJCE_P(zv_arg), php_date_get_date_ce()))) {
 		object_init_ex(&zv_tmp, php_date_get_date_ce());
 		zend_call_method_with_1_params(&zv_tmp, NULL, NULL, "__construct", NULL, zv_arg);
@@ -1158,7 +1158,7 @@ U_CFUNC PHP_FUNCTION(intlcal_from_date_time)
 	}
 
 	zend_call_method_with_0_params(zv_datetime, php_date_get_date_ce(), NULL, "gettimestamp", &zv_timestamp);
-	if (Z_TYPE(zv_timestamp) != IS_LONG) {
+	if (!Z_IS_LONG(zv_timestamp)) {
 		intl_error_set(NULL, U_ILLEGAL_ARGUMENT_ERROR,
 			"intlcal_from_date_time: bad DateTime; call to "
 			"DateTime::getTimestamp() failed", 0);
@@ -1272,7 +1272,7 @@ U_CFUNC PHP_FUNCTION(intlcal_to_date_time)
 	/* due to bug #40743, we have to set the time zone again */
 	zend_call_method_with_1_params(return_value, NULL, NULL, "settimezone",
 			&retval, timezone_zval);
-	if (Z_ISUNDEF(retval) || Z_TYPE(retval) == IS_FALSE) {
+	if (Z_ISUNDEF(retval) || Z_IS_FALSE(retval)) {
 		intl_errors_set(CALENDAR_ERROR_P(co), U_ILLEGAL_ARGUMENT_ERROR,
 			"intlcal_to_date_time: call to DateTime::setTimeZone has failed",
 			1);

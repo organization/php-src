@@ -1138,7 +1138,7 @@ PHPAPI void php_pcre_match_impl(pcre_cache_entry *pce, char *subject, size_t sub
 						mark = pcre2_get_mark(match_data);
 						/* Add MARK, if available */
 						if (mark) {
-							if (Z_TYPE(marks) == IS_UNDEF) {
+							if (Z_IS_UNDEF(marks)) {
 								array_init(&marks);
 							}
 							add_index_string(&marks, matched - 1, (char *) mark);
@@ -1338,7 +1338,7 @@ PHPAPI void php_pcre_match_impl(pcre_cache_entry *pce, char *subject, size_t sub
 		}
 		efree(match_sets);
 
-		if (Z_TYPE(marks) != IS_UNDEF) {
+		if (!Z_IS_UNDEF(marks)) {
 			add_assoc_zval(subpats, "MARK", &marks);
 		}
 	}
@@ -1442,8 +1442,8 @@ static zend_string *preg_do_repl_func(zend_fcall_info *fci, zend_fcall_info_cach
 	fci->params = &arg;
 	fci->no_separation = 0;
 
-	if (zend_call_function(fci, fcc) == SUCCESS && Z_TYPE(retval) != IS_UNDEF) {
-		if (EXPECTED(Z_TYPE(retval) == IS_STRING)) {
+	if (zend_call_function(fci, fcc) == SUCCESS && !Z_IS_UNDEF(retval)) {
+		if (EXPECTED(Z_IS_STRING(retval))) {
 			result_str = Z_STR(retval);
 		} else {
 			result_str = zval_get_string_func(&retval);
@@ -1967,7 +1967,7 @@ static zend_string *php_pcre_replace_array(HashTable *regex, zval *replace, zend
 	zend_string *result;
 	zend_string *replace_str, *tmp_replace_str;
 
-	if (Z_TYPE_P(replace) == IS_ARRAY) {
+	if (Z_IS_ARRAY_P(replace)) {
 		uint32_t replace_idx = 0;
 		HashTable *replace_ht = Z_ARRVAL_P(replace);
 
@@ -1987,7 +1987,7 @@ static zend_string *php_pcre_replace_array(HashTable *regex, zval *replace, zend
 				}
 				zv = &replace_ht->arData[replace_idx].val;
 				replace_idx++;
-				if (Z_TYPE_P(zv) != IS_UNDEF) {
+				if (!Z_IS_UNDEF_P(zv)) {
 					replace_str = zval_get_tmp_string(zv, &tmp_replace_str);
 					break;
 				}
@@ -2050,7 +2050,7 @@ static zend_always_inline zend_string *php_replace_in_subject(zval *regex, zval 
 	zend_string *result;
 	zend_string *subject_str = zval_get_string(subject);
 
-	if (Z_TYPE_P(regex) != IS_ARRAY) {
+	if (!Z_IS_ARRAY_P(regex)) {
 		result = php_pcre_replace(Z_STR_P(regex),
 								  subject_str,
 								  ZSTR_VAL(subject_str),
@@ -2078,7 +2078,7 @@ static zend_string *php_replace_in_subject_func(zval *regex, zend_fcall_info *fc
 	zend_string *result;
 	zend_string	*subject_str = zval_get_string(subject);
 
-	if (Z_TYPE_P(regex) != IS_ARRAY) {
+	if (!Z_IS_ARRAY_P(regex)) {
 		result = php_pcre_replace_func(Z_STR_P(regex),
 								  subject_str,
 								  fci, fcc,
@@ -2122,11 +2122,11 @@ static size_t preg_replace_func_impl(zval *return_value, zval *regex, zend_fcall
 	zend_string	*result;
 	size_t replace_count = 0;
 
-	if (Z_TYPE_P(regex) != IS_ARRAY) {
+	if (!Z_IS_ARRAY_P(regex)) {
 		convert_to_string_ex(regex);
 	}
 
-	if (Z_TYPE_P(subject) != IS_ARRAY) {
+	if (!Z_IS_ARRAY_P(subject)) {
 		result = php_replace_in_subject_func(regex, fci, fcc, subject, limit_val, &replace_count);
 		if (result != NULL) {
 			RETVAL_STR(result);
@@ -2181,19 +2181,19 @@ static void preg_replace_common(INTERNAL_FUNCTION_PARAMETERS, int is_filter)
 		Z_PARAM_ZVAL_DEREF(zcount)
 	ZEND_PARSE_PARAMETERS_END();
 
-	if (Z_TYPE_P(replace) != IS_ARRAY) {
+	if (!Z_IS_ARRAY_P(replace)) {
 		convert_to_string_ex(replace);
-		if (Z_TYPE_P(regex) != IS_ARRAY) {
+		if (!Z_IS_ARRAY_P(regex)) {
 			convert_to_string_ex(regex);
 		}
 	} else {
-		if (Z_TYPE_P(regex) != IS_ARRAY) {
+		if (!Z_IS_ARRAY_P(regex)) {
 			php_error_docref(NULL, E_WARNING, "Parameter mismatch, pattern is a string while replacement is an array");
 			RETURN_FALSE;
 		}
 	}
 
-	if (Z_TYPE_P(subject) != IS_ARRAY) {
+	if (!Z_IS_ARRAY_P(subject)) {
 		old_replace_count = replace_count;
 		result = php_replace_in_subject(regex,
 										replace,
