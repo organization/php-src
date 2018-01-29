@@ -22276,12 +22276,12 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FE_FETCH_R_SPEC_VAR_HANDLER(ZE
 				goto fe_fetch_r_exit;
 			}
 			value = &p->val;
-			value_type = Z_TYPE_INFO_P(value);
-			if (EXPECTED(value_type != IS_UNDEF)) {
-				if (UNEXPECTED(value_type == IS_INDIRECT)) {
+			value_type = Z_RAW_TYPE_INFO_P(value);
+			if (EXPECTED(!T_IS_UNDEF(value_type))) {
+				if (UNEXPECTED(T_IS_INDIRECT(value_type))) {
 					value = Z_INDIRECT_P(value);
-					value_type = Z_TYPE_INFO_P(value);
-					if (EXPECTED(value_type != IS_UNDEF)) {
+					value_type = Z_RAW_TYPE_INFO_P(value);
+					if (EXPECTED(!T_IS_UNDEF(value_type))) {
 						break;
 					}
 				} else {
@@ -22315,12 +22315,12 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FE_FETCH_R_SPEC_VAR_HANDLER(ZE
 				}
 
 				value = &p->val;
-				value_type = Z_TYPE_INFO_P(value);
-				if (EXPECTED(value_type != IS_UNDEF)) {
-					if (UNEXPECTED(value_type == IS_INDIRECT)) {
+				value_type = Z_RAW_TYPE_INFO_P(value);
+				if (EXPECTED(!T_IS_UNDEF(value_type))) {
+					if (UNEXPECTED(T_IS_INDIRECT(value_type))) {
 						value = Z_INDIRECT_P(value);
-						value_type = Z_TYPE_INFO_P(value);
-						if (EXPECTED(value_type != IS_UNDEF)
+						value_type = Z_RAW_TYPE_INFO_P(value);
+						if (EXPECTED(!T_IS_UNDEF(value_type))
 						 && EXPECTED(zend_check_property_access(Z_OBJ_P(array), p->key) == SUCCESS)) {
 							break;
 						}
@@ -22386,7 +22386,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FE_FETCH_R_SPEC_VAR_HANDLER(ZE
 					ZVAL_LONG(EX_VAR(opline->result.var), iter->index);
 				}
 			}
-			value_type = Z_TYPE_INFO_P(value);
+			value_type = Z_RAW_TYPE_INFO_P(value);
 		}
 	} else {
 		zend_error(E_WARNING, "Invalid argument supplied for foreach()");
@@ -22406,10 +22406,8 @@ fe_fetch_r_exit:
 		zval *res = EX_VAR(opline->op2.var);
 		zend_refcounted *gc = Z_COUNTED_P(value);
 
-		//???ZVAL_COPY_VALUE_EX(res, value, gc, value_type);
-		Z_COUNTED_P(res) = gc;
-		Z_SET_TYPE_INFO_P(res, value_type);
-		if (EXPECTED((value_type & (IS_TYPE_REFCOUNTED << Z_TYPE_FLAGS_SHIFT)) != 0)) {
+		ZVAL_COPY_VALUE_EX(res, value, gc, value_type);
+		if (EXPECTED(T_IS_REFCOUNTED(value_type))) {
 			GC_ADDREF(gc);
 		}
 	}
@@ -22440,12 +22438,12 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FE_FETCH_RW_SPEC_VAR_HANDLER(Z
 				goto fe_fetch_w_exit;
 			}
 			value = &p->val;
-			value_type = Z_TYPE_INFO_P(value);
-			if (EXPECTED(value_type != IS_UNDEF)) {
-				if (UNEXPECTED(value_type == IS_INDIRECT)) {
+			value_type = Z_RAW_TYPE_INFO_P(value);
+			if (EXPECTED(!T_IS_UNDEF(value_type))) {
+				if (UNEXPECTED(T_IS_INDIRECT(value_type))) {
 					value = Z_INDIRECT_P(value);
-					value_type = Z_TYPE_INFO_P(value);
-					if (EXPECTED(value_type != IS_UNDEF)) {
+					value_type = Z_RAW_TYPE_INFO_P(value);
+					if (EXPECTED(!T_IS_UNDEF(value_type))) {
 						break;
 					}
 				} else {
@@ -22482,12 +22480,12 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FE_FETCH_RW_SPEC_VAR_HANDLER(Z
 				}
 
 				value = &p->val;
-				value_type = Z_TYPE_INFO_P(value);
-				if (EXPECTED(value_type != IS_UNDEF)) {
-					if (UNEXPECTED(value_type == IS_INDIRECT)) {
+				value_type = Z_RAW_TYPE_INFO_P(value);
+				if (EXPECTED(!T_IS_UNDEF(value_type))) {
+					if (UNEXPECTED(T_IS_INDIRECT(value_type))) {
 						value = Z_INDIRECT_P(value);
-						value_type = Z_TYPE_INFO_P(value);
-						if (EXPECTED(value_type != IS_UNDEF)
+						value_type = Z_RAW_TYPE_INFO_P(value);
+						if (EXPECTED(!T_IS_UNDEF(value_type))
 						 && EXPECTED(zend_check_property_access(Z_OBJ_P(array), p->key) == SUCCESS)) {
 							break;
 						}
@@ -22553,7 +22551,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FE_FETCH_RW_SPEC_VAR_HANDLER(Z
 					ZVAL_LONG(EX_VAR(opline->result.var), iter->index);
 				}
 			}
-			value_type = Z_TYPE_INFO_P(value);
+			value_type = Z_RAW_TYPE_INFO_P(value);
 		}
 	} else {
 		zend_error(E_WARNING, "Invalid argument supplied for foreach()");
@@ -22566,14 +22564,12 @@ fe_fetch_w_exit:
 		ZEND_VM_CONTINUE();
 	}
 
-	if (EXPECTED((value_type & Z_TYPE_MASK) != IS_REFERENCE)) {
+	if (EXPECTED(!T_IS_REFERENCE(value_type))) {
 		zend_refcounted *gc = Z_COUNTED_P(value);
 		zval *ref;
 		ZVAL_NEW_EMPTY_REF(value);
 		ref = Z_REFVAL_P(value);
-		//???ZVAL_COPY_VALUE_EX(ref, value, gc, value_type);
-		Z_COUNTED_P(ref) = gc;
-		Z_SET_TYPE_INFO_P(ref, value_type);
+		ZVAL_COPY_VALUE_EX(ref, value, gc, value_type);
 	}
 	if (EXPECTED(opline->op2_type == IS_CV)) {
 		zval *variable_ptr = _get_zval_ptr_cv_undef_BP_VAR_W(opline->op2.var EXECUTE_DATA_CC);
@@ -31634,12 +31630,12 @@ static ZEND_VM_HOT ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FE_FETCH_R_SIMPLE_
 			ZEND_VM_CONTINUE();
 		}
 		value = &p->val;
-		value_type = Z_TYPE_INFO_P(value);
-		if (EXPECTED(value_type != IS_UNDEF)) {
-			if (UNEXPECTED(value_type == IS_INDIRECT)) {
+		value_type = Z_RAW_TYPE_INFO_P(value);
+		if (EXPECTED(!T_IS_UNDEF(value_type))) {
+			if (UNEXPECTED(T_IS_INDIRECT(value_type))) {
 				value = Z_INDIRECT_P(value);
-				value_type = Z_TYPE_INFO_P(value);
-				if (EXPECTED(value_type != IS_UNDEF)) {
+				value_type = Z_RAW_TYPE_INFO_P(value);
+				if (EXPECTED(!T_IS_UNDEF(value_type))) {
 					break;
 				}
 			} else {
@@ -31686,12 +31682,12 @@ static ZEND_VM_HOT ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FE_FETCH_R_SIMPLE_
 			ZEND_VM_CONTINUE();
 		}
 		value = &p->val;
-		value_type = Z_TYPE_INFO_P(value);
-		if (EXPECTED(value_type != IS_UNDEF)) {
-			if (UNEXPECTED(value_type == IS_INDIRECT)) {
+		value_type = Z_RAW_TYPE_INFO_P(value);
+		if (EXPECTED(!T_IS_UNDEF(value_type))) {
+			if (UNEXPECTED(T_IS_INDIRECT(value_type))) {
 				value = Z_INDIRECT_P(value);
-				value_type = Z_TYPE_INFO_P(value);
-				if (EXPECTED(value_type != IS_UNDEF)) {
+				value_type = Z_RAW_TYPE_INFO_P(value);
+				if (EXPECTED(!T_IS_UNDEF(value_type))) {
 					break;
 				}
 			} else {
