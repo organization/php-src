@@ -4691,7 +4691,7 @@ ZEND_VM_HOT_HANDLER(64, ZEND_RECV_INIT, NUM, CONST)
 	param = _get_zval_ptr_cv_undef_BP_VAR_W(opline->result.var EXECUTE_DATA_CC);
 	if (arg_num > EX_NUM_ARGS()) {
 		ZVAL_COPY(param, RT_CONSTANT(opline, opline->op2));
-		if (Z_OPT_TYPE_P(param) == IS_CONSTANT_AST) {
+		if (Z_CONSTANT_P(param)) {
 			SAVE_OPLINE();
 			if (UNEXPECTED(zval_update_constant_ex(param, EX(func)->op_array.scope) != SUCCESS)) {
 				zval_ptr_dtor_nogc(param);

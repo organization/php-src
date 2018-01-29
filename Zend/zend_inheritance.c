@@ -847,7 +847,7 @@ ZEND_API void zend_do_inheritance(zend_class_entry *ce, zend_class_entry *parent
 				dst--;
 				src--;
 				ZVAL_COPY_OR_DUP(dst, src);
-				if (Z_OPT_TYPE_P(dst) == IS_CONSTANT_AST) {
+				if (Z_CONSTANT_P(dst)) {
 					ce->ce_flags &= ~ZEND_ACC_CONSTANTS_UPDATED;
 				}
 				continue;
@@ -857,7 +857,7 @@ ZEND_API void zend_do_inheritance(zend_class_entry *ce, zend_class_entry *parent
 				dst--;
 				src--;
 				ZVAL_COPY(dst, src);
-				if (Z_OPT_TYPE_P(dst) == IS_CONSTANT_AST) {
+				if (Z_CONSTANT_P(dst)) {
 					ce->ce_flags &= ~ZEND_ACC_CONSTANTS_UPDATED;
 				}
 				continue;

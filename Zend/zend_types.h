@@ -404,10 +404,6 @@ static zend_always_inline zend_bool zval_is_double(const zval* pz) {
 	return (pz->u1.type_info < MIN_NAN);
 }
 
-static zend_always_inline zend_bool zval_is_undef(const zval* pz) {
-	return (pz->u1.type_info == (uint32_t)~IS_UNDEF);
-}
-
 static zend_always_inline zend_bool zval_is_refcounted(const zval* pz) {
 	uint32_t ti = pz->u1.type_info;
 	return ti >= MIN_NAN && ti < (uint32_t)~(IS_TYPE_REFCOUNTED << Z_TYPE_FLAGS_SHIFT);
@@ -559,9 +555,11 @@ static zend_always_inline uint32_t zval_get_type_info(const zval* pz) {
 #define Z_IS_LONG(zval)				((zval).u1.type_info == (uint32_t)~IS_LONG)
 #define Z_IS_DOUBLE(zval)			zval_is_double(&(zval))
 // TODO
-#define Z_IS_STRING(zval)			(Z_TYPE(zval) == IS_STRING)
+//#define Z_IS_STRING(zval)			(Z_TYPE(zval) == IS_STRING)
+#define Z_IS_STRING(zval)			(((zval).u1.type_info | (uint32_t)(IS_TYPE_REFCOUNTED << Z_TYPE_FLAGS_SHIFT)) == (uint32_t)~IS_STRING)
 // TODO
-#define Z_IS_ARRAY(zval)			(Z_TYPE(zval) == IS_ARRAY)
+//#define Z_IS_ARRAY(zval)			(Z_TYPE(zval) == IS_ARRAY)
+#define Z_IS_ARRAY(zval)			(((zval).u1.type_info | (uint32_t)(IS_TYPE_REFCOUNTED << Z_TYPE_FLAGS_SHIFT)) == (uint32_t)~IS_ARRAY)
 #define Z_IS_OBJECT(zval)			((zval).u1.type_info == (uint32_t)~IS_OBJECT_EX)
 #define Z_IS_RESOURCE(zval)			((zval).u1.type_info == (uint32_t)~IS_RESOURCE_EX)
 #define Z_IS_REFERENCE(zval)		((zval).u1.type_info == (uint32_t)~IS_REFERENCE_EX)
@@ -584,7 +582,8 @@ static zend_always_inline uint32_t zval_get_type_info(const zval* pz) {
 #define Z_IS_LESS_THAN_TRUE_P(zval)	Z_IS_LESS_THAN_TRUE(*(zval))
 
 /* All data types < IS_STRING have their constructor/destructors skipped */
-#define Z_CONSTANT(zval)			(Z_TYPE(zval) == IS_CONSTANT_AST)
+//#define Z_CONSTANT(zval)			(Z_TYPE(zval) == IS_CONSTANT_AST)
+#define Z_CONSTANT(zval)			(((zval).u1.type_info | (uint32_t)(IS_TYPE_REFCOUNTED << Z_TYPE_FLAGS_SHIFT)) == (uint32_t)~IS_CONSTANT_AST)
 #define Z_CONSTANT_P(zval_p)		Z_CONSTANT(*(zval_p))
 
 //#define Z_REFCOUNTED(zval)			((Z_TYPE_FLAGS(zval) & IS_TYPE_REFCOUNTED) != 0)
@@ -602,10 +601,10 @@ static zend_always_inline uint32_t zval_get_type_info(const zval* pz) {
 #define Z_OPT_IMMUTABLE_P(zval_p)	Z_IMMUTABLE(*(zval_p))
 
 /* the following Z_OPT_* macros make better code when Z_TYPE_INFO accessed before */
-#define Z_OPT_TYPE(zval)			(Z_TYPE_INFO(zval) & Z_TYPE_MASK)
+#define Z_OPT_TYPE(zval)			Z_TYPE(zval)
 #define Z_OPT_TYPE_P(zval_p)		Z_OPT_TYPE(*(zval_p))
 
-#define Z_OPT_CONSTANT(zval)		(Z_OPT_TYPE(zval) == IS_CONSTANT_AST)
+#define Z_OPT_CONSTANT(zval)		Z_CONSTANT(zval)
 #define Z_OPT_CONSTANT_P(zval_p)	Z_OPT_CONSTANT(*(zval_p))
 
 #define Z_OPT_REFCOUNTED(zval)		zval_is_refcounted(&(zval))
@@ -627,7 +626,7 @@ static zend_always_inline uint32_t zval_get_type_info(const zval* pz) {
 #define Z_ISNULL(zval)				Z_IS_NULL(zval)
 #define Z_ISNULL_P(zval_p)			Z_ISNULL(*(zval_p))
 
-#define Z_ISERROR(zval)				(Z_TYPE(zval) == _IS_ERROR)
+#define Z_ISERROR(zval)				((zval).u1.type_info == (uint32_t)~_IS_ERROR)
 #define Z_ISERROR_P(zval_p)			Z_ISERROR(*(zval_p))
 
 #define Z_LVAL(zval)				(zval).value.lval
@@ -1193,7 +1192,7 @@ static zend_always_inline uint32_t zval_delref_p(zval* pz) {
 			ZVAL_COPY_VALUE(_zv, &_r->val);				\
 			if (GC_DELREF(_r) == 0) {					\
 				efree_size(_r, sizeof(zend_reference));	\
-			} else if (Z_OPT_TYPE_P(_zv) == IS_ARRAY) {	\
+			} else if (Z_IS_ARRAY_P(_zv)) {				\
 				ZVAL_ARR(_zv, zend_array_dup(Z_ARR_P(_zv)));\
 				break;									\
 			} else if (Z_OPT_REFCOUNTED_P(_zv)) {		\

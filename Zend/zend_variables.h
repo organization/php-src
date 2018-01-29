@@ -64,7 +64,7 @@ static zend_always_inline void _zval_copy_ctor(zval *zvalue ZEND_FILE_LINE_DC)
 
 static zend_always_inline void _zval_opt_copy_ctor(zval *zvalue ZEND_FILE_LINE_DC)
 {
-	if (Z_OPT_TYPE_P(zvalue) == IS_ARRAY) {
+	if (Z_IS_ARRAY_P(zvalue)) {
 		ZVAL_ARR(zvalue, zend_array_dup(Z_ARR_P(zvalue)));
 	} else if (Z_OPT_REFCOUNTED_P(zvalue)) {
 		Z_ADDREF_P(zvalue);
