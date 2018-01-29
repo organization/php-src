@@ -602,12 +602,9 @@ static zend_always_inline uint32_t zval_get_raw_type_info(const zval* pz) {
 #define Z_IS_LESS_THAN_TRUE(zval)	T_IS_LESS_THAN_TRUE((zval).u1.type_info)
 #define Z_IS_LESS_THAN_TRUE_P(zval)	Z_IS_LESS_THAN_TRUE(*(zval))
 
-/* All data types < IS_STRING have their constructor/destructors skipped */
-//#define Z_CONSTANT(zval)			(Z_TYPE(zval) == IS_CONSTANT_AST)
 #define Z_CONSTANT(zval)			T_IS_CONSTANT((zval).u1.type_info)
 #define Z_CONSTANT_P(zval_p)		Z_CONSTANT(*(zval_p))
 
-//#define Z_REFCOUNTED(zval)			((Z_TYPE_FLAGS(zval) & IS_TYPE_REFCOUNTED) != 0)
 #define Z_REFCOUNTED(zval)			T_IS_REFCOUNTED((zval).u1.type_info)
 #define Z_REFCOUNTED_P(zval_p)		Z_REFCOUNTED(*(zval_p))
 
