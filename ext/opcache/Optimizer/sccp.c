@@ -88,12 +88,10 @@ typedef struct _sccp_ctx {
 	zval bot;
 } sccp_ctx;
 
-#define TOP                     21
-#define BOT                     22
-#define PARTIAL_ARRAY           23
-#define PARTIAL_OBJECT          24
-#define PARTIAL_ARRAY_EX        ((IS_TYPE_REFCOUNTED << Z_TYPE_FLAGS_SHIFT) | PARTIAL_ARRAY)
-#define PARTIAL_OBJECT_EX       ((IS_TYPE_REFCOUNTED << Z_TYPE_FLAGS_SHIFT) | PARTIAL_OBJECT)
+#define TOP                     IS_RESERVE_1
+#define BOT                     IS_RESERVE_2
+#define PARTIAL_ARRAY_EX        ((IS_TYPE_REFCOUNTED << Z_TYPE_FLAGS_SHIFT) | IS_RESERVE_1)
+#define PARTIAL_OBJECT_EX       ((IS_TYPE_REFCOUNTED << Z_TYPE_FLAGS_SHIFT) | IS_RESERVE_2)
 
 #define IS_TOP(zv)              (Z_RAW_TYPE_INFO_P(zv) == (uint32_t)~TOP)
 #define IS_BOT(zv)              (Z_RAW_TYPE_INFO_P(zv) == (uint32_t)~BOT)

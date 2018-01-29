@@ -371,9 +371,12 @@ struct _zend_ast_ref {
 #define IS_CONSTANT_AST				11
 
 /* internal types */
-#define IS_INDIRECT             	13
-#define IS_PTR						14
-#define _IS_ERROR					15
+#define IS_INDIRECT             	12
+#define IS_PTR						13
+#define _IS_ERROR					13
+
+#define IS_RESERVE_1				14
+#define IS_RESERVE_2				15
 
 /* fake types used only for type hinting (Z_TYPE(zv) can not use them) */
 #define _IS_BOOL					16
@@ -382,9 +385,9 @@ struct _zend_ast_ref {
 #define IS_VOID						19
 #define _IS_NUMBER					20
 
-#define MIN_NAN                     0xffffff80
+#define MIN_NAN                     0xffffffe0
 
-#define IS_TYPE_REFCOUNTED			(1<<6)
+#define IS_TYPE_REFCOUNTED			(1<<4)
 
 #define Z_TYPE_MASK					0x0f
 #define Z_TYPE_FLAGS_SHIFT			0
