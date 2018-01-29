@@ -397,8 +397,8 @@ ZEND_API zend_long ZEND_FASTCALL zend_atol(const char *str, size_t str_len);
 
 ZEND_API void ZEND_FASTCALL zend_locale_sprintf_double(zval *op ZEND_FILE_LINE_DC);
 
-#define convert_to_ex_master(pzv, lower_type, upper_type)	\
-	if (Z_TYPE_P(pzv)!=upper_type) {					\
+#define convert_to_ex_master(pzv, lower_type, check_type)	\
+	if (!check_type(pzv)) {									\
 		convert_to_##lower_type(pzv);						\
 	}
 
@@ -432,18 +432,13 @@ ZEND_API void ZEND_FASTCALL zend_locale_sprintf_double(zval *op ZEND_FILE_LINE_D
 		}										\
 	} while (0);
 
-#define convert_to_explicit_type_ex(pzv, str_type)	\
-	if (Z_TYPE_P(pzv) != str_type) {				\
-		convert_to_explicit_type(pzv, str_type);	\
-	}
-
-#define convert_to_boolean_ex(pzv)	convert_to_ex_master(pzv, boolean, _IS_BOOL)
-#define convert_to_long_ex(pzv)		convert_to_ex_master(pzv, long, IS_LONG)
-#define convert_to_double_ex(pzv)	convert_to_ex_master(pzv, double, IS_DOUBLE)
-#define convert_to_string_ex(pzv)	convert_to_ex_master(pzv, string, IS_STRING)
-#define convert_to_array_ex(pzv)	convert_to_ex_master(pzv, array, IS_ARRAY)
-#define convert_to_object_ex(pzv)	convert_to_ex_master(pzv, object, IS_OBJECT)
-#define convert_to_null_ex(pzv)		convert_to_ex_master(pzv, null, IS_NULL)
+#define convert_to_boolean_ex(pzv)	convert_to_ex_master(pzv, boolean, Z_IS_BOOL_P)
+#define convert_to_long_ex(pzv)		convert_to_ex_master(pzv, long, Z_IS_LONG_P)
+#define convert_to_double_ex(pzv)	convert_to_ex_master(pzv, double, Z_IS_DOUBLE_P)
+#define convert_to_string_ex(pzv)	convert_to_ex_master(pzv, string, Z_IS_STRING_P)
+#define convert_to_array_ex(pzv)	convert_to_ex_master(pzv, array, Z_IS_ARRAY_P)
+#define convert_to_object_ex(pzv)	convert_to_ex_master(pzv, object, Z_IS_OBJECT_P)
+#define convert_to_null_ex(pzv)		convert_to_ex_master(pzv, null, Z_IS_NULL_P)
 
 #define convert_scalar_to_number_ex(pzv)							\
 	if (!Z_IS_LONG_P(pzv) && !Z_IS_DOUBLE_P(pzv)) {		\
