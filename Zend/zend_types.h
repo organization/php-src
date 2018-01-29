@@ -546,6 +546,35 @@ static zend_always_inline uint32_t zval_get_type_info(const zval* pz) {
 #define Z_PROTECT_RECURSION_P(zv)   Z_PROTECT_RECURSION(*(zv))
 #define Z_UNPROTECT_RECURSION_P(zv) Z_UNPROTECT_RECURSION(*(zv))
 
+/* Type checks */
+#define Z_IS_UNDEF(zval)			((zval).u1.type_info == (uint32_t)~IS_UNDEF)
+#define Z_IS_NULL(zval)				((zval).u1.type_info == (uint32_t)~IS_NULL)
+#define Z_IS_FALSE(zval)			((zval).u1.type_info == (uint32_t)~IS_FALSE)
+#define Z_IS_TRUE(zval)				((zval).u1.type_info == (uint32_t)~IS_TRUE)
+#define Z_IS_LONG(zval)				((zval).u1.type_info == (uint32_t)~IS_LONG)
+#define Z_IS_DOUBLE(zval)			zval_is_double(&(zval))
+// TODO
+#define Z_IS_STRING(zval)			(Z_TYPE(zval) == IS_STRING)
+// TODO
+#define Z_IS_ARRAY(zval)			(Z_TYPE(zval) == IS_ARRAY)
+#define Z_IS_OBJECT(zval)			((zval).u1.type_info == (uint32_t)~IS_OBJECT_EX)
+#define Z_IS_RESOURCE(zval)			((zval).u1.type_info == (uint32_t)~IS_RESOURCE_EX)
+#define Z_IS_REFERENCE(zval)		((zval).u1.type_info == (uint32_t)~IS_REFERENCE_EX)
+#define Z_IS_INDIRECT(zval)			((zval).u1.type_info == (uint32_t)~IS_INDIRECT)
+
+#define Z_IS_UNDEF_P(zval)			Z_IS_UNDEF(*(zval))
+#define Z_IS_NULL_P(zval)			Z_IS_NULL(*(zval))
+#define Z_IS_FALSE_P(zval)			Z_IS_FALSE(*(zval))
+#define Z_IS_TRUE_P(zval)			Z_IS_TRUE(*(zval))
+#define Z_IS_LONG_P(zval)			Z_IS_LONG(*(zval))
+#define Z_IS_DOUBLE_P(zval)			Z_IS_DOUBLE(*(zval))
+#define Z_IS_STRING_P(zval)			Z_IS_STRING(*(zval))
+#define Z_IS_ARRAY_P(zval)			Z_IS_ARRAY(*(zval))
+#define Z_IS_OBJECT_P(zval)			Z_IS_OBJECT(*(zval))
+#define Z_IS_RESOURCE_P(zval)		Z_IS_RESOURCE(*(zval))
+#define Z_IS_REFERENCE_P(zval)		Z_IS_REFERENCE(*(zval))
+#define Z_IS_INDIRECT_P(zval)		Z_IS_INDIRECT(*(zval))
+
 /* All data types < IS_STRING have their constructor/destructors skipped */
 #define Z_CONSTANT(zval)			(Z_TYPE(zval) == IS_CONSTANT_AST)
 #define Z_CONSTANT_P(zval_p)		Z_CONSTANT(*(zval_p))
@@ -554,7 +583,7 @@ static zend_always_inline uint32_t zval_get_type_info(const zval* pz) {
 #define Z_REFCOUNTED_P(zval_p)		Z_REFCOUNTED(*(zval_p))
 
 /* deprecated: (COPYABLE is the same as IS_ARRAY) */
-#define Z_COPYABLE(zval)			((Z_TYPE(zval) == IS_ARRAY)
+#define Z_COPYABLE(zval)			(Z_IS_ARRAY(zval)
 #define Z_COPYABLE_P(zval_p)		Z_COPYABLE(*(zval_p))
 
 /* deprecated: (IMMUTABLE is the same as IS_ARRAY && !REFCOUED) */
@@ -574,19 +603,19 @@ static zend_always_inline uint32_t zval_get_type_info(const zval* pz) {
 #define Z_OPT_REFCOUNTED_P(zval_p)	Z_OPT_REFCOUNTED(*(zval_p))
 
 /* deprecated: (COPYABLE is the same as IS_ARRAY) */
-#define Z_OPT_COPYABLE(zval)		((Z_OPT_TYPE(zval) == IS_ARRAY)
+#define Z_OPT_COPYABLE(zval)		Z_IS_ARRAY(zval)
 #define Z_OPT_COPYABLE_P(zval_p)	Z_OPT_COPYABLE(*(zval_p))
 
-#define Z_OPT_ISREF(zval)			(Z_OPT_TYPE(zval) == IS_REFERENCE)
+#define Z_OPT_ISREF(zval)			Z_IS_REFERENCE(zval)
 #define Z_OPT_ISREF_P(zval_p)		Z_OPT_ISREF(*(zval_p))
 
-#define Z_ISREF(zval)				(Z_TYPE(zval) == IS_REFERENCE)
+#define Z_ISREF(zval)				Z_IS_REFERENCE(zval)
 #define Z_ISREF_P(zval_p)			Z_ISREF(*(zval_p))
 
-#define Z_ISUNDEF(zval)				(Z_TYPE(zval) == IS_UNDEF)
+#define Z_ISUNDEF(zval)				Z_IS_UNDEF(zval)
 #define Z_ISUNDEF_P(zval_p)			Z_ISUNDEF(*(zval_p))
 
-#define Z_ISNULL(zval)				(Z_TYPE(zval) == IS_NULL)
+#define Z_ISNULL(zval)				Z_IS_NULL(zval)
 #define Z_ISNULL_P(zval_p)			Z_ISNULL(*(zval_p))
 
 #define Z_ISERROR(zval)				(Z_TYPE(zval) == _IS_ERROR)
