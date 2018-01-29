@@ -408,6 +408,11 @@ static zend_always_inline zend_bool zval_is_undef(const zval* pz) {
 	return (pz->u1.type_info == (uint32_t)~IS_UNDEF);
 }
 
+static zend_always_inline zend_bool zval_is_refcounted(const zval* pz) {
+	uint32_t ti = pz->u1.type_info;
+	return ti >= MIN_NAN && ti < (uint32_t)~(IS_TYPE_REFCOUNTED << Z_TYPE_FLAGS_SHIFT);
+}
+
 static zend_always_inline zend_uchar zval_get_type(const zval* pz) {
 	return zval_is_double(pz) ? IS_DOUBLE : ~pz->u1.v.type;
 }
@@ -579,7 +584,8 @@ static zend_always_inline uint32_t zval_get_type_info(const zval* pz) {
 #define Z_CONSTANT(zval)			(Z_TYPE(zval) == IS_CONSTANT_AST)
 #define Z_CONSTANT_P(zval_p)		Z_CONSTANT(*(zval_p))
 
-#define Z_REFCOUNTED(zval)			((Z_TYPE_FLAGS(zval) & IS_TYPE_REFCOUNTED) != 0)
+//#define Z_REFCOUNTED(zval)			((Z_TYPE_FLAGS(zval) & IS_TYPE_REFCOUNTED) != 0)
+#define Z_REFCOUNTED(zval)			zval_is_refcounted(&(zval))
 #define Z_REFCOUNTED_P(zval_p)		Z_REFCOUNTED(*(zval_p))
 
 /* deprecated: (COPYABLE is the same as IS_ARRAY) */
@@ -599,7 +605,7 @@ static zend_always_inline uint32_t zval_get_type_info(const zval* pz) {
 #define Z_OPT_CONSTANT(zval)		(Z_OPT_TYPE(zval) == IS_CONSTANT_AST)
 #define Z_OPT_CONSTANT_P(zval_p)	Z_OPT_CONSTANT(*(zval_p))
 
-#define Z_OPT_REFCOUNTED(zval)		((Z_TYPE_INFO(zval) & (IS_TYPE_REFCOUNTED << Z_TYPE_FLAGS_SHIFT)) != 0)
+#define Z_OPT_REFCOUNTED(zval)		zval_is_refcounted(&(zval))
 #define Z_OPT_REFCOUNTED_P(zval_p)	Z_OPT_REFCOUNTED(*(zval_p))
 
 /* deprecated: (COPYABLE is the same as IS_ARRAY) */
