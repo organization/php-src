@@ -2912,26 +2912,27 @@ ZEND_VM_HANDLER(56, ZEND_ROPE_END, TMP, CONST|TMPVAR|CV, NUM)
 
 ZEND_VM_HANDLER(109, ZEND_FETCH_CLASS, ANY, CONST|TMPVAR|UNUSED|CV, CLASS_FETCH)
 {
+	zend_free_op free_op2;
+	zval *class_name;
 	USE_OPLINE
 
 	SAVE_OPLINE();
 	if (OP2_TYPE == IS_UNUSED) {
 		Z_CE_P(EX_VAR(opline->result.var)) = zend_fetch_class(NULL, opline->extended_value);
 		ZEND_VM_NEXT_OPCODE_CHECK_EXCEPTION();
+	} else if (OP2_TYPE == IS_CONST) {
+		zend_class_entry *ce = CACHED_PTR(opline->cache_slot);
+
+		if (UNEXPECTED(ce == NULL)) {
+			class_name = GET_OP2_ZVAL_PTR_UNDEF(BP_VAR_R);
+			ce = zend_fetch_class_by_name(Z_STR_P(class_name), RT_CONSTANT(opline, opline->op2) + 1, opline->extended_value);
+			CACHE_PTR(opline->cache_slot, ce);
+		}
+		Z_CE_P(EX_VAR(opline->result.var)) = ce;
 	} else {
-		zend_free_op free_op2;
-		zval *class_name = GET_OP2_ZVAL_PTR_UNDEF(BP_VAR_R);
-
+		class_name = GET_OP2_ZVAL_PTR_UNDEF(BP_VAR_R);
 ZEND_VM_C_LABEL(try_class_name):
-		if (OP2_TYPE == IS_CONST) {
-			zend_class_entry *ce = CACHED_PTR(opline->cache_slot);
-
-			if (UNEXPECTED(ce == NULL)) {
-				ce = zend_fetch_class_by_name(Z_STR_P(class_name), RT_CONSTANT(opline, opline->op2) + 1, opline->extended_value);
-				CACHE_PTR(opline->cache_slot, ce);
-			}
-			Z_CE_P(EX_VAR(opline->result.var)) = ce;
-		} else if (Z_IS_OBJECT_P(class_name)) {
+		if (Z_IS_OBJECT_P(class_name)) {
 			Z_CE_P(EX_VAR(opline->result.var)) = Z_OBJCE_P(class_name);
 		} else if (Z_IS_STRING_P(class_name)) {
 			Z_CE_P(EX_VAR(opline->result.var)) = zend_fetch_class(Z_STR_P(class_name), opline->extended_value);
@@ -2947,10 +2948,10 @@ ZEND_VM_C_LABEL(try_class_name):
 			}
 			zend_throw_error(NULL, "Class name must be a valid object or a string");
 		}
-
-		FREE_OP2();
-		ZEND_VM_NEXT_OPCODE_CHECK_EXCEPTION();
 	}
+
+	FREE_OP2();
+	ZEND_VM_NEXT_OPCODE_CHECK_EXCEPTION();
 }
 
 ZEND_VM_HOT_OBJ_HANDLER(112, ZEND_INIT_METHOD_CALL, CONST|TMPVAR|UNUSED|THIS|CV, CONST|TMPVAR|CV, NUM)
@@ -2973,7 +2974,9 @@ ZEND_VM_HOT_OBJ_HANDLER(112, ZEND_INIT_METHOD_CALL, CONST|TMPVAR|UNUSED|THIS|CV,
 		ZEND_VM_DISPATCH_TO_HELPER(zend_this_not_in_object_context_helper);
 	}
 
-	function_name = GET_OP2_ZVAL_PTR_UNDEF(BP_VAR_R);
+	if (OP2_TYPE != IS_CONST) {
+		function_name = GET_OP2_ZVAL_PTR_UNDEF(BP_VAR_R);
+	}
 
 	if (OP2_TYPE != IS_CONST &&
 	    UNEXPECTED(!Z_IS_STRING_P(function_name))) {
@@ -3013,6 +3016,9 @@ ZEND_VM_HOT_OBJ_HANDLER(112, ZEND_INIT_METHOD_CALL, CONST|TMPVAR|UNUSED|THIS|CV,
 						HANDLE_EXCEPTION();
 					}
 				}
+				if (OP2_TYPE == IS_CONST) {
+					function_name = GET_OP2_ZVAL_PTR_UNDEF(BP_VAR_R);
+				}
 				zend_throw_error(NULL, "Call to a member function %s() on %s", Z_STRVAL_P(function_name), zend_get_type_by_const(Z_TYPE_P(object)));
 				FREE_OP2();
 				FREE_OP1();
@@ -3035,6 +3041,10 @@ ZEND_VM_HOT_OBJ_HANDLER(112, ZEND_INIT_METHOD_CALL, CONST|TMPVAR|UNUSED|THIS|CV,
 			FREE_OP2();
 			FREE_OP1();
 			HANDLE_EXCEPTION();
+		}
+
+		if (OP2_TYPE == IS_CONST) {
+			function_name = GET_OP2_ZVAL_PTR_UNDEF(BP_VAR_R);
 		}
 
 		/* First, locate the function. */
@@ -3242,9 +3252,9 @@ ZEND_VM_HOT_HANDLER(59, ZEND_INIT_FCALL_BY_NAME, ANY, CONST, NUM)
 	zval *function_name, *func;
 	zend_execute_data *call;
 
-	function_name = (zval*)RT_CONSTANT(opline, opline->op2);
 	fbc = CACHED_PTR(opline->cache_slot);
 	if (UNEXPECTED(fbc == NULL)) {
+		function_name = (zval*)RT_CONSTANT(opline, opline->op2);
 		func = zend_hash_find_ex(EG(function_table), Z_STR_P(function_name+1), 1);
 		if (UNEXPECTED(func == NULL)) {
 			SAVE_OPLINE();
@@ -3406,9 +3416,9 @@ ZEND_VM_HANDLER(69, ZEND_INIT_NS_FCALL_BY_NAME, ANY, CONST, NUM)
 	zend_function *fbc;
 	zend_execute_data *call;
 
-	func_name = RT_CONSTANT(opline, opline->op2) + 1;
 	fbc = CACHED_PTR(opline->cache_slot);
 	if (UNEXPECTED(fbc == NULL)) {
+		func_name = RT_CONSTANT(opline, opline->op2) + 1;
 		func = zend_hash_find_ex(EG(function_table), Z_STR_P(func_name), 1);
 		if (func == NULL) {
 			func_name++;
@@ -3438,13 +3448,14 @@ ZEND_VM_HOT_HANDLER(61, ZEND_INIT_FCALL, NUM, CONST, NUM)
 {
 	USE_OPLINE
 	zend_free_op free_op2;
-	zval *fname = GET_OP2_ZVAL_PTR(BP_VAR_R);
+	zval *fname;
 	zval *func;
 	zend_function *fbc;
 	zend_execute_data *call;
 
 	fbc = CACHED_PTR(opline->cache_slot);
 	if (UNEXPECTED(fbc == NULL)) {
+		fname = GET_OP2_ZVAL_PTR(BP_VAR_R);
 		func = zend_hash_find_ex(EG(function_table), Z_STR_P(fname), 1);
 		if (UNEXPECTED(func == NULL)) {
 		    SAVE_OPLINE();
