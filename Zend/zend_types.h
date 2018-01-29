@@ -186,8 +186,8 @@ union _zval_struct {
 				struct {
 					ZEND_ENDIAN_LOHI_3(
 						zend_uchar    type,			/* active type */
-						zend_uchar    type_flags,
-						uint16_t      _unused
+						zend_uchar    _unused_byte,
+						uint16_t      _unused_word
 					)
 				} v;
 				uint32_t type_info;
@@ -382,20 +382,15 @@ struct _zend_ast_ref {
 #define IS_VOID						19
 #define _IS_NUMBER					20
 
-#define MIN_NAN                     0xfffff800
+#define MIN_NAN                     0xffffff80
 
-/* zval.u1.v.type_flags */
-#define IS_TYPE_REFCOUNTED			(1<<2)
+#define IS_TYPE_REFCOUNTED			(1<<6)
 
-#define Z_TYPE_MASK					0xff
-#define Z_TYPE_FLAGS_SHIFT			8
+#define Z_TYPE_MASK					0x0f
+#define Z_TYPE_FLAGS_SHIFT			0
 
 static zend_always_inline void zval_set_type_info(zval* pz, uint32_t type_info) {
 	if (type_info != IS_DOUBLE) {
-		// IS_UNDEF
-		//   0x00000000 => 0xffffffff
-		// IS_STRING & (IS_TYPE_REFCOUNTED << Z_TYPE_FLAGS_SHIFT)
-		//   0x00000406 => 0xffffffbf9
 		pz->u1.type_info = ~type_info;
 	}
 }
@@ -409,11 +404,11 @@ static zend_always_inline zend_bool zend_type_is_refcounted(uint32_t type_info) 
 }
 
 static zend_always_inline zend_uchar zval_get_type(const zval* pz) {
-	return zend_type_is_double(pz->u1.type_info) ? IS_DOUBLE : ~pz->u1.v.type;
+	return zend_type_is_double(pz->u1.type_info) ? IS_DOUBLE : ((~pz->u1.v.type) & Z_TYPE_MASK);
 }
 
 static zend_always_inline zend_uchar zval_get_type_flags(const zval* pz) {
-	return zend_type_is_double(pz->u1.type_info) ? 0 : ~pz->u1.v.type_flags;
+	return zend_type_is_double(pz->u1.type_info) ? 0 : ((~pz->u1.v.type) & IS_TYPE_REFCOUNTED);
 }
 
 static zend_always_inline uint32_t zval_get_type_info(const zval* pz) {

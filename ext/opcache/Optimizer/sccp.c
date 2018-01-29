@@ -88,20 +88,23 @@ typedef struct _sccp_ctx {
 	zval bot;
 } sccp_ctx;
 
-#define TOP ((zend_uchar)-1)
-#define BOT ((zend_uchar)-2)
-#define PARTIAL_ARRAY ((zend_uchar)-3)
-#define PARTIAL_OBJECT ((zend_uchar)-4)
-#define IS_TOP(zv) (Z_TYPE_P(zv) == TOP)
-#define IS_BOT(zv) (Z_TYPE_P(zv) == BOT)
-#define IS_PARTIAL_ARRAY(zv) (Z_TYPE_P(zv) == PARTIAL_ARRAY)
-#define IS_PARTIAL_OBJECT(zv) (Z_TYPE_P(zv) == PARTIAL_OBJECT)
+#define TOP                     21
+#define BOT                     22
+#define PARTIAL_ARRAY           23
+#define PARTIAL_OBJECT          24
+#define PARTIAL_ARRAY_EX        ((IS_TYPE_REFCOUNTED << Z_TYPE_FLAGS_SHIFT) | PARTIAL_ARRAY)
+#define PARTIAL_OBJECT_EX       ((IS_TYPE_REFCOUNTED << Z_TYPE_FLAGS_SHIFT) | PARTIAL_OBJECT)
 
-#define MAKE_PARTIAL_ARRAY(zv) (Z_SET_TYPE_INFO_P(zv, PARTIAL_ARRAY | (IS_TYPE_REFCOUNTED << Z_TYPE_FLAGS_SHIFT)))
-#define MAKE_PARTIAL_OBJECT(zv) (Z_SET_TYPE_INFO_P(zv, PARTIAL_OBJECT | (IS_TYPE_REFCOUNTED << Z_TYPE_FLAGS_SHIFT)))
+#define IS_TOP(zv)              (Z_RAW_TYPE_INFO_P(zv) == (uint32_t)~TOP)
+#define IS_BOT(zv)              (Z_RAW_TYPE_INFO_P(zv) == (uint32_t)~BOT)
+#define IS_PARTIAL_ARRAY(zv)    (Z_RAW_TYPE_INFO_P(zv) == (uint32_t)~PARTIAL_ARRAY_EX)
+#define IS_PARTIAL_OBJECT(zv)   (Z_RAW_TYPE_INFO_P(zv) == (uint32_t)~PARTIAL_OBJECT_EX)
 
-#define MAKE_TOP(zv) (Z_SET_TYPE_INFO_P(zv, TOP))
-#define MAKE_BOT(zv) (Z_SET_TYPE_INFO_P(zv, BOT))
+#define MAKE_PARTIAL_ARRAY(zv)   Z_SET_TYPE_INFO_P(zv, PARTIAL_ARRAY_EX)
+#define MAKE_PARTIAL_OBJECT(zv)  Z_SET_TYPE_INFO_P(zv, PARTIAL_OBJECT_EX)
+
+#define MAKE_TOP(zv)             Z_SET_TYPE_INFO_P(zv, TOP)
+#define MAKE_BOT(zv)             Z_SET_TYPE_INFO_P(zv, BOT)
 
 static void empty_partial_array(zval *zv)
 {
@@ -154,7 +157,7 @@ static void set_value(scdf_ctx *scdf, sccp_ctx *ctx, int var, zval *new) {
 
 	/* Always replace PARTIAL_(ARRAY|OBJECT), as new maybe changed by join_partial_(arrays|object) */
 	if (IS_PARTIAL_ARRAY(new) || IS_PARTIAL_OBJECT(new)) {
-		if (Z_TYPE_P(value) != Z_TYPE_P(new)
+		if (Z_RAW_TYPE_INFO_P(value) != Z_RAW_TYPE_INFO_P(new)
 			|| zend_hash_num_elements(Z_ARR_P(new)) != zend_hash_num_elements(Z_ARR_P(value))) {
 			zval_ptr_dtor_nogc(value);
 			ZVAL_COPY(value, new);
@@ -517,17 +520,13 @@ static inline int ct_eval_add_array_elem(zval *result, zval *value, zval *key) {
 }
 
 static inline int ct_eval_assign_dim(zval *result, zval *value, zval *key) {
-	switch (Z_TYPE_P(result)) {
-		case IS_NULL:
-		case IS_FALSE:
-			array_init(result);
-			/* break missing intentionally */
-		case IS_ARRAY:
-		case PARTIAL_ARRAY:
-			return ct_eval_add_array_elem(result, value, key);
-		case IS_STRING:
-			// TODO Before enabling this case, make sure ARRAY_DIM result op is correct
+	if (Z_IS_NULL_P(result) || Z_IS_FALSE_P(result)) {
+		array_init(result);
+		return ct_eval_add_array_elem(result, value, key);
+	} else if (Z_IS_ARRAY_P(result) || IS_PARTIAL_ARRAY(result)) {
+		return ct_eval_add_array_elem(result, value, key);
 #if 0
+	} else if (Z_IS_STRING(result)) {
 			zend_long index;
 			zend_string *new_str, *value_str;
 			if (!key || Z_IS_ARRAY_P(value)
@@ -549,9 +548,8 @@ static inline int ct_eval_assign_dim(zval *result, zval *value, zval *key) {
 			Z_STRVAL_P(result)[index] = ZSTR_VAL(value_str)[0];
 			zend_string_release(value_str);
 #endif
-			return FAILURE;
-		default:
-			return FAILURE;
+	} else {
+		return FAILURE;
 	}
 }
 
@@ -626,15 +624,13 @@ static inline int ct_eval_add_obj_prop(zval *result, zval *value, zval *key) {
 }
 
 static inline int ct_eval_assign_obj(zval *result, zval *value, zval *key) {
-	switch (Z_TYPE_P(result)) {
-		case IS_NULL:
-		case IS_FALSE:
-			empty_partial_object(result);
-			/* break missing intentionally */
-		case PARTIAL_OBJECT:
-			return ct_eval_add_obj_prop(result, value, key);
-		default:
-			return FAILURE;
+	if (Z_IS_NULL_P(result) || Z_IS_FALSE_P(result)) {
+		empty_partial_object(result);
+		return ct_eval_add_obj_prop(result, value, key);
+	} else if (IS_PARTIAL_OBJECT(result)) {
+		return ct_eval_add_obj_prop(result, value, key);
+	} else {
+		return FAILURE;
 	}
 }
 
