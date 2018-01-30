@@ -200,7 +200,7 @@ try_again:
 				convert_object_to_type(op, &dst, _IS_NUMBER, convert_scalar_to_number);
 				zval_dtor(op);
 
-				if (Z_IS_LONG(dst) || Z_IS_DOUBLE(dst)) {
+				if (Z_IS_NUMBER(dst)) {
 					ZVAL_COPY_VALUE(op, &dst);
 				} else {
 					ZVAL_LONG(op, 1);
@@ -260,7 +260,7 @@ ZEND_API void ZEND_FASTCALL convert_scalar_to_number(zval *op) /* {{{ */
 						}											\
 						return FAILURE;								\
 					}												\
-					if (Z_IS_LONG(holder) || Z_IS_DOUBLE(holder)) { \
+					if (Z_IS_NUMBER(holder)) {						\
 						if (op == result) {							\
 							zval_ptr_dtor(op);						\
 							ZVAL_COPY(op, &(holder));				\
@@ -2061,7 +2061,7 @@ ZEND_API int ZEND_FASTCALL compare_function(zval *result, zval *op1, zval *op2) 
 						return ret;
 					} else if (!Z_IS_OBJECT_P(op2) && Z_OBJ_HT_P(op1)->cast_object) {
 						ZVAL_UNDEF(&tmp_free);
-						if (Z_OBJ_HT_P(op1)->cast_object(op1, &tmp_free, ((Z_IS_FALSE_P(op2) || Z_IS_TRUE_P(op2)) ? _IS_BOOL : Z_TYPE_P(op2))) == FAILURE) {
+						if (Z_OBJ_HT_P(op1)->cast_object(op1, &tmp_free, (Z_IS_BOOL_P(op2) ? _IS_BOOL : Z_TYPE_P(op2))) == FAILURE) {
 							ZVAL_LONG(result, 1);
 							zend_free_obj_get_result(&tmp_free);
 							return SUCCESS;
@@ -2080,7 +2080,7 @@ ZEND_API int ZEND_FASTCALL compare_function(zval *result, zval *op1, zval *op2) 
 						return ret;
 					} else if (!Z_IS_OBJECT_P(op1) && Z_OBJ_HT_P(op2)->cast_object) {
 						ZVAL_UNDEF(&tmp_free);
-						if (Z_OBJ_HT_P(op2)->cast_object(op2, &tmp_free, ((Z_IS_FALSE_P(op1) || Z_IS_TRUE_P(op1)) ? _IS_BOOL : Z_TYPE_P(op1))) == FAILURE) {
+						if (Z_OBJ_HT_P(op2)->cast_object(op2, &tmp_free, (Z_IS_BOOL_P(op1) ? _IS_BOOL : Z_TYPE_P(op1))) == FAILURE) {
 							ZVAL_LONG(result, -1);
 							zend_free_obj_get_result(&tmp_free);
 							return SUCCESS;

@@ -947,7 +947,7 @@ PHPAPI zend_string * _php_math_zvaltobase(zval *arg, int base)
 {
 	static char digits[] = "0123456789abcdefghijklmnopqrstuvwxyz";
 
-	if ((!Z_IS_LONG_P(arg) && !Z_IS_DOUBLE_P(arg)) || base < 2 || base > 36) {
+	if (!Z_IS_NUMBER_P(arg) || base < 2 || base > 36) {
 		return ZSTR_EMPTY_ALLOC();
 	}
 

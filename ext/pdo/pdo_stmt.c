@@ -646,11 +646,8 @@ static inline void fetch_value(pdo_stmt_t *stmt, zval *dest, int colno, int *typ
 	}
 
 	if (stmt->dbh->stringify) {
-		switch (Z_TYPE_P(dest)) {
-			case IS_LONG:
-			case IS_DOUBLE:
-				convert_to_string(dest);
-				break;
+		if (Z_IS_NUMBER_P(dest)) {
+			convert_to_string(dest);
 		}
 	}
 

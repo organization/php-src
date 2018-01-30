@@ -785,7 +785,7 @@ static inline int ct_eval_func_call(
 			}
 
 			ZEND_HASH_FOREACH_VAL(Z_ARRVAL_P(args[0]), entry) {
-				if (Z_TYPE_P(entry) > IS_STRING) {
+				if (!Z_IS_SCALAR_OR_STRING_P(entry)) {
 					return FAILURE;
 				}
 			} ZEND_HASH_FOREACH_END();
@@ -863,13 +863,13 @@ static inline int ct_eval_func_call(
 
 			if (Z_IS_ARRAY_P(args[0])) {
 				ZEND_HASH_FOREACH_VAL(Z_ARRVAL_P(args[0]), entry) {
-					if (Z_TYPE_P(entry) > IS_STRING) {
+					if (!Z_IS_SCALAR_OR_STRING_P(entry)) {
 						return FAILURE;
 					}
 				} ZEND_HASH_FOREACH_END();
 			} else {
 				ZEND_HASH_FOREACH_VAL(Z_ARRVAL_P(args[1]), entry) {
-					if (Z_TYPE_P(entry) > IS_STRING) {
+					if (!Z_IS_SCALAR_OR_STRING_P(entry)) {
 						return FAILURE;
 					}
 				} ZEND_HASH_FOREACH_END();
@@ -888,8 +888,7 @@ static inline int ct_eval_func_call(
 			}
 			/* pass */
 		} else if (zend_string_equals_literal(name, "pow")) {
-			if ((!Z_IS_LONG_P(args[0]) && !Z_IS_DOUBLE_P(args[0]))
-					|| (!Z_IS_LONG_P(args[1]) && !Z_IS_DOUBLE_P(args[1]))) {
+			if (!Z_IS_NUMBER_P(args[0]) || !Z_IS_NUMBER_P(args[1])) {
 				return FAILURE;
 			}
 			/* pass */

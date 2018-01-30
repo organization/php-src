@@ -242,7 +242,7 @@ static inline void alloc_cache_slots(zend_op_array *op_array, zend_op *opline, u
 } while (0)
 
 #define TO_STRING_NOWARN(val) do { \
-	if (Z_TYPE_P(val) >= IS_ARRAY) { \
+	if (!Z_IS_PERSISTABLE_P(val)) { \
 		return 0; \
 	} \
 	convert_to_string(val); \

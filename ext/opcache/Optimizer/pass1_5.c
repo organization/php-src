@@ -378,7 +378,7 @@ void zend_optimizer_pass1(zend_op_array *op_array, zend_optimizer_ctx *ctx)
 
 				if (Z_IS_STRING(ZEND_OP1_LITERAL(send1_opline)) &&
 				    send2_opline &&
-				    Z_TYPE(ZEND_OP1_LITERAL(send2_opline)) <= IS_STRING) {
+				    Z_IS_SCALAR_OR_STRING(ZEND_OP1_LITERAL(send2_opline))) {
 
 					if (collect_constants) {
 						zend_optimizer_collect_constant(ctx, &ZEND_OP1_LITERAL(send1_opline), &ZEND_OP1_LITERAL(send2_opline));
@@ -584,7 +584,7 @@ void zend_optimizer_pass1(zend_op_array *op_array, zend_optimizer_ctx *ctx)
 		case ZEND_DECLARE_CONST:
 			if (collect_constants &&
 			    Z_IS_STRING(ZEND_OP1_LITERAL(opline)) &&
-			    Z_TYPE(ZEND_OP2_LITERAL(opline)) <= IS_STRING) {
+			    Z_IS_SCALAR_OR_STRING(ZEND_OP2_LITERAL(opline))) {
 				zend_optimizer_collect_constant(ctx, &ZEND_OP1_LITERAL(opline), &ZEND_OP2_LITERAL(opline));
 			}
 			break;

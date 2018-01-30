@@ -565,6 +565,10 @@ static zend_always_inline uint32_t zval_get_raw_type_info(const zval* pz) {
 #define T_IS_REFERENCE(t)			((t) == (uint32_t)~IS_REFERENCE_EX)
 #define T_IS_INDIRECT(t)			((t) == (uint32_t)~IS_INDIRECT)
 
+#define T_IS_CONSTANT(t)			(((t) | (uint32_t)(IS_TYPE_REFCOUNTED << Z_TYPE_FLAGS_SHIFT)) == (uint32_t)~IS_CONSTANT_AST)
+#define T_IS_PTR(t)					((t) == (uint32_t)~IS_PTR)
+#define T_IS_ERROR(t)				((t) == (uint32_t)~_IS_ERROR)
+
 // IS_UNDEF, IS_NULL, IS_FALSE or IS_TRUE
 #define T_IS_PRIMITIVE(t)			((t) >= (uint32_t)~IS_TRUE)
 // IS_UNDEF, IS_NULL or IS_FALSE
@@ -572,9 +576,15 @@ static zend_always_inline uint32_t zval_get_raw_type_info(const zval* pz) {
 // !IS_UNDEF and !IS_NULL
 #define T_IS_SET(t)					((t) < (uint32_t)~IS_NULL)
 // IS_FALSE or IS_TRUE
-#define T_IS_BOOL(t)				(((t) == (uint32_t)~IS_FALSE) || ((t) == (uint32_t)~IS_FALSE))
-#define T_IS_CONSTANT(t)			(((t) | (uint32_t)(IS_TYPE_REFCOUNTED << Z_TYPE_FLAGS_SHIFT)) == (uint32_t)~IS_CONSTANT_AST)
-#define T_IS_ERROR(t)				((t) == (uint32_t)~_IS_ERROR)
+#define T_IS_BOOL(t)				(T_IS_FALSE(t) || T_IS_TRUE(t))
+// IS_LONG or IS_DOUBLE
+#define T_IS_NUMBER(t)				(T_IS_LONG(t) || T_IS_DOUBLE(t))
+// IS_UNDEF, IS_NULL, IS_FALSE, IS_TRUE, IS_LONG or IS_DOUBLE
+#define T_IS_SCALAR(t)				(T_IS_DOUBLE(t) || (t) >= (uint32_t)~IS_LONG)
+// IS_UNDEF, IS_NULL, IS_FALSE, IS_TRUE, IS_LONG, IS_DOUBLE or IS_STRING
+#define T_IS_SCALAR_OR_STRING(t)	(T_IS_DOUBLE(t) || ((t) | (uint32_t)(IS_TYPE_REFCOUNTED << Z_TYPE_FLAGS_SHIFT)) >= (uint32_t)~IS_STRING)
+// IS_UNDEF, IS_NULL, IS_FALSE, IS_TRUE, IS_LONG, S_DOUBLE, IS_STRING or IS_ARRAY
+#define T_IS_PERSISTABLE(t)			(T_IS_DOUBLE(t) || ((t) | (uint32_t)(IS_TYPE_REFCOUNTED << Z_TYPE_FLAGS_SHIFT)) >= (uint32_t)~IS_ARRAY)
 
 #define T_IS_REFCOUNTED(t)			zend_type_is_refcounted(t)
 
@@ -604,6 +614,9 @@ static zend_always_inline uint32_t zval_get_raw_type_info(const zval* pz) {
 #define Z_IS_REFERENCE_P(zval)		Z_IS_REFERENCE(*(zval))
 #define Z_IS_INDIRECT_P(zval)		Z_IS_INDIRECT(*(zval))
 
+#define Z_IS_PTR(zval)				T_IS_PTR((zval).u1.type_info)
+#define Z_IS_PTR_P(zval)			Z_IS_PTR(*(zval))
+
 #define Z_IS_SET(zval)				T_IS_SET((zval).u1.type_info)
 #define Z_IS_SET_P(zval)			Z_IS_SET(*(zval))
 
@@ -612,6 +625,18 @@ static zend_always_inline uint32_t zval_get_raw_type_info(const zval* pz) {
 
 #define Z_IS_BOOL(zval)				T_IS_BOOL((zval).u1.type_info)
 #define Z_IS_BOOL_P(zval)			Z_IS_BOOL(*(zval))
+
+#define Z_IS_NUMBER(zval)			T_IS_NUMBER((zval).u1.type_info)
+#define Z_IS_NUMBER_P(zval)			Z_IS_NUMBER(*(zval))
+
+#define Z_IS_SCALAR(zval)			T_IS_SCALAR((zval).u1.type_info)
+#define Z_IS_SCALAR_P(zval)			Z_IS_SCALAR(*(zval))
+
+#define Z_IS_SCALAR_OR_STRING(zval)		T_IS_SCALAR_OR_STRING((zval).u1.type_info)
+#define Z_IS_SCALAR_OR_STRING_P(zval)	Z_IS_SCALAR_OR_STRING(*(zval))
+
+#define Z_IS_PERSISTABLE(zval)		T_IS_PERSISTABLE((zval).u1.type_info)
+#define Z_IS_PERSISTABLE_P(zval)	Z_IS_PERSISTABLE(*(zval))
 
 #define Z_IS_LESS_THAN_TRUE(zval)	T_IS_LESS_THAN_TRUE((zval).u1.type_info)
 #define Z_IS_LESS_THAN_TRUE_P(zval)	Z_IS_LESS_THAN_TRUE(*(zval))

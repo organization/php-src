@@ -1408,7 +1408,7 @@ static zend_bool zend_try_ct_eval_const(zval *zv, zend_string *name, zend_bool i
 	c = zend_hash_find_ptr(EG(zend_constants), name);
 	if (c && (
 	      ((c->flags & CONST_PERSISTENT) && !(CG(compiler_options) & ZEND_COMPILE_NO_PERSISTENT_CONSTANT_SUBSTITUTION))
-	   || (Z_TYPE(c->value) < IS_OBJECT && !(CG(compiler_options) & ZEND_COMPILE_NO_CONSTANT_SUBSTITUTION))
+	   || (Z_IS_PERSISTABLE(c->value) && !(CG(compiler_options) & ZEND_COMPILE_NO_CONSTANT_SUBSTITUTION))
 	)) {
 		ZVAL_COPY_OR_DUP(zv, &c->value);
 		return 1;
@@ -1577,7 +1577,7 @@ static zend_bool zend_try_ct_eval_class_const(zval *zv, zend_string *class_name,
 	c = &cc->value;
 
 	/* Substitute case-sensitive (or lowercase) persistent class constants */
-	if (Z_TYPE_P(c) < IS_OBJECT) {
+	if (Z_IS_PERSISTABLE_P(c)) {
 		ZVAL_COPY_OR_DUP(zv, c);
 		return 1;
 	}
@@ -5640,7 +5640,7 @@ void zend_compile_params(zend_ast *ast, zend_ast *return_type_ast) /* {{{ */
 							"with a class type can only be NULL");
 					} else switch (ZEND_TYPE_CODE(arg_info->type)) {
 						case IS_DOUBLE:
-							if (!Z_IS_DOUBLE(default_node.u.constant) && !Z_IS_LONG(default_node.u.constant)) {
+							if (!Z_IS_NUMBER(default_node.u.constant)) {
 								zend_error_noreturn(E_COMPILE_ERROR, "Default value for parameters "
 									"with a float type can only be float, integer, or NULL");
 							}

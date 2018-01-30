@@ -68,7 +68,7 @@ PHP_FUNCTION( numfmt_format )
 		}
 	}
 
-	if(!Z_IS_DOUBLE_P(number) && !Z_IS_LONG_P(number)) {
+	if(!Z_IS_NUMBER_P(number)) {
 		convert_scalar_to_number(number );
 	}
 

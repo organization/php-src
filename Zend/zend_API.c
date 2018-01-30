@@ -269,7 +269,7 @@ ZEND_API int ZEND_FASTCALL zend_parse_arg_class(zval *arg, zend_class_entry **pc
 
 ZEND_API int ZEND_FASTCALL zend_parse_arg_bool_weak(zval *arg, zend_bool *dest) /* {{{ */
 {
-	if (EXPECTED(Z_TYPE_P(arg) <= IS_STRING)) {
+	if (EXPECTED(Z_IS_SCALAR_OR_STRING_P(arg))) {
 		*dest = zend_is_true(arg);
 	} else {
 		return 0;
@@ -417,7 +417,7 @@ ZEND_API int ZEND_FASTCALL zend_parse_arg_double_slow(zval *arg, double *dest) /
 
 ZEND_API int ZEND_FASTCALL zend_parse_arg_str_weak(zval *arg, zend_string **dest) /* {{{ */
 {
-	if (EXPECTED(Z_TYPE_P(arg) < IS_STRING)) {
+	if (EXPECTED(Z_IS_SCALAR_P(arg))) {
 		convert_to_string(arg);
 		*dest = Z_STR_P(arg);
 	} else if (UNEXPECTED(Z_IS_OBJECT_P(arg))) {

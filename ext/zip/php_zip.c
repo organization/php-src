@@ -2768,19 +2768,14 @@ static ZIPARCHIVE_METHOD(extractTo)
 				}
 				for (i = 0; i < nelems; i++) {
 					if ((zval_file = zend_hash_index_find(Z_ARRVAL_P(zval_files), i)) != NULL) {
-						switch (Z_TYPE_P(zval_file)) {
-							case IS_LONG:
-								break;
-							case IS_STRING:
-								if (!php_zip_extract_file(intern, pathto, Z_STRVAL_P(zval_file), Z_STRLEN_P(zval_file))) {
-									RETURN_FALSE;
-								}
-								break;
+						if (Z_IS_STRING_P(zval_file)) {
+							if (!php_zip_extract_file(intern, pathto, Z_STRVAL_P(zval_file), Z_STRLEN_P(zval_file))) {
+								RETURN_FALSE;
+							}
 						}
 					}
 				}
 				break;
-			case IS_LONG:
 			default:
 				php_error_docref(NULL, E_WARNING, "Invalid argument, expect string or array of strings");
 				break;

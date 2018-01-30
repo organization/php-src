@@ -940,7 +940,7 @@ zend_string *phpdbg_watchpoint_change_collision_name(phpdbg_watchpoint_t *watch)
 	}
 	ZEND_HASH_FOREACH_PTR(&watch->elements, element) {
 		if (element->flags & PHPDBG_WATCH_IMPLICIT) {
-			if ((watch->type == WATCH_ON_ZVAL || watch->type == WATCH_ON_BUCKET) && Z_TYPE(watch->backup.zv) > IS_STRING) {
+			if ((watch->type == WATCH_ON_ZVAL || watch->type == WATCH_ON_BUCKET) && !Z_IS_SCALAR_OR_STRING(watch->backup.zv)) {
 				phpdbg_update_watch_element_watch(element->child);
 			}
 			continue;

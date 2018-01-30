@@ -441,7 +441,7 @@ ZEND_API void ZEND_FASTCALL zend_locale_sprintf_double(zval *op ZEND_FILE_LINE_D
 #define convert_to_null_ex(pzv)		convert_to_ex_master(pzv, null, Z_IS_NULL_P)
 
 #define convert_scalar_to_number_ex(pzv)							\
-	if (!Z_IS_LONG_P(pzv) && !Z_IS_DOUBLE_P(pzv)) {		\
+	if (!Z_IS_NUMBER_P(pzv)) {		\
 		convert_scalar_to_number(pzv);					\
 	}
 

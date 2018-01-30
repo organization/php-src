@@ -3525,7 +3525,7 @@ static zend_bool can_convert_to_double(
 				ZVAL_DOUBLE(&dval_op1, (double) Z_LVAL_P(value));
 			} else if (opline->op1_type == IS_CONST) {
 				zval *zv = CRT_CONSTANT_EX(op_array, opline, opline->op1, ssa->rt_constants);
-				if (Z_IS_LONG_P(zv) || Z_IS_DOUBLE_P(zv)) {
+				if (Z_IS_NUMBER_P(zv)) {
 					ZVAL_COPY_VALUE(&orig_op1, zv);
 					ZVAL_COPY_VALUE(&dval_op1, zv);
 				}
@@ -3538,7 +3538,7 @@ static zend_bool can_convert_to_double(
 				ZVAL_DOUBLE(&dval_op2, (double) Z_LVAL_P(value));
 			} else if (opline->op2_type == IS_CONST) {
 				zval *zv = CRT_CONSTANT_EX(op_array, opline, opline->op2, ssa->rt_constants);
-				if (Z_IS_LONG_P(zv) || Z_IS_DOUBLE_P(zv)) {
+				if (Z_IS_NUMBER_P(zv)) {
 					ZVAL_COPY_VALUE(&orig_op2, zv);
 					ZVAL_COPY_VALUE(&dval_op2, zv);
 				}
