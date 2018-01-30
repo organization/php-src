@@ -798,14 +798,12 @@ PHP_FUNCTION(posix_ttyname)
 		Z_PARAM_ZVAL(z_fd)
 	ZEND_PARSE_PARAMETERS_END_EX(RETURN_FALSE);
 
-	switch (Z_TYPE_P(z_fd)) {
-		case IS_RESOURCE:
-			if (!php_posix_stream_get_fd(z_fd, &fd)) {
-				RETURN_FALSE;
-			}
-			break;
-		default:
-			fd = zval_get_long(z_fd);
+	if (Z_IS_RESOURCE_P(z_fd)) {
+		if (!php_posix_stream_get_fd(z_fd, &fd)) {
+			RETURN_FALSE;
+		}
+	} else {
+		fd = zval_get_long(z_fd);
 	}
 #if defined(ZTS) && defined(HAVE_TTYNAME_R) && defined(_SC_TTY_NAME_MAX)
 	buflen = sysconf(_SC_TTY_NAME_MAX);
@@ -842,14 +840,12 @@ PHP_FUNCTION(posix_isatty)
 		Z_PARAM_ZVAL(z_fd)
 	ZEND_PARSE_PARAMETERS_END_EX(RETURN_FALSE);
 
-	switch (Z_TYPE_P(z_fd)) {
-		case IS_RESOURCE:
-			if (!php_posix_stream_get_fd(z_fd, &fd)) {
-				RETURN_FALSE;
-			}
-			break;
-		default:
-			fd = zval_get_long(z_fd);
+	if (Z_IS_RESOURCE_P(z_fd)) {
+		if (!php_posix_stream_get_fd(z_fd, &fd)) {
+			RETURN_FALSE;
+		}
+	} else {
+		fd = zval_get_long(z_fd);
 	}
 
 	if (isatty(fd)) {

@@ -373,8 +373,8 @@ void zend_optimizer_compact_literals(zend_op_array *op_array, zend_optimizer_ctx
 					}
 					pos = zend_hash_find(&hash, key);
 					if (pos != NULL &&
-					   	Z_TYPE(op_array->literals[i]) == Z_TYPE(op_array->literals[Z_LVAL_P(pos)]) &&
-						LITERAL_NUM_RELATED(info[i].flags) == LITERAL_NUM_RELATED(info[Z_LVAL_P(pos)].flags) &&
+					    Z_IS_STRING(op_array->literals[Z_LVAL_P(pos)]) &&
+					    LITERAL_NUM_RELATED(info[i].flags) == LITERAL_NUM_RELATED(info[Z_LVAL_P(pos)].flags) &&
 					    (LITERAL_NUM_RELATED(info[i].flags) != 2 ||
 					     ((info[i].flags & LITERAL_KIND_MASK) != LITERAL_VALUE &&
 					      (info[Z_LVAL_P(pos)].flags & LITERAL_KIND_MASK) != LITERAL_VALUE))) {

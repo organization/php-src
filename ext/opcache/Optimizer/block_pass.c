@@ -465,7 +465,7 @@ static void zend_optimize_block(zend_basic_block *block, zend_op_array *op_array
 					 * because ("0" == null) is not equal to !("0")
 					 */
 					opline->opcode =
-						((opline->opcode != ZEND_IS_NOT_EQUAL) == ((Z_TYPE(ZEND_OP1_LITERAL(opline))) == IS_TRUE)) ?
+						((opline->opcode != ZEND_IS_NOT_EQUAL) == Z_IS_TRUE(ZEND_OP1_LITERAL(opline))) ?
 						ZEND_BOOL : ZEND_BOOL_NOT;
 					COPY_NODE(opline->op1, opline->op2);
 					SET_UNUSED(opline->op2);
@@ -477,7 +477,7 @@ static void zend_optimize_block(zend_basic_block *block, zend_op_array *op_array
 					 * because ("0" == null) is not equal to !("0")
 					 */
 					opline->opcode =
-						((opline->opcode != ZEND_IS_NOT_EQUAL) == ((Z_TYPE(ZEND_OP2_LITERAL(opline))) == IS_TRUE)) ?
+						((opline->opcode != ZEND_IS_NOT_EQUAL) == Z_IS_TRUE(ZEND_OP2_LITERAL(opline))) ?
 						ZEND_BOOL : ZEND_BOOL_NOT;
 					SET_UNUSED(opline->op2);
 					goto optimize_bool;

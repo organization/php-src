@@ -1299,7 +1299,7 @@ PHP_FUNCTION(odbc_execute)
 	} params_t;
 	params_t *params = NULL;
 	char *filename;
-	unsigned char otype;
+	zend_bool is_null;
 	SQLSMALLINT ctype;
    	odbc_result *result;
 	int numArgs, i, ne;
@@ -1346,7 +1346,7 @@ PHP_FUNCTION(odbc_execute)
 				RETURN_FALSE;
 			}
 
-			otype = Z_TYPE_P(tmp);
+			is_null = Z_IS_NULL_P(tmp);
 			convert_to_string_ex(tmp);
 			if (!Z_IS_STRING_P(tmp)) {
 				php_error_docref(NULL, E_WARNING,"Error converting parameter");
@@ -1417,7 +1417,7 @@ PHP_FUNCTION(odbc_execute)
 #ifdef HAVE_DBMAKER
 				precision = params[i-1].vallen;
 #endif
-				if (otype == IS_NULL) {
+				if (is_null) {
 					params[i-1].vallen = SQL_NULL_DATA;
 				}
 

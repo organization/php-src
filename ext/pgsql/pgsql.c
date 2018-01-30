@@ -2669,22 +2669,19 @@ PHP_FUNCTION(pg_fetch_result)
 		}
 		pgsql_row = (int)row;
 	}
-	switch (Z_TYPE_P(field)) {
-		case IS_STRING:
-			field_offset = PQfnumber(pgsql_result, Z_STRVAL_P(field));
-			if (field_offset < 0 || field_offset >= PQnfields(pgsql_result)) {
-				php_error_docref(NULL, E_WARNING, "Bad column offset specified");
-				RETURN_FALSE;
-			}
-			break;
-		default:
-			convert_to_long_ex(field);
-			if (Z_LVAL_P(field) < 0 || Z_LVAL_P(field) >= PQnfields(pgsql_result)) {
-				php_error_docref(NULL, E_WARNING, "Bad column offset specified");
-				RETURN_FALSE;
-			}
-			field_offset = (int)Z_LVAL_P(field);
-			break;
+	if (Z_IS_STRING_P(field)) {
+		field_offset = PQfnumber(pgsql_result, Z_STRVAL_P(field));
+		if (field_offset < 0 || field_offset >= PQnfields(pgsql_result)) {
+			php_error_docref(NULL, E_WARNING, "Bad column offset specified");
+			RETURN_FALSE;
+		}
+	} else {
+		convert_to_long_ex(field);
+		if (Z_LVAL_P(field) < 0 || Z_LVAL_P(field) >= PQnfields(pgsql_result)) {
+			php_error_docref(NULL, E_WARNING, "Bad column offset specified");
+			RETURN_FALSE;
+		}
+		field_offset = (int)Z_LVAL_P(field);
 	}
 
 	if (PQgetisnull(pgsql_result, pgsql_row, field_offset)) {
@@ -3036,23 +3033,20 @@ static void php_pgsql_data_info(INTERNAL_FUNCTION_PARAMETERS, int entry_type)
 		pgsql_row = (int)row;
 	}
 
-	switch (Z_TYPE_P(field)) {
-		case IS_STRING:
-			convert_to_string_ex(field);
-			field_offset = PQfnumber(pgsql_result, Z_STRVAL_P(field));
-			if (field_offset < 0 || field_offset >= PQnfields(pgsql_result)) {
-				php_error_docref(NULL, E_WARNING, "Bad column offset specified");
-				RETURN_FALSE;
-			}
-			break;
-		default:
-			convert_to_long_ex(field);
-			if (Z_LVAL_P(field) < 0 || Z_LVAL_P(field) >= PQnfields(pgsql_result)) {
-				php_error_docref(NULL, E_WARNING, "Bad column offset specified");
-				RETURN_FALSE;
-			}
-			field_offset = (int)Z_LVAL_P(field);
-			break;
+	if (Z_IS_STRING_P(field)) {
+		convert_to_string_ex(field);
+		field_offset = PQfnumber(pgsql_result, Z_STRVAL_P(field));
+		if (field_offset < 0 || field_offset >= PQnfields(pgsql_result)) {
+			php_error_docref(NULL, E_WARNING, "Bad column offset specified");
+			RETURN_FALSE;
+		}
+	} else {
+		convert_to_long_ex(field);
+		if (Z_LVAL_P(field) < 0 || Z_LVAL_P(field) >= PQnfields(pgsql_result)) {
+			php_error_docref(NULL, E_WARNING, "Bad column offset specified");
+			RETURN_FALSE;
+		}
+		field_offset = (int)Z_LVAL_P(field);
 	}
 
 	switch (entry_type) {

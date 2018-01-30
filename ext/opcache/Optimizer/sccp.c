@@ -552,11 +552,10 @@ static inline int ct_eval_assign_dim(zval *result, zval *value, zval *key) {
 }
 
 static inline int fetch_obj_prop(zval **result, zval *op1, zval *op2) {
-	switch (Z_TYPE_P(op2)) {
-		case IS_STRING:
-			*result = zend_symtable_find(Z_ARR_P(op1), Z_STR_P(op2));
-			return SUCCESS;
-		default:
+	if (Z_IS_STRING_P(op2)) {
+		*result = zend_symtable_find(Z_ARR_P(op1), Z_STR_P(op2));
+		return SUCCESS;
+	} else {
 			return FAILURE;
 	}
 }
@@ -597,28 +596,22 @@ static inline int ct_eval_isset_obj(zval *result, uint32_t extended_value, zval 
 static inline int ct_eval_del_obj_prop(zval *result, zval *key) {
 	ZEND_ASSERT(IS_PARTIAL_OBJECT(result));
 
-	switch (Z_TYPE_P(key)) {
-		case IS_STRING:
-			zend_symtable_del(Z_ARR_P(result), Z_STR_P(key));
-			break;
-		default:
-			return FAILURE;
+	if (Z_IS_STRING_P(key)) {
+		zend_symtable_del(Z_ARR_P(result), Z_STR_P(key));
+		return SUCCESS;
+	} else {
+		return FAILURE;
 	}
-
-	return SUCCESS;
 }
 
 static inline int ct_eval_add_obj_prop(zval *result, zval *value, zval *key) {
-	switch (Z_TYPE_P(key)) {
-		case IS_STRING:
-			value = zend_symtable_update(Z_ARR_P(result), Z_STR_P(key), value);
-			break;
-		default:
-			return FAILURE;
+	if (Z_IS_STRING_P(key)) {
+		value = zend_symtable_update(Z_ARR_P(result), Z_STR_P(key), value);
+		Z_TRY_ADDREF_P(value);
+		return SUCCESS;
+	} else {
+		return FAILURE;
 	}
-
-	Z_TRY_ADDREF_P(value);
-	return SUCCESS;
 }
 
 static inline int ct_eval_assign_obj(zval *result, zval *value, zval *key) {

@@ -128,8 +128,8 @@ void _php_curl_multi_cleanup_list(void *data) /* {{{ */
 /* Used internally as comparison routine passed to zend_list_del_element */
 static int curl_compare_resources( zval *z1, zval *z2 ) /* {{{ */
 {
-	return (Z_TYPE_P(z1) == Z_TYPE_P(z2) &&
-			Z_IS_RESOURCE_P(z1) &&
+	return (Z_IS_RESOURCE_P(z1) &&
+			Z_IS_RESOURCE_P(z2) &&
 			Z_RES_P(z1) == Z_RES_P(z2));
 }
 /* }}} */
