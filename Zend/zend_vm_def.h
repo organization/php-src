@@ -1509,15 +1509,87 @@ ZEND_VM_HELPER(zend_fetch_static_prop_helper, CONST|TMPVAR|CV, UNUSED|CONST|VAR,
 	zend_free_op free_op1;
 	zval *varname;
 	zval *retval;
+	zend_string *name, *tmp_name;
+	zend_class_entry *ce;
 
 	SAVE_OPLINE();
-	varname = GET_OP1_ZVAL_PTR_UNDEF(BP_VAR_R);
 
-	retval = zend_fetch_static_property_address(varname, OP1_TYPE, opline->op2, OP2_TYPE, type EXECUTE_DATA_CC OPLINE_CC);
+	do {
+		if (OP2_TYPE == IS_CONST) {
+			if (OP1_TYPE == IS_CONST && EXPECTED((ce = CACHED_PTR(opline->cache_slot)) != NULL)) {
+				retval = CACHED_PTR(opline->cache_slot + sizeof(void*));
+
+				/* check if static properties were destoyed */
+				if (EXPECTED(CE_STATIC_MEMBERS(ce) != NULL)) {
+					FREE_UNFETCHED_OP1();
+					break;
+				}
+			} else {
+				zval *class_name = RT_CONSTANT(opline, opline->op2);
+
+				if (UNEXPECTED((ce = CACHED_PTR(opline->cache_slot)) == NULL)) {
+					ce = zend_fetch_class_by_name(Z_STR_P(class_name), class_name + 1, ZEND_FETCH_CLASS_DEFAULT | ZEND_FETCH_CLASS_EXCEPTION);
+					if (UNEXPECTED(ce == NULL)) {
+						FREE_UNFETCHED_OP1();
+						retval = NULL;
+						break;
+					}
+					if (OP1_TYPE != IS_CONST) {
+						CACHE_PTR(opline->cache_slot, ce);
+					}
+				}
+			}
+		} else {
+			if (OP2_TYPE == IS_UNUSED) {
+				ce = zend_fetch_class(NULL, opline->op2.num);
+				if (UNEXPECTED(ce == NULL)) {
+					FREE_UNFETCHED_OP1();
+					retval = NULL;
+					break;
+				}
+			} else {
+				ce = Z_CE_P(EX_VAR(opline->op2.var));
+			}
+			if (OP1_TYPE == IS_CONST &&
+			    EXPECTED(CACHED_PTR(opline->cache_slot) == ce)) {
+				retval = CACHED_PTR(opline->cache_slot + sizeof(void*));
+
+				/* check if static properties were destoyed */
+				if (EXPECTED(CE_STATIC_MEMBERS(ce) != NULL)) {
+					FREE_UNFETCHED_OP1();
+					break;
+				}
+			}
+		}
+
+		varname = GET_OP1_ZVAL_PTR_UNDEF(BP_VAR_R);
+		if (OP1_TYPE == IS_CONST) {
+			name = Z_STR_P(varname);
+		} else if (EXPECTED(Z_IS_STRING_P(varname))) {
+			name = Z_STR_P(varname);
+			tmp_name = NULL;
+		} else {
+			if (OP1_TYPE == IS_CV && UNEXPECTED(Z_IS_UNDEF_P(varname))) {
+				zval_undefined_cv(EX(opline)->op1.var EXECUTE_DATA_CC);
+			}
+			name = zval_get_tmp_string(varname, &tmp_name);
+		}
+
+		retval = zend_std_get_static_property(ce, name, type == BP_VAR_IS);
+
+		if (OP1_TYPE != IS_CONST) {
+			zend_tmp_string_release(tmp_name);
+		}
+
+		if (OP1_TYPE == IS_CONST && EXPECTED(retval)) {
+			CACHE_POLYMORPHIC_PTR(opline->cache_slot, ce, retval);
+		}
+
+		FREE_OP1();
+	} while (0);
 
 	if (UNEXPECTED(retval == NULL)) {
 		if (EG(exception)) {
-			FREE_OP1();
 			ZVAL_UNDEF(EX_VAR(opline->result.var));
 			HANDLE_EXCEPTION();
 		} else {
@@ -1525,8 +1597,6 @@ ZEND_VM_HELPER(zend_fetch_static_prop_helper, CONST|TMPVAR|CV, UNUSED|CONST|VAR,
 			retval = &EG(uninitialized_zval);
 		}
 	}
-
-	FREE_OP1();
 
 	if (type == BP_VAR_R || type == BP_VAR_IS) {
 		ZVAL_COPY_UNREF(EX_VAR(opline->result.var), retval);
@@ -5436,8 +5506,29 @@ ZEND_VM_HANDLER(179, ZEND_UNSET_STATIC_PROP, CONST|TMPVAR|CV, UNUSED|CLASS_FETCH
 
 	SAVE_OPLINE();
 
-	varname = GET_OP1_ZVAL_PTR_UNDEF(BP_VAR_R);
+	if (OP2_TYPE == IS_CONST) {
+		ce = CACHED_PTR(opline->cache_slot);
+		if (UNEXPECTED(ce == NULL)) {
+			ce = zend_fetch_class_by_name(Z_STR_P(RT_CONSTANT(opline, opline->op2)), RT_CONSTANT(opline, opline->op2) + 1, ZEND_FETCH_CLASS_DEFAULT | ZEND_FETCH_CLASS_EXCEPTION);
+			if (UNEXPECTED(ce == NULL)) {
+				ZEND_ASSERT(EG(exception));
+				FREE_UNFETCHED_OP1();
+				HANDLE_EXCEPTION();
+			}
+			/*CACHE_PTR(opline->cache_slot, ce);*/
+		}
+	} else if (OP2_TYPE == IS_UNUSED) {
+		ce = zend_fetch_class(NULL, opline->op2.num);
+		if (UNEXPECTED(ce == NULL)) {
+			ZEND_ASSERT(EG(exception));
+			FREE_UNFETCHED_OP1();
+			HANDLE_EXCEPTION();
+		}
+	} else {
+		ce = Z_CE_P(EX_VAR(opline->op2.var));
+	}
 
+	varname = GET_OP1_ZVAL_PTR_UNDEF(BP_VAR_R);
 	if (OP1_TYPE == IS_CONST) {
 		name = Z_STR_P(varname);
 	} else if (EXPECTED(Z_IS_STRING_P(varname))) {
@@ -5450,33 +5541,6 @@ ZEND_VM_HANDLER(179, ZEND_UNSET_STATIC_PROP, CONST|TMPVAR|CV, UNUSED|CLASS_FETCH
 		name = zval_get_tmp_string(varname, &tmp_name);
 	}
 
-	if (OP2_TYPE == IS_CONST) {
-		ce = CACHED_PTR(opline->cache_slot);
-		if (UNEXPECTED(ce == NULL)) {
-			ce = zend_fetch_class_by_name(Z_STR_P(RT_CONSTANT(opline, opline->op2)), RT_CONSTANT(opline, opline->op2) + 1, ZEND_FETCH_CLASS_DEFAULT | ZEND_FETCH_CLASS_EXCEPTION);
-			if (UNEXPECTED(ce == NULL)) {
-				ZEND_ASSERT(EG(exception));
-				if (OP1_TYPE != IS_CONST) {
-					zend_tmp_string_release(tmp_name);
-				}
-				FREE_OP1();
-				HANDLE_EXCEPTION();
-			}
-			/*CACHE_PTR(opline->cache_slot, ce);*/
-		}
-	} else if (OP2_TYPE == IS_UNUSED) {
-		ce = zend_fetch_class(NULL, opline->op2.num);
-		if (UNEXPECTED(ce == NULL)) {
-			ZEND_ASSERT(EG(exception));
-			if (OP1_TYPE != IS_CONST) {
-				zend_tmp_string_release(tmp_name);
-			}
-			FREE_OP1();
-			HANDLE_EXCEPTION();
-		}
-	} else {
-		ce = Z_CE_P(EX_VAR(opline->op2.var));
-	}
 	zend_std_unset_static_property(ce, name);
 
 	if (OP1_TYPE != IS_CONST) {
@@ -6264,13 +6328,6 @@ ZEND_VM_HANDLER(180, ZEND_ISSET_ISEMPTY_STATIC_PROP, CONST|TMPVAR|CV, UNUSED|CLA
 	zend_class_entry *ce;
 
 	SAVE_OPLINE();
-	varname = GET_OP1_ZVAL_PTR(BP_VAR_IS);
-	if (OP1_TYPE == IS_CONST) {
-		name = Z_STR_P(varname);
-	} else {
-		name = zval_get_tmp_string(varname, &tmp_name);
-	}
-
 	if (OP2_TYPE == IS_CONST) {
 		if (OP1_TYPE == IS_CONST && EXPECTED((ce = CACHED_PTR(opline->cache_slot)) != NULL)) {
 			value = CACHED_PTR(opline->cache_slot + sizeof(void*));
@@ -6297,10 +6354,7 @@ ZEND_VM_HANDLER(180, ZEND_ISSET_ISEMPTY_STATIC_PROP, CONST|TMPVAR|CV, UNUSED|CLA
 			ce = zend_fetch_class(NULL, opline->op2.num);
 			if (UNEXPECTED(ce == NULL)) {
 				ZEND_ASSERT(EG(exception));
-				if (OP1_TYPE != IS_CONST) {
-					zend_tmp_string_release(tmp_name);
-				}
-				FREE_OP1();
+				FREE_UNFETCHED_OP1();
 				ZVAL_UNDEF(EX_VAR(opline->result.var));
 				HANDLE_EXCEPTION();
 			}
@@ -6319,6 +6373,13 @@ ZEND_VM_HANDLER(180, ZEND_ISSET_ISEMPTY_STATIC_PROP, CONST|TMPVAR|CV, UNUSED|CLA
 
 			ZEND_VM_C_GOTO(is_static_prop_return);
 		}
+	}
+
+	varname = GET_OP1_ZVAL_PTR(BP_VAR_IS);
+	if (OP1_TYPE == IS_CONST) {
+		name = Z_STR_P(varname);
+	} else {
+		name = zval_get_tmp_string(varname, &tmp_name);
 	}
 
 	value = zend_std_get_static_property(ce, name, 1);
