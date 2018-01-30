@@ -6038,7 +6038,7 @@ is_static_prop_return:
 	if (opline->extended_value & ZEND_ISSET) {
 		result = value && Z_IS_SET_P(value) &&
 		    (!Z_ISREF_P(value) || !Z_IS_NULL_P(Z_REFVAL_P(value)));
-	} else /* if (opline->extended_value & ZEND_ISEMPTY) */ {
+	} else {
 		result = !value || !i_zend_is_true(value);
 	}
 
@@ -6112,7 +6112,7 @@ num_index_prop:
 			/* > IS_NULL means not IS_UNDEF and not IS_NULL */
 			result = value != NULL && Z_IS_SET_P(value) &&
 			    (!Z_ISREF_P(value) || !Z_IS_NULL_P(Z_REFVAL_P(value)));
-		} else /* if (opline->extended_value & ZEND_ISEMPTY) */ {
+		} else {
 			result = (value == NULL || !i_zend_is_true(value));
 		}
 		goto isset_dim_obj_exit;
@@ -8105,7 +8105,7 @@ num_index_prop:
 			/* > IS_NULL means not IS_UNDEF and not IS_NULL */
 			result = value != NULL && Z_IS_SET_P(value) &&
 			    (!Z_ISREF_P(value) || !Z_IS_NULL_P(Z_REFVAL_P(value)));
-		} else /* if (opline->extended_value & ZEND_ISEMPTY) */ {
+		} else {
 			result = (value == NULL || !i_zend_is_true(value));
 		}
 		goto isset_dim_obj_exit;
@@ -8677,7 +8677,7 @@ is_static_prop_return:
 	if (opline->extended_value & ZEND_ISSET) {
 		result = value && Z_IS_SET_P(value) &&
 		    (!Z_ISREF_P(value) || !Z_IS_NULL_P(Z_REFVAL_P(value)));
-	} else /* if (opline->extended_value & ZEND_ISEMPTY) */ {
+	} else {
 		result = !value || !i_zend_is_true(value);
 	}
 
@@ -8936,7 +8936,7 @@ fetch_this:
 		}
 	}
 
-	if ((opline->extended_value & ZEND_FETCH_TYPE_MASK) != ZEND_FETCH_GLOBAL_LOCK) {
+	if (!(opline->extended_value & ZEND_FETCH_GLOBAL_LOCK)) {
 
 	}
 
@@ -9588,7 +9588,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_ISSET_ISEMPTY_VAR_SPEC_CONST_U
 	if (opline->extended_value & ZEND_ISSET) {
 		result = value && Z_IS_SET_P(value) &&
 		    (!Z_ISREF_P(value) || !Z_IS_NULL_P(Z_REFVAL_P(value)));
-	} else /* if (opline->extended_value & ZEND_ISEMPTY) */ {
+	} else {
 		result = !value || !i_zend_is_true(value);
 	}
 
@@ -9676,7 +9676,7 @@ is_static_prop_return:
 	if (opline->extended_value & ZEND_ISSET) {
 		result = value && Z_IS_SET_P(value) &&
 		    (!Z_ISREF_P(value) || !Z_IS_NULL_P(Z_REFVAL_P(value)));
-	} else /* if (opline->extended_value & ZEND_ISEMPTY) */ {
+	} else {
 		result = !value || !i_zend_is_true(value);
 	}
 
@@ -11428,7 +11428,7 @@ num_index_prop:
 			/* > IS_NULL means not IS_UNDEF and not IS_NULL */
 			result = value != NULL && Z_IS_SET_P(value) &&
 			    (!Z_ISREF_P(value) || !Z_IS_NULL_P(Z_REFVAL_P(value)));
-		} else /* if (opline->extended_value & ZEND_ISEMPTY) */ {
+		} else {
 			result = (value == NULL || !i_zend_is_true(value));
 		}
 		goto isset_dim_obj_exit;
@@ -14993,7 +14993,7 @@ is_static_prop_return:
 	if (opline->extended_value & ZEND_ISSET) {
 		result = value && Z_IS_SET_P(value) &&
 		    (!Z_ISREF_P(value) || !Z_IS_NULL_P(Z_REFVAL_P(value)));
-	} else /* if (opline->extended_value & ZEND_ISEMPTY) */ {
+	} else {
 		result = !value || !i_zend_is_true(value);
 	}
 
@@ -15067,7 +15067,7 @@ num_index_prop:
 			/* > IS_NULL means not IS_UNDEF and not IS_NULL */
 			result = value != NULL && Z_IS_SET_P(value) &&
 			    (!Z_ISREF_P(value) || !Z_IS_NULL_P(Z_REFVAL_P(value)));
-		} else /* if (opline->extended_value & ZEND_ISEMPTY) */ {
+		} else {
 			result = (value == NULL || !i_zend_is_true(value));
 		}
 		goto isset_dim_obj_exit;
@@ -16539,7 +16539,7 @@ num_index_prop:
 			/* > IS_NULL means not IS_UNDEF and not IS_NULL */
 			result = value != NULL && Z_IS_SET_P(value) &&
 			    (!Z_ISREF_P(value) || !Z_IS_NULL_P(Z_REFVAL_P(value)));
-		} else /* if (opline->extended_value & ZEND_ISEMPTY) */ {
+		} else {
 			result = (value == NULL || !i_zend_is_true(value));
 		}
 		goto isset_dim_obj_exit;
@@ -16972,7 +16972,7 @@ is_static_prop_return:
 	if (opline->extended_value & ZEND_ISSET) {
 		result = value && Z_IS_SET_P(value) &&
 		    (!Z_ISREF_P(value) || !Z_IS_NULL_P(Z_REFVAL_P(value)));
-	} else /* if (opline->extended_value & ZEND_ISEMPTY) */ {
+	} else {
 		result = !value || !i_zend_is_true(value);
 	}
 
@@ -17139,7 +17139,7 @@ fetch_this:
 		}
 	}
 
-	if ((opline->extended_value & ZEND_FETCH_TYPE_MASK) != ZEND_FETCH_GLOBAL_LOCK) {
+	if (!(opline->extended_value & ZEND_FETCH_GLOBAL_LOCK)) {
 		zval_ptr_dtor_nogc(free_op1);
 	}
 
@@ -17448,7 +17448,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_ISSET_ISEMPTY_VAR_SPEC_TMPVAR_
 	if (opline->extended_value & ZEND_ISSET) {
 		result = value && Z_IS_SET_P(value) &&
 		    (!Z_ISREF_P(value) || !Z_IS_NULL_P(Z_REFVAL_P(value)));
-	} else /* if (opline->extended_value & ZEND_ISEMPTY) */ {
+	} else {
 		result = !value || !i_zend_is_true(value);
 	}
 
@@ -17537,7 +17537,7 @@ is_static_prop_return:
 	if (opline->extended_value & ZEND_ISSET) {
 		result = value && Z_IS_SET_P(value) &&
 		    (!Z_ISREF_P(value) || !Z_IS_NULL_P(Z_REFVAL_P(value)));
-	} else /* if (opline->extended_value & ZEND_ISEMPTY) */ {
+	} else {
 		result = !value || !i_zend_is_true(value);
 	}
 
@@ -18598,7 +18598,7 @@ num_index_prop:
 			/* > IS_NULL means not IS_UNDEF and not IS_NULL */
 			result = value != NULL && Z_IS_SET_P(value) &&
 			    (!Z_ISREF_P(value) || !Z_IS_NULL_P(Z_REFVAL_P(value)));
-		} else /* if (opline->extended_value & ZEND_ISEMPTY) */ {
+		} else {
 			result = (value == NULL || !i_zend_is_true(value));
 		}
 		goto isset_dim_obj_exit;
@@ -43448,7 +43448,7 @@ is_static_prop_return:
 	if (opline->extended_value & ZEND_ISSET) {
 		result = value && Z_IS_SET_P(value) &&
 		    (!Z_ISREF_P(value) || !Z_IS_NULL_P(Z_REFVAL_P(value)));
-	} else /* if (opline->extended_value & ZEND_ISEMPTY) */ {
+	} else {
 		result = !value || !i_zend_is_true(value);
 	}
 
@@ -43522,7 +43522,7 @@ num_index_prop:
 			/* > IS_NULL means not IS_UNDEF and not IS_NULL */
 			result = value != NULL && Z_IS_SET_P(value) &&
 			    (!Z_ISREF_P(value) || !Z_IS_NULL_P(Z_REFVAL_P(value)));
-		} else /* if (opline->extended_value & ZEND_ISEMPTY) */ {
+		} else {
 			result = (value == NULL || !i_zend_is_true(value));
 		}
 		goto isset_dim_obj_exit;
@@ -47218,7 +47218,7 @@ num_index_prop:
 			/* > IS_NULL means not IS_UNDEF and not IS_NULL */
 			result = value != NULL && Z_IS_SET_P(value) &&
 			    (!Z_ISREF_P(value) || !Z_IS_NULL_P(Z_REFVAL_P(value)));
-		} else /* if (opline->extended_value & ZEND_ISEMPTY) */ {
+		} else {
 			result = (value == NULL || !i_zend_is_true(value));
 		}
 		goto isset_dim_obj_exit;
@@ -48031,7 +48031,7 @@ is_static_prop_return:
 	if (opline->extended_value & ZEND_ISSET) {
 		result = value && Z_IS_SET_P(value) &&
 		    (!Z_ISREF_P(value) || !Z_IS_NULL_P(Z_REFVAL_P(value)));
-	} else /* if (opline->extended_value & ZEND_ISEMPTY) */ {
+	} else {
 		result = !value || !i_zend_is_true(value);
 	}
 
@@ -48506,7 +48506,7 @@ fetch_this:
 		}
 	}
 
-	if ((opline->extended_value & ZEND_FETCH_TYPE_MASK) != ZEND_FETCH_GLOBAL_LOCK) {
+	if (!(opline->extended_value & ZEND_FETCH_GLOBAL_LOCK)) {
 
 	}
 
@@ -49410,7 +49410,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_ISSET_ISEMPTY_CV_SPEC_CV_UNUSE
 		result =
 			Z_IS_SET_P(value) &&
 		    (!Z_ISREF_P(value) || !Z_IS_NULL_P(Z_REFVAL_P(value)));
-	} else /* if (opline->extended_value & ZEND_ISEMPTY) */ {
+	} else {
 		SAVE_OPLINE();
 		result = !i_zend_is_true(value);
 		if (UNEXPECTED(EG(exception))) {
@@ -49452,7 +49452,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_ISSET_ISEMPTY_VAR_SPEC_CV_UNUS
 	if (opline->extended_value & ZEND_ISSET) {
 		result = value && Z_IS_SET_P(value) &&
 		    (!Z_ISREF_P(value) || !Z_IS_NULL_P(Z_REFVAL_P(value)));
-	} else /* if (opline->extended_value & ZEND_ISEMPTY) */ {
+	} else {
 		result = !value || !i_zend_is_true(value);
 	}
 
@@ -49540,7 +49540,7 @@ is_static_prop_return:
 	if (opline->extended_value & ZEND_ISSET) {
 		result = value && Z_IS_SET_P(value) &&
 		    (!Z_ISREF_P(value) || !Z_IS_NULL_P(Z_REFVAL_P(value)));
-	} else /* if (opline->extended_value & ZEND_ISEMPTY) */ {
+	} else {
 		result = !value || !i_zend_is_true(value);
 	}
 
@@ -53192,7 +53192,7 @@ num_index_prop:
 			/* > IS_NULL means not IS_UNDEF and not IS_NULL */
 			result = value != NULL && Z_IS_SET_P(value) &&
 			    (!Z_ISREF_P(value) || !Z_IS_NULL_P(Z_REFVAL_P(value)));
-		} else /* if (opline->extended_value & ZEND_ISEMPTY) */ {
+		} else {
 			result = (value == NULL || !i_zend_is_true(value));
 		}
 		goto isset_dim_obj_exit;
