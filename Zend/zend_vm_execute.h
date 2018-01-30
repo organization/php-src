@@ -6158,7 +6158,7 @@ isset_str_offset:
 			if (IS_CONST & (IS_CV|IS_VAR)) {
 				ZVAL_DEREF(offset);
 			}
-			if (Z_TYPE_P(offset) < IS_STRING /* simple scalar types */
+			if (Z_IS_SCALAR_P(offset) /* simple scalar types */
 					|| (Z_IS_STRING_P(offset) /* or numeric string */
 						&& IS_LONG == is_numeric_string(Z_STRVAL_P(offset), Z_STRLEN_P(offset), NULL, NULL, 0))) {
 				lval = zval_get_long(offset);
@@ -8151,7 +8151,7 @@ isset_str_offset:
 			if ((IS_TMP_VAR|IS_VAR) & (IS_CV|IS_VAR)) {
 				ZVAL_DEREF(offset);
 			}
-			if (Z_TYPE_P(offset) < IS_STRING /* simple scalar types */
+			if (Z_IS_SCALAR_P(offset) /* simple scalar types */
 					|| (Z_IS_STRING_P(offset) /* or numeric string */
 						&& IS_LONG == is_numeric_string(Z_STRVAL_P(offset), Z_STRLEN_P(offset), NULL, NULL, 0))) {
 				lval = zval_get_long(offset);
@@ -11474,7 +11474,7 @@ isset_str_offset:
 			if (IS_CV & (IS_CV|IS_VAR)) {
 				ZVAL_DEREF(offset);
 			}
-			if (Z_TYPE_P(offset) < IS_STRING /* simple scalar types */
+			if (Z_IS_SCALAR_P(offset) /* simple scalar types */
 					|| (Z_IS_STRING_P(offset) /* or numeric string */
 						&& IS_LONG == is_numeric_string(Z_STRVAL_P(offset), Z_STRLEN_P(offset), NULL, NULL, 0))) {
 				lval = zval_get_long(offset);
@@ -15113,7 +15113,7 @@ isset_str_offset:
 			if (IS_CONST & (IS_CV|IS_VAR)) {
 				ZVAL_DEREF(offset);
 			}
-			if (Z_TYPE_P(offset) < IS_STRING /* simple scalar types */
+			if (Z_IS_SCALAR_P(offset) /* simple scalar types */
 					|| (Z_IS_STRING_P(offset) /* or numeric string */
 						&& IS_LONG == is_numeric_string(Z_STRVAL_P(offset), Z_STRLEN_P(offset), NULL, NULL, 0))) {
 				lval = zval_get_long(offset);
@@ -16585,7 +16585,7 @@ isset_str_offset:
 			if ((IS_TMP_VAR|IS_VAR) & (IS_CV|IS_VAR)) {
 				ZVAL_DEREF(offset);
 			}
-			if (Z_TYPE_P(offset) < IS_STRING /* simple scalar types */
+			if (Z_IS_SCALAR_P(offset) /* simple scalar types */
 					|| (Z_IS_STRING_P(offset) /* or numeric string */
 						&& IS_LONG == is_numeric_string(Z_STRVAL_P(offset), Z_STRLEN_P(offset), NULL, NULL, 0))) {
 				lval = zval_get_long(offset);
@@ -18644,7 +18644,7 @@ isset_str_offset:
 			if (IS_CV & (IS_CV|IS_VAR)) {
 				ZVAL_DEREF(offset);
 			}
-			if (Z_TYPE_P(offset) < IS_STRING /* simple scalar types */
+			if (Z_IS_SCALAR_P(offset) /* simple scalar types */
 					|| (Z_IS_STRING_P(offset) /* or numeric string */
 						&& IS_LONG == is_numeric_string(Z_STRVAL_P(offset), Z_STRLEN_P(offset), NULL, NULL, 0))) {
 				lval = zval_get_long(offset);
@@ -43568,7 +43568,7 @@ isset_str_offset:
 			if (IS_CONST & (IS_CV|IS_VAR)) {
 				ZVAL_DEREF(offset);
 			}
-			if (Z_TYPE_P(offset) < IS_STRING /* simple scalar types */
+			if (Z_IS_SCALAR_P(offset) /* simple scalar types */
 					|| (Z_IS_STRING_P(offset) /* or numeric string */
 						&& IS_LONG == is_numeric_string(Z_STRVAL_P(offset), Z_STRLEN_P(offset), NULL, NULL, 0))) {
 				lval = zval_get_long(offset);
@@ -47264,7 +47264,7 @@ isset_str_offset:
 			if ((IS_TMP_VAR|IS_VAR) & (IS_CV|IS_VAR)) {
 				ZVAL_DEREF(offset);
 			}
-			if (Z_TYPE_P(offset) < IS_STRING /* simple scalar types */
+			if (Z_IS_SCALAR_P(offset) /* simple scalar types */
 					|| (Z_IS_STRING_P(offset) /* or numeric string */
 						&& IS_LONG == is_numeric_string(Z_STRVAL_P(offset), Z_STRLEN_P(offset), NULL, NULL, 0))) {
 				lval = zval_get_long(offset);
@@ -53238,7 +53238,7 @@ isset_str_offset:
 			if (IS_CV & (IS_CV|IS_VAR)) {
 				ZVAL_DEREF(offset);
 			}
-			if (Z_TYPE_P(offset) < IS_STRING /* simple scalar types */
+			if (Z_IS_SCALAR_P(offset) /* simple scalar types */
 					|| (Z_IS_STRING_P(offset) /* or numeric string */
 						&& IS_LONG == is_numeric_string(Z_STRVAL_P(offset), Z_STRLEN_P(offset), NULL, NULL, 0))) {
 				lval = zval_get_long(offset);
