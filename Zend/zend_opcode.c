@@ -459,7 +459,6 @@ void init_op(zend_op *op)
 	memset(op, 0, sizeof(zend_op));
 	op->lineno = CG(zend_lineno);
 	op->cache_slot = (uint32_t)-1;
-	SET_UNUSED(op->result);
 }
 
 zend_op *get_next_op(zend_op_array *op_array)
