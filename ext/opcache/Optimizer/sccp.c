@@ -1608,6 +1608,7 @@ static void sccp_visit_instr(scdf_ctx *scdf, zend_op *opline, zend_ssa_op *ssa_o
 		case ZEND_COALESCE:
 			SET_RESULT(result, op1);
 			break;
+#if 0
 		case ZEND_FETCH_CLASS:
 			if (!op1) {
 				SET_RESULT_BOT(result);
@@ -1615,6 +1616,7 @@ static void sccp_visit_instr(scdf_ctx *scdf, zend_op *opline, zend_ssa_op *ssa_o
 			}
 			SET_RESULT(result, op1);
 			break;
+#endif
 		case ZEND_ISSET_ISEMPTY_CV:
 			SKIP_IF_TOP(op1);
 			if (ct_eval_isset_isempty(&zv, opline->extended_value, op1) == SUCCESS) {

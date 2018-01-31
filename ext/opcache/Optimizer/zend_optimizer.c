@@ -269,7 +269,6 @@ int zend_optimizer_update_op1_const(zend_op_array *op_array,
 		case ZEND_INSTANCEOF:
 			return 0;
 		case ZEND_CATCH:
-//???		case ZEND_FETCH_CONSTANT:
 		case ZEND_DEFINED:
 		case ZEND_NEW:
 			REQUIRES_STRING(val);

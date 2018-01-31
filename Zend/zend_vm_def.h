@@ -2980,7 +2980,7 @@ ZEND_VM_HANDLER(56, ZEND_ROPE_END, TMP, CONST|TMPVAR|CV, NUM)
 	ZEND_VM_NEXT_OPCODE();
 }
 
-ZEND_VM_HANDLER(109, ZEND_FETCH_CLASS, ANY, CONST|TMPVAR|UNUSED|CV, CLASS_FETCH)
+ZEND_VM_HANDLER(109, ZEND_FETCH_CLASS, UNUSED|CLASS_FETCH, CONST|TMPVAR|UNUSED|CV)
 {
 	zend_free_op free_op2;
 	zval *class_name;
@@ -2988,14 +2988,14 @@ ZEND_VM_HANDLER(109, ZEND_FETCH_CLASS, ANY, CONST|TMPVAR|UNUSED|CV, CLASS_FETCH)
 
 	SAVE_OPLINE();
 	if (OP2_TYPE == IS_UNUSED) {
-		Z_CE_P(EX_VAR(opline->result.var)) = zend_fetch_class(NULL, opline->extended_value);
+		Z_CE_P(EX_VAR(opline->result.var)) = zend_fetch_class(NULL, opline->op1.num);
 		ZEND_VM_NEXT_OPCODE_CHECK_EXCEPTION();
 	} else if (OP2_TYPE == IS_CONST) {
 		zend_class_entry *ce = CACHED_PTR(opline->cache_slot);
 
 		if (UNEXPECTED(ce == NULL)) {
 			class_name = GET_OP2_ZVAL_PTR_UNDEF(BP_VAR_R);
-			ce = zend_fetch_class_by_name(Z_STR_P(class_name), RT_CONSTANT(opline, opline->op2) + 1, opline->extended_value);
+			ce = zend_fetch_class_by_name(Z_STR_P(class_name), RT_CONSTANT(opline, opline->op2) + 1, opline->op1.num);
 			CACHE_PTR(opline->cache_slot, ce);
 		}
 		Z_CE_P(EX_VAR(opline->result.var)) = ce;
@@ -3005,7 +3005,7 @@ ZEND_VM_C_LABEL(try_class_name):
 		if (Z_IS_OBJECT_P(class_name)) {
 			Z_CE_P(EX_VAR(opline->result.var)) = Z_OBJCE_P(class_name);
 		} else if (Z_IS_STRING_P(class_name)) {
-			Z_CE_P(EX_VAR(opline->result.var)) = zend_fetch_class(Z_STR_P(class_name), opline->extended_value);
+			Z_CE_P(EX_VAR(opline->result.var)) = zend_fetch_class(Z_STR_P(class_name), opline->op1.num);
 		} else if ((OP2_TYPE & (IS_VAR|IS_CV)) && Z_IS_REFERENCE_P(class_name)) {
 			class_name = Z_REFVAL_P(class_name);
 			ZEND_VM_C_GOTO(try_class_name);
@@ -5066,17 +5066,17 @@ ZEND_VM_HANDLER(110, ZEND_CLONE, CONST|TMPVAR|UNUSED|THIS|CV, ANY)
 	ZEND_VM_NEXT_OPCODE_CHECK_EXCEPTION();
 }
 
-ZEND_VM_HANDLER(99, ZEND_FETCH_CONSTANT, UNUSED, CONST, CONST_FETCH)
+ZEND_VM_HANDLER(99, ZEND_FETCH_CONSTANT, UNUSED|CONST_FETCH, CONST)
 {
 	USE_OPLINE
 	zend_constant *c;
 
 	if (EXPECTED(CACHED_PTR(opline->cache_slot))) {
 		c = CACHED_PTR(opline->cache_slot);
-	} else if ((c = zend_quick_get_constant(RT_CONSTANT(opline, opline->op2) + 1, opline->extended_value)) == NULL) {
+	} else if ((c = zend_quick_get_constant(RT_CONSTANT(opline, opline->op2) + 1, opline->op1.num)) == NULL) {
 		SAVE_OPLINE();
 
-		if ((opline->extended_value & IS_CONSTANT_UNQUALIFIED) != 0) {
+		if ((opline->op1.num & IS_CONSTANT_UNQUALIFIED) != 0) {
 			char *actual = (char *)zend_memrchr(Z_STRVAL_P(RT_CONSTANT(opline, opline->op2)), '\\', Z_STRLEN_P(RT_CONSTANT(opline, opline->op2)));
 			if (!actual) {
 				ZVAL_STR_COPY(EX_VAR(opline->result.var), Z_STR_P(RT_CONSTANT(opline, opline->op2)));
@@ -7793,13 +7793,13 @@ ZEND_VM_HANDLER(151, ZEND_ASSERT_CHECK, ANY, JMP_ADDR)
 	}
 }
 
-ZEND_VM_HANDLER(157, ZEND_FETCH_CLASS_NAME, ANY, ANY, CLASS_FETCH)
+ZEND_VM_HANDLER(157, ZEND_FETCH_CLASS_NAME, UNUSED|CLASS_FETCH, ANY)
 {
 	uint32_t fetch_type;
 	zend_class_entry *called_scope, *scope;
 	USE_OPLINE
 
-	fetch_type = opline->extended_value;
+	fetch_type = opline->op1.num;
 
 	scope = EX(func)->op_array.scope;
 	if (UNEXPECTED(scope == NULL)) {

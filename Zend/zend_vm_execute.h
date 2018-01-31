@@ -1932,51 +1932,6 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_ASSERT_CHECK_SPEC_HANDLER(ZEND
 	}
 }
 
-static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FETCH_CLASS_NAME_SPEC_HANDLER(ZEND_OPCODE_HANDLER_ARGS)
-{
-	uint32_t fetch_type;
-	zend_class_entry *called_scope, *scope;
-	USE_OPLINE
-
-	fetch_type = opline->extended_value;
-
-	scope = EX(func)->op_array.scope;
-	if (UNEXPECTED(scope == NULL)) {
-		SAVE_OPLINE();
-		zend_throw_error(NULL, "Cannot use \"%s\" when no class scope is active",
-			fetch_type == ZEND_FETCH_CLASS_SELF ? "self" :
-			fetch_type == ZEND_FETCH_CLASS_PARENT ? "parent" : "static");
-		ZVAL_UNDEF(EX_VAR(opline->result.var));
-		HANDLE_EXCEPTION();
-	}
-
-	switch (fetch_type) {
-		case ZEND_FETCH_CLASS_SELF:
-			ZVAL_STR_COPY(EX_VAR(opline->result.var), scope->name);
-			break;
-		case ZEND_FETCH_CLASS_PARENT:
-			if (UNEXPECTED(scope->parent == NULL)) {
-				SAVE_OPLINE();
-				zend_throw_error(NULL,
-					"Cannot use \"parent\" when current class scope has no parent");
-				ZVAL_UNDEF(EX_VAR(opline->result.var));
-				HANDLE_EXCEPTION();
-			}
-			ZVAL_STR_COPY(EX_VAR(opline->result.var), scope->parent->name);
-			break;
-		case ZEND_FETCH_CLASS_STATIC:
-			if (Z_IS_OBJECT(EX(This))) {
-				called_scope = Z_OBJCE(EX(This));
-			} else {
-				called_scope = Z_CE(EX(This));
-			}
-			ZVAL_STR_COPY(EX_VAR(opline->result.var), called_scope->name);
-			break;
-		EMPTY_SWITCH_DEFAULT_CASE()
-	}
-	ZEND_VM_NEXT_OPCODE();
-}
-
 static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_CALL_TRAMPOLINE_SPEC_HANDLER(ZEND_OPCODE_HANDLER_ARGS)
 {
 	zend_array *args;
@@ -2125,49 +2080,6 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL zend_interrupt_helper_SPEC(ZEND_OPC
 	}
 	ZEND_VM_CONTINUE();
 }
-static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FETCH_CLASS_SPEC_CONST_HANDLER(ZEND_OPCODE_HANDLER_ARGS)
-{
-
-	zval *class_name;
-	USE_OPLINE
-
-	SAVE_OPLINE();
-	if (IS_CONST == IS_UNUSED) {
-		Z_CE_P(EX_VAR(opline->result.var)) = zend_fetch_class(NULL, opline->extended_value);
-		ZEND_VM_NEXT_OPCODE_CHECK_EXCEPTION();
-	} else if (IS_CONST == IS_CONST) {
-		zend_class_entry *ce = CACHED_PTR(opline->cache_slot);
-
-		if (UNEXPECTED(ce == NULL)) {
-			class_name = RT_CONSTANT(opline, opline->op2);
-			ce = zend_fetch_class_by_name(Z_STR_P(class_name), RT_CONSTANT(opline, opline->op2) + 1, opline->extended_value);
-			CACHE_PTR(opline->cache_slot, ce);
-		}
-		Z_CE_P(EX_VAR(opline->result.var)) = ce;
-	} else {
-		class_name = RT_CONSTANT(opline, opline->op2);
-try_class_name:
-		if (Z_IS_OBJECT_P(class_name)) {
-			Z_CE_P(EX_VAR(opline->result.var)) = Z_OBJCE_P(class_name);
-		} else if (Z_IS_STRING_P(class_name)) {
-			Z_CE_P(EX_VAR(opline->result.var)) = zend_fetch_class(Z_STR_P(class_name), opline->extended_value);
-		} else if ((IS_CONST & (IS_VAR|IS_CV)) && Z_IS_REFERENCE_P(class_name)) {
-			class_name = Z_REFVAL_P(class_name);
-			goto try_class_name;
-		} else {
-			if (IS_CONST == IS_CV && UNEXPECTED(Z_IS_UNDEF_P(class_name))) {
-				GET_OP2_UNDEF_CV(class_name, BP_VAR_R);
-				if (UNEXPECTED(EG(exception) != NULL)) {
-					HANDLE_EXCEPTION();
-				}
-			}
-			zend_throw_error(NULL, "Class name must be a valid object or a string");
-		}
-	}
-
-	ZEND_VM_NEXT_OPCODE_CHECK_EXCEPTION();
-}
-
 static ZEND_VM_HOT ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_INIT_FCALL_BY_NAME_SPEC_CONST_HANDLER(ZEND_OPCODE_HANDLER_ARGS)
 {
 	USE_OPLINE
@@ -2383,50 +2295,6 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_ADD_INTERFACE_SPEC_CONST_HANDL
 	ZEND_VM_NEXT_OPCODE_CHECK_EXCEPTION();
 }
 
-static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FETCH_CLASS_SPEC_TMPVAR_HANDLER(ZEND_OPCODE_HANDLER_ARGS)
-{
-	zend_free_op free_op2;
-	zval *class_name;
-	USE_OPLINE
-
-	SAVE_OPLINE();
-	if ((IS_TMP_VAR|IS_VAR) == IS_UNUSED) {
-		Z_CE_P(EX_VAR(opline->result.var)) = zend_fetch_class(NULL, opline->extended_value);
-		ZEND_VM_NEXT_OPCODE_CHECK_EXCEPTION();
-	} else if ((IS_TMP_VAR|IS_VAR) == IS_CONST) {
-		zend_class_entry *ce = CACHED_PTR(opline->cache_slot);
-
-		if (UNEXPECTED(ce == NULL)) {
-			class_name = _get_zval_ptr_var(opline->op2.var, &free_op2 EXECUTE_DATA_CC);
-			ce = zend_fetch_class_by_name(Z_STR_P(class_name), RT_CONSTANT(opline, opline->op2) + 1, opline->extended_value);
-			CACHE_PTR(opline->cache_slot, ce);
-		}
-		Z_CE_P(EX_VAR(opline->result.var)) = ce;
-	} else {
-		class_name = _get_zval_ptr_var(opline->op2.var, &free_op2 EXECUTE_DATA_CC);
-try_class_name:
-		if (Z_IS_OBJECT_P(class_name)) {
-			Z_CE_P(EX_VAR(opline->result.var)) = Z_OBJCE_P(class_name);
-		} else if (Z_IS_STRING_P(class_name)) {
-			Z_CE_P(EX_VAR(opline->result.var)) = zend_fetch_class(Z_STR_P(class_name), opline->extended_value);
-		} else if (((IS_TMP_VAR|IS_VAR) & (IS_VAR|IS_CV)) && Z_IS_REFERENCE_P(class_name)) {
-			class_name = Z_REFVAL_P(class_name);
-			goto try_class_name;
-		} else {
-			if ((IS_TMP_VAR|IS_VAR) == IS_CV && UNEXPECTED(Z_IS_UNDEF_P(class_name))) {
-				GET_OP2_UNDEF_CV(class_name, BP_VAR_R);
-				if (UNEXPECTED(EG(exception) != NULL)) {
-					HANDLE_EXCEPTION();
-				}
-			}
-			zend_throw_error(NULL, "Class name must be a valid object or a string");
-		}
-	}
-
-	zval_ptr_dtor_nogc(free_op2);
-	ZEND_VM_NEXT_OPCODE_CHECK_EXCEPTION();
-}
-
 static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_INIT_DYNAMIC_CALL_SPEC_TMPVAR_HANDLER(ZEND_OPCODE_HANDLER_ARGS)
 {
 	USE_OPLINE
@@ -2526,92 +2394,6 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_DECLARE_ANON_INHERITED_CLASS_S
 
 	zend_do_inheritance(ce, Z_CE_P(EX_VAR(opline->op2.var)));
 	ce->ce_flags |= ZEND_ACC_ANON_BOUND;
-	ZEND_VM_NEXT_OPCODE_CHECK_EXCEPTION();
-}
-
-static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FETCH_CLASS_SPEC_UNUSED_HANDLER(ZEND_OPCODE_HANDLER_ARGS)
-{
-
-	zval *class_name;
-	USE_OPLINE
-
-	SAVE_OPLINE();
-	if (IS_UNUSED == IS_UNUSED) {
-		Z_CE_P(EX_VAR(opline->result.var)) = zend_fetch_class(NULL, opline->extended_value);
-		ZEND_VM_NEXT_OPCODE_CHECK_EXCEPTION();
-	} else if (IS_UNUSED == IS_CONST) {
-		zend_class_entry *ce = CACHED_PTR(opline->cache_slot);
-
-		if (UNEXPECTED(ce == NULL)) {
-			class_name = NULL;
-			ce = zend_fetch_class_by_name(Z_STR_P(class_name), RT_CONSTANT(opline, opline->op2) + 1, opline->extended_value);
-			CACHE_PTR(opline->cache_slot, ce);
-		}
-		Z_CE_P(EX_VAR(opline->result.var)) = ce;
-	} else {
-		class_name = NULL;
-try_class_name:
-		if (Z_IS_OBJECT_P(class_name)) {
-			Z_CE_P(EX_VAR(opline->result.var)) = Z_OBJCE_P(class_name);
-		} else if (Z_IS_STRING_P(class_name)) {
-			Z_CE_P(EX_VAR(opline->result.var)) = zend_fetch_class(Z_STR_P(class_name), opline->extended_value);
-		} else if ((IS_UNUSED & (IS_VAR|IS_CV)) && Z_IS_REFERENCE_P(class_name)) {
-			class_name = Z_REFVAL_P(class_name);
-			goto try_class_name;
-		} else {
-			if (IS_UNUSED == IS_CV && UNEXPECTED(Z_IS_UNDEF_P(class_name))) {
-				GET_OP2_UNDEF_CV(class_name, BP_VAR_R);
-				if (UNEXPECTED(EG(exception) != NULL)) {
-					HANDLE_EXCEPTION();
-				}
-			}
-			zend_throw_error(NULL, "Class name must be a valid object or a string");
-		}
-	}
-
-	ZEND_VM_NEXT_OPCODE_CHECK_EXCEPTION();
-}
-
-static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FETCH_CLASS_SPEC_CV_HANDLER(ZEND_OPCODE_HANDLER_ARGS)
-{
-
-	zval *class_name;
-	USE_OPLINE
-
-	SAVE_OPLINE();
-	if (IS_CV == IS_UNUSED) {
-		Z_CE_P(EX_VAR(opline->result.var)) = zend_fetch_class(NULL, opline->extended_value);
-		ZEND_VM_NEXT_OPCODE_CHECK_EXCEPTION();
-	} else if (IS_CV == IS_CONST) {
-		zend_class_entry *ce = CACHED_PTR(opline->cache_slot);
-
-		if (UNEXPECTED(ce == NULL)) {
-			class_name = _get_zval_ptr_cv_undef(opline->op2.var EXECUTE_DATA_CC);
-			ce = zend_fetch_class_by_name(Z_STR_P(class_name), RT_CONSTANT(opline, opline->op2) + 1, opline->extended_value);
-			CACHE_PTR(opline->cache_slot, ce);
-		}
-		Z_CE_P(EX_VAR(opline->result.var)) = ce;
-	} else {
-		class_name = _get_zval_ptr_cv_undef(opline->op2.var EXECUTE_DATA_CC);
-try_class_name:
-		if (Z_IS_OBJECT_P(class_name)) {
-			Z_CE_P(EX_VAR(opline->result.var)) = Z_OBJCE_P(class_name);
-		} else if (Z_IS_STRING_P(class_name)) {
-			Z_CE_P(EX_VAR(opline->result.var)) = zend_fetch_class(Z_STR_P(class_name), opline->extended_value);
-		} else if ((IS_CV & (IS_VAR|IS_CV)) && Z_IS_REFERENCE_P(class_name)) {
-			class_name = Z_REFVAL_P(class_name);
-			goto try_class_name;
-		} else {
-			if (IS_CV == IS_CV && UNEXPECTED(Z_IS_UNDEF_P(class_name))) {
-				GET_OP2_UNDEF_CV(class_name, BP_VAR_R);
-				if (UNEXPECTED(EG(exception) != NULL)) {
-					HANDLE_EXCEPTION();
-				}
-			}
-			zend_throw_error(NULL, "Class name must be a valid object or a string");
-		}
-	}
-
 	ZEND_VM_NEXT_OPCODE_CHECK_EXCEPTION();
 }
 
@@ -32318,6 +32100,51 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_EXIT_SPEC_UNUSED_HANDLER(ZEND_
 	ZEND_VM_NEXT_OPCODE(); /* Never reached */
 }
 
+static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FETCH_CLASS_NAME_SPEC_UNUSED_HANDLER(ZEND_OPCODE_HANDLER_ARGS)
+{
+	uint32_t fetch_type;
+	zend_class_entry *called_scope, *scope;
+	USE_OPLINE
+
+	fetch_type = opline->op1.num;
+
+	scope = EX(func)->op_array.scope;
+	if (UNEXPECTED(scope == NULL)) {
+		SAVE_OPLINE();
+		zend_throw_error(NULL, "Cannot use \"%s\" when no class scope is active",
+			fetch_type == ZEND_FETCH_CLASS_SELF ? "self" :
+			fetch_type == ZEND_FETCH_CLASS_PARENT ? "parent" : "static");
+		ZVAL_UNDEF(EX_VAR(opline->result.var));
+		HANDLE_EXCEPTION();
+	}
+
+	switch (fetch_type) {
+		case ZEND_FETCH_CLASS_SELF:
+			ZVAL_STR_COPY(EX_VAR(opline->result.var), scope->name);
+			break;
+		case ZEND_FETCH_CLASS_PARENT:
+			if (UNEXPECTED(scope->parent == NULL)) {
+				SAVE_OPLINE();
+				zend_throw_error(NULL,
+					"Cannot use \"parent\" when current class scope has no parent");
+				ZVAL_UNDEF(EX_VAR(opline->result.var));
+				HANDLE_EXCEPTION();
+			}
+			ZVAL_STR_COPY(EX_VAR(opline->result.var), scope->parent->name);
+			break;
+		case ZEND_FETCH_CLASS_STATIC:
+			if (Z_IS_OBJECT(EX(This))) {
+				called_scope = Z_OBJCE(EX(This));
+			} else {
+				called_scope = Z_CE(EX(This));
+			}
+			ZVAL_STR_COPY(EX_VAR(opline->result.var), called_scope->name);
+			break;
+		EMPTY_SWITCH_DEFAULT_CASE()
+	}
+	ZEND_VM_NEXT_OPCODE();
+}
+
 static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL zend_binary_assign_op_obj_helper_SPEC_UNUSED_CONST(binary_op_type binary_op ZEND_OPCODE_HANDLER_ARGS_DC)
 {
 	USE_OPLINE
@@ -33523,6 +33350,49 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_ROPE_INIT_SPEC_UNUSED_CONST_HA
 	ZEND_VM_NEXT_OPCODE();
 }
 
+static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FETCH_CLASS_SPEC_UNUSED_CONST_HANDLER(ZEND_OPCODE_HANDLER_ARGS)
+{
+
+	zval *class_name;
+	USE_OPLINE
+
+	SAVE_OPLINE();
+	if (IS_CONST == IS_UNUSED) {
+		Z_CE_P(EX_VAR(opline->result.var)) = zend_fetch_class(NULL, opline->op1.num);
+		ZEND_VM_NEXT_OPCODE_CHECK_EXCEPTION();
+	} else if (IS_CONST == IS_CONST) {
+		zend_class_entry *ce = CACHED_PTR(opline->cache_slot);
+
+		if (UNEXPECTED(ce == NULL)) {
+			class_name = RT_CONSTANT(opline, opline->op2);
+			ce = zend_fetch_class_by_name(Z_STR_P(class_name), RT_CONSTANT(opline, opline->op2) + 1, opline->op1.num);
+			CACHE_PTR(opline->cache_slot, ce);
+		}
+		Z_CE_P(EX_VAR(opline->result.var)) = ce;
+	} else {
+		class_name = RT_CONSTANT(opline, opline->op2);
+try_class_name:
+		if (Z_IS_OBJECT_P(class_name)) {
+			Z_CE_P(EX_VAR(opline->result.var)) = Z_OBJCE_P(class_name);
+		} else if (Z_IS_STRING_P(class_name)) {
+			Z_CE_P(EX_VAR(opline->result.var)) = zend_fetch_class(Z_STR_P(class_name), opline->op1.num);
+		} else if ((IS_CONST & (IS_VAR|IS_CV)) && Z_IS_REFERENCE_P(class_name)) {
+			class_name = Z_REFVAL_P(class_name);
+			goto try_class_name;
+		} else {
+			if (IS_CONST == IS_CV && UNEXPECTED(Z_IS_UNDEF_P(class_name))) {
+				GET_OP2_UNDEF_CV(class_name, BP_VAR_R);
+				if (UNEXPECTED(EG(exception) != NULL)) {
+					HANDLE_EXCEPTION();
+				}
+			}
+			zend_throw_error(NULL, "Class name must be a valid object or a string");
+		}
+	}
+
+	ZEND_VM_NEXT_OPCODE_CHECK_EXCEPTION();
+}
+
 static ZEND_VM_HOT ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_INIT_METHOD_CALL_SPEC_UNUSED_CONST_HANDLER(ZEND_OPCODE_HANDLER_ARGS)
 {
 	USE_OPLINE
@@ -33819,10 +33689,10 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FETCH_CONSTANT_SPEC_UNUSED_CON
 
 	if (EXPECTED(CACHED_PTR(opline->cache_slot))) {
 		c = CACHED_PTR(opline->cache_slot);
-	} else if ((c = zend_quick_get_constant(RT_CONSTANT(opline, opline->op2) + 1, opline->extended_value)) == NULL) {
+	} else if ((c = zend_quick_get_constant(RT_CONSTANT(opline, opline->op2) + 1, opline->op1.num)) == NULL) {
 		SAVE_OPLINE();
 
-		if ((opline->extended_value & IS_CONSTANT_UNQUALIFIED) != 0) {
+		if ((opline->op1.num & IS_CONSTANT_UNQUALIFIED) != 0) {
 			char *actual = (char *)zend_memrchr(Z_STRVAL_P(RT_CONSTANT(opline, opline->op2)), '\\', Z_STRLEN_P(RT_CONSTANT(opline, opline->op2)));
 			if (!actual) {
 				ZVAL_STR_COPY(EX_VAR(opline->result.var), Z_STR_P(RT_CONSTANT(opline, opline->op2)));
@@ -35350,6 +35220,50 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_ROPE_INIT_SPEC_UNUSED_TMPVAR_H
 	ZEND_VM_NEXT_OPCODE();
 }
 
+static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FETCH_CLASS_SPEC_UNUSED_TMPVAR_HANDLER(ZEND_OPCODE_HANDLER_ARGS)
+{
+	zend_free_op free_op2;
+	zval *class_name;
+	USE_OPLINE
+
+	SAVE_OPLINE();
+	if ((IS_TMP_VAR|IS_VAR) == IS_UNUSED) {
+		Z_CE_P(EX_VAR(opline->result.var)) = zend_fetch_class(NULL, opline->op1.num);
+		ZEND_VM_NEXT_OPCODE_CHECK_EXCEPTION();
+	} else if ((IS_TMP_VAR|IS_VAR) == IS_CONST) {
+		zend_class_entry *ce = CACHED_PTR(opline->cache_slot);
+
+		if (UNEXPECTED(ce == NULL)) {
+			class_name = _get_zval_ptr_var(opline->op2.var, &free_op2 EXECUTE_DATA_CC);
+			ce = zend_fetch_class_by_name(Z_STR_P(class_name), RT_CONSTANT(opline, opline->op2) + 1, opline->op1.num);
+			CACHE_PTR(opline->cache_slot, ce);
+		}
+		Z_CE_P(EX_VAR(opline->result.var)) = ce;
+	} else {
+		class_name = _get_zval_ptr_var(opline->op2.var, &free_op2 EXECUTE_DATA_CC);
+try_class_name:
+		if (Z_IS_OBJECT_P(class_name)) {
+			Z_CE_P(EX_VAR(opline->result.var)) = Z_OBJCE_P(class_name);
+		} else if (Z_IS_STRING_P(class_name)) {
+			Z_CE_P(EX_VAR(opline->result.var)) = zend_fetch_class(Z_STR_P(class_name), opline->op1.num);
+		} else if (((IS_TMP_VAR|IS_VAR) & (IS_VAR|IS_CV)) && Z_IS_REFERENCE_P(class_name)) {
+			class_name = Z_REFVAL_P(class_name);
+			goto try_class_name;
+		} else {
+			if ((IS_TMP_VAR|IS_VAR) == IS_CV && UNEXPECTED(Z_IS_UNDEF_P(class_name))) {
+				GET_OP2_UNDEF_CV(class_name, BP_VAR_R);
+				if (UNEXPECTED(EG(exception) != NULL)) {
+					HANDLE_EXCEPTION();
+				}
+			}
+			zend_throw_error(NULL, "Class name must be a valid object or a string");
+		}
+	}
+
+	zval_ptr_dtor_nogc(free_op2);
+	ZEND_VM_NEXT_OPCODE_CHECK_EXCEPTION();
+}
+
 static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_INIT_METHOD_CALL_SPEC_UNUSED_TMPVAR_HANDLER(ZEND_OPCODE_HANDLER_ARGS)
 {
 	USE_OPLINE
@@ -36002,6 +35916,49 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_YIELD_SPEC_UNUSED_VAR_HANDLER(
 	SAVE_OPLINE();
 
 	ZEND_VM_RETURN();
+}
+
+static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FETCH_CLASS_SPEC_UNUSED_UNUSED_HANDLER(ZEND_OPCODE_HANDLER_ARGS)
+{
+
+	zval *class_name;
+	USE_OPLINE
+
+	SAVE_OPLINE();
+	if (IS_UNUSED == IS_UNUSED) {
+		Z_CE_P(EX_VAR(opline->result.var)) = zend_fetch_class(NULL, opline->op1.num);
+		ZEND_VM_NEXT_OPCODE_CHECK_EXCEPTION();
+	} else if (IS_UNUSED == IS_CONST) {
+		zend_class_entry *ce = CACHED_PTR(opline->cache_slot);
+
+		if (UNEXPECTED(ce == NULL)) {
+			class_name = NULL;
+			ce = zend_fetch_class_by_name(Z_STR_P(class_name), RT_CONSTANT(opline, opline->op2) + 1, opline->op1.num);
+			CACHE_PTR(opline->cache_slot, ce);
+		}
+		Z_CE_P(EX_VAR(opline->result.var)) = ce;
+	} else {
+		class_name = NULL;
+try_class_name:
+		if (Z_IS_OBJECT_P(class_name)) {
+			Z_CE_P(EX_VAR(opline->result.var)) = Z_OBJCE_P(class_name);
+		} else if (Z_IS_STRING_P(class_name)) {
+			Z_CE_P(EX_VAR(opline->result.var)) = zend_fetch_class(Z_STR_P(class_name), opline->op1.num);
+		} else if ((IS_UNUSED & (IS_VAR|IS_CV)) && Z_IS_REFERENCE_P(class_name)) {
+			class_name = Z_REFVAL_P(class_name);
+			goto try_class_name;
+		} else {
+			if (IS_UNUSED == IS_CV && UNEXPECTED(Z_IS_UNDEF_P(class_name))) {
+				GET_OP2_UNDEF_CV(class_name, BP_VAR_R);
+				if (UNEXPECTED(EG(exception) != NULL)) {
+					HANDLE_EXCEPTION();
+				}
+			}
+			zend_throw_error(NULL, "Class name must be a valid object or a string");
+		}
+	}
+
+	ZEND_VM_NEXT_OPCODE_CHECK_EXCEPTION();
 }
 
 static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_INIT_STATIC_METHOD_CALL_SPEC_UNUSED_UNUSED_HANDLER(ZEND_OPCODE_HANDLER_ARGS)
@@ -37708,6 +37665,49 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_ROPE_INIT_SPEC_UNUSED_CV_HANDL
 		}
 	}
 	ZEND_VM_NEXT_OPCODE();
+}
+
+static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FETCH_CLASS_SPEC_UNUSED_CV_HANDLER(ZEND_OPCODE_HANDLER_ARGS)
+{
+
+	zval *class_name;
+	USE_OPLINE
+
+	SAVE_OPLINE();
+	if (IS_CV == IS_UNUSED) {
+		Z_CE_P(EX_VAR(opline->result.var)) = zend_fetch_class(NULL, opline->op1.num);
+		ZEND_VM_NEXT_OPCODE_CHECK_EXCEPTION();
+	} else if (IS_CV == IS_CONST) {
+		zend_class_entry *ce = CACHED_PTR(opline->cache_slot);
+
+		if (UNEXPECTED(ce == NULL)) {
+			class_name = _get_zval_ptr_cv_undef(opline->op2.var EXECUTE_DATA_CC);
+			ce = zend_fetch_class_by_name(Z_STR_P(class_name), RT_CONSTANT(opline, opline->op2) + 1, opline->op1.num);
+			CACHE_PTR(opline->cache_slot, ce);
+		}
+		Z_CE_P(EX_VAR(opline->result.var)) = ce;
+	} else {
+		class_name = _get_zval_ptr_cv_undef(opline->op2.var EXECUTE_DATA_CC);
+try_class_name:
+		if (Z_IS_OBJECT_P(class_name)) {
+			Z_CE_P(EX_VAR(opline->result.var)) = Z_OBJCE_P(class_name);
+		} else if (Z_IS_STRING_P(class_name)) {
+			Z_CE_P(EX_VAR(opline->result.var)) = zend_fetch_class(Z_STR_P(class_name), opline->op1.num);
+		} else if ((IS_CV & (IS_VAR|IS_CV)) && Z_IS_REFERENCE_P(class_name)) {
+			class_name = Z_REFVAL_P(class_name);
+			goto try_class_name;
+		} else {
+			if (IS_CV == IS_CV && UNEXPECTED(Z_IS_UNDEF_P(class_name))) {
+				GET_OP2_UNDEF_CV(class_name, BP_VAR_R);
+				if (UNEXPECTED(EG(exception) != NULL)) {
+					HANDLE_EXCEPTION();
+				}
+			}
+			zend_throw_error(NULL, "Class name must be a valid object or a string");
+		}
+	}
+
+	ZEND_VM_NEXT_OPCODE_CHECK_EXCEPTION();
 }
 
 static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_INIT_METHOD_CALL_SPEC_UNUSED_CV_HANDLER(ZEND_OPCODE_HANDLER_ARGS)
@@ -55538,11 +55538,11 @@ ZEND_API void execute_ex(zend_execute_data *ex)
 			(void*)&&ZEND_THROW_SPEC_VAR_LABEL,
 			(void*)&&ZEND_NULL_LABEL,
 			(void*)&&ZEND_THROW_SPEC_CV_LABEL,
-			(void*)&&ZEND_FETCH_CLASS_SPEC_CONST_LABEL,
-			(void*)&&ZEND_FETCH_CLASS_SPEC_TMPVAR_LABEL,
-			(void*)&&ZEND_FETCH_CLASS_SPEC_TMPVAR_LABEL,
-			(void*)&&ZEND_FETCH_CLASS_SPEC_UNUSED_LABEL,
-			(void*)&&ZEND_FETCH_CLASS_SPEC_CV_LABEL,
+			(void*)&&ZEND_FETCH_CLASS_SPEC_UNUSED_CONST_LABEL,
+			(void*)&&ZEND_FETCH_CLASS_SPEC_UNUSED_TMPVAR_LABEL,
+			(void*)&&ZEND_FETCH_CLASS_SPEC_UNUSED_TMPVAR_LABEL,
+			(void*)&&ZEND_FETCH_CLASS_SPEC_UNUSED_UNUSED_LABEL,
+			(void*)&&ZEND_FETCH_CLASS_SPEC_UNUSED_CV_LABEL,
 			(void*)&&ZEND_CLONE_SPEC_CONST_LABEL,
 			(void*)&&ZEND_CLONE_SPEC_TMPVAR_LABEL,
 			(void*)&&ZEND_CLONE_SPEC_TMPVAR_LABEL,
@@ -56118,7 +56118,7 @@ ZEND_API void execute_ex(zend_execute_data *ex)
 			(void*)&&ZEND_ADD_TRAIT_SPEC_LABEL,
 			(void*)&&ZEND_BIND_TRAITS_SPEC_LABEL,
 			(void*)&&ZEND_SEPARATE_SPEC_VAR_UNUSED_LABEL,
-			(void*)&&ZEND_FETCH_CLASS_NAME_SPEC_LABEL,
+			(void*)&&ZEND_FETCH_CLASS_NAME_SPEC_UNUSED_LABEL,
 			(void*)&&ZEND_CALL_TRAMPOLINE_SPEC_LABEL,
 			(void*)&&ZEND_DISCARD_EXCEPTION_SPEC_LABEL,
 			(void*)&&ZEND_YIELD_SPEC_CONST_CONST_LABEL,
@@ -57584,17 +57584,11 @@ ZEND_API void execute_ex(zend_execute_data *ex)
 			HYBRID_CASE(ZEND_ASSERT_CHECK_SPEC):
 				ZEND_ASSERT_CHECK_SPEC_HANDLER(ZEND_OPCODE_HANDLER_ARGS_PASSTHRU);
 				HYBRID_BREAK();
-			HYBRID_CASE(ZEND_FETCH_CLASS_NAME_SPEC):
-				ZEND_FETCH_CLASS_NAME_SPEC_HANDLER(ZEND_OPCODE_HANDLER_ARGS_PASSTHRU);
-				HYBRID_BREAK();
 			HYBRID_CASE(ZEND_CALL_TRAMPOLINE_SPEC):
 				ZEND_CALL_TRAMPOLINE_SPEC_HANDLER(ZEND_OPCODE_HANDLER_ARGS_PASSTHRU);
 				HYBRID_BREAK();
 			HYBRID_CASE(ZEND_JMP_FORWARD_SPEC):
 				ZEND_JMP_FORWARD_SPEC_HANDLER(ZEND_OPCODE_HANDLER_ARGS_PASSTHRU);
-				HYBRID_BREAK();
-			HYBRID_CASE(ZEND_FETCH_CLASS_SPEC_CONST):
-				ZEND_FETCH_CLASS_SPEC_CONST_HANDLER(ZEND_OPCODE_HANDLER_ARGS_PASSTHRU);
 				HYBRID_BREAK();
 			HYBRID_CASE(ZEND_INIT_FCALL_BY_NAME_SPEC_CONST):
 				ZEND_INIT_FCALL_BY_NAME_SPEC_CONST_HANDLER(ZEND_OPCODE_HANDLER_ARGS_PASSTHRU);
@@ -57614,9 +57608,6 @@ ZEND_API void execute_ex(zend_execute_data *ex)
 			HYBRID_CASE(ZEND_ADD_INTERFACE_SPEC_CONST):
 				ZEND_ADD_INTERFACE_SPEC_CONST_HANDLER(ZEND_OPCODE_HANDLER_ARGS_PASSTHRU);
 				HYBRID_BREAK();
-			HYBRID_CASE(ZEND_FETCH_CLASS_SPEC_TMPVAR):
-				ZEND_FETCH_CLASS_SPEC_TMPVAR_HANDLER(ZEND_OPCODE_HANDLER_ARGS_PASSTHRU);
-				HYBRID_BREAK();
 			HYBRID_CASE(ZEND_INIT_DYNAMIC_CALL_SPEC_TMPVAR):
 				ZEND_INIT_DYNAMIC_CALL_SPEC_TMPVAR_HANDLER(ZEND_OPCODE_HANDLER_ARGS_PASSTHRU);
 				HYBRID_BREAK();
@@ -57628,12 +57619,6 @@ ZEND_API void execute_ex(zend_execute_data *ex)
 				HYBRID_BREAK();
 			HYBRID_CASE(ZEND_DECLARE_ANON_INHERITED_CLASS_SPEC_VAR):
 				ZEND_DECLARE_ANON_INHERITED_CLASS_SPEC_VAR_HANDLER(ZEND_OPCODE_HANDLER_ARGS_PASSTHRU);
-				HYBRID_BREAK();
-			HYBRID_CASE(ZEND_FETCH_CLASS_SPEC_UNUSED):
-				ZEND_FETCH_CLASS_SPEC_UNUSED_HANDLER(ZEND_OPCODE_HANDLER_ARGS_PASSTHRU);
-				HYBRID_BREAK();
-			HYBRID_CASE(ZEND_FETCH_CLASS_SPEC_CV):
-				ZEND_FETCH_CLASS_SPEC_CV_HANDLER(ZEND_OPCODE_HANDLER_ARGS_PASSTHRU);
 				HYBRID_BREAK();
 			HYBRID_CASE(ZEND_INIT_DYNAMIC_CALL_SPEC_CV):
 				ZEND_INIT_DYNAMIC_CALL_SPEC_CV_HANDLER(ZEND_OPCODE_HANDLER_ARGS_PASSTHRU);
@@ -59843,6 +59828,9 @@ ZEND_API void execute_ex(zend_execute_data *ex)
 			HYBRID_CASE(ZEND_EXIT_SPEC_UNUSED):
 				ZEND_EXIT_SPEC_UNUSED_HANDLER(ZEND_OPCODE_HANDLER_ARGS_PASSTHRU);
 				HYBRID_BREAK();
+			HYBRID_CASE(ZEND_FETCH_CLASS_NAME_SPEC_UNUSED):
+				ZEND_FETCH_CLASS_NAME_SPEC_UNUSED_HANDLER(ZEND_OPCODE_HANDLER_ARGS_PASSTHRU);
+				HYBRID_BREAK();
 			HYBRID_CASE(ZEND_ASSIGN_ADD_SPEC_UNUSED_CONST_OBJ):
 				ZEND_ASSIGN_ADD_SPEC_UNUSED_CONST_OBJ_HANDLER(ZEND_OPCODE_HANDLER_ARGS_PASSTHRU);
 				HYBRID_BREAK();
@@ -59923,6 +59911,9 @@ ZEND_API void execute_ex(zend_execute_data *ex)
 				HYBRID_BREAK();
 			HYBRID_CASE(ZEND_ROPE_INIT_SPEC_UNUSED_CONST):
 				ZEND_ROPE_INIT_SPEC_UNUSED_CONST_HANDLER(ZEND_OPCODE_HANDLER_ARGS_PASSTHRU);
+				HYBRID_BREAK();
+			HYBRID_CASE(ZEND_FETCH_CLASS_SPEC_UNUSED_CONST):
+				ZEND_FETCH_CLASS_SPEC_UNUSED_CONST_HANDLER(ZEND_OPCODE_HANDLER_ARGS_PASSTHRU);
 				HYBRID_BREAK();
 			HYBRID_CASE(ZEND_INIT_METHOD_CALL_SPEC_UNUSED_CONST):
 				ZEND_INIT_METHOD_CALL_SPEC_UNUSED_CONST_HANDLER(ZEND_OPCODE_HANDLER_ARGS_PASSTHRU);
@@ -60026,6 +60017,9 @@ ZEND_API void execute_ex(zend_execute_data *ex)
 			HYBRID_CASE(ZEND_ROPE_INIT_SPEC_UNUSED_TMPVAR):
 				ZEND_ROPE_INIT_SPEC_UNUSED_TMPVAR_HANDLER(ZEND_OPCODE_HANDLER_ARGS_PASSTHRU);
 				HYBRID_BREAK();
+			HYBRID_CASE(ZEND_FETCH_CLASS_SPEC_UNUSED_TMPVAR):
+				ZEND_FETCH_CLASS_SPEC_UNUSED_TMPVAR_HANDLER(ZEND_OPCODE_HANDLER_ARGS_PASSTHRU);
+				HYBRID_BREAK();
 			HYBRID_CASE(ZEND_INIT_METHOD_CALL_SPEC_UNUSED_TMPVAR):
 				ZEND_INIT_METHOD_CALL_SPEC_UNUSED_TMPVAR_HANDLER(ZEND_OPCODE_HANDLER_ARGS_PASSTHRU);
 				HYBRID_BREAK();
@@ -60043,6 +60037,9 @@ ZEND_API void execute_ex(zend_execute_data *ex)
 				HYBRID_BREAK();
 			HYBRID_CASE(ZEND_YIELD_SPEC_UNUSED_VAR):
 				ZEND_YIELD_SPEC_UNUSED_VAR_HANDLER(ZEND_OPCODE_HANDLER_ARGS_PASSTHRU);
+				HYBRID_BREAK();
+			HYBRID_CASE(ZEND_FETCH_CLASS_SPEC_UNUSED_UNUSED):
+				ZEND_FETCH_CLASS_SPEC_UNUSED_UNUSED_HANDLER(ZEND_OPCODE_HANDLER_ARGS_PASSTHRU);
 				HYBRID_BREAK();
 			HYBRID_CASE(ZEND_INIT_STATIC_METHOD_CALL_SPEC_UNUSED_UNUSED):
 				ZEND_INIT_STATIC_METHOD_CALL_SPEC_UNUSED_UNUSED_HANDLER(ZEND_OPCODE_HANDLER_ARGS_PASSTHRU);
@@ -60151,6 +60148,9 @@ ZEND_API void execute_ex(zend_execute_data *ex)
 				HYBRID_BREAK();
 			HYBRID_CASE(ZEND_ROPE_INIT_SPEC_UNUSED_CV):
 				ZEND_ROPE_INIT_SPEC_UNUSED_CV_HANDLER(ZEND_OPCODE_HANDLER_ARGS_PASSTHRU);
+				HYBRID_BREAK();
+			HYBRID_CASE(ZEND_FETCH_CLASS_SPEC_UNUSED_CV):
+				ZEND_FETCH_CLASS_SPEC_UNUSED_CV_HANDLER(ZEND_OPCODE_HANDLER_ARGS_PASSTHRU);
 				HYBRID_BREAK();
 			HYBRID_CASE(ZEND_INIT_METHOD_CALL_SPEC_UNUSED_CV):
 				ZEND_INIT_METHOD_CALL_SPEC_UNUSED_CV_HANDLER(ZEND_OPCODE_HANDLER_ARGS_PASSTHRU);
@@ -63423,11 +63423,11 @@ void zend_init_opcodes_handlers(void)
 		ZEND_THROW_SPEC_VAR_HANDLER,
 		ZEND_NULL_HANDLER,
 		ZEND_THROW_SPEC_CV_HANDLER,
-		ZEND_FETCH_CLASS_SPEC_CONST_HANDLER,
-		ZEND_FETCH_CLASS_SPEC_TMPVAR_HANDLER,
-		ZEND_FETCH_CLASS_SPEC_TMPVAR_HANDLER,
-		ZEND_FETCH_CLASS_SPEC_UNUSED_HANDLER,
-		ZEND_FETCH_CLASS_SPEC_CV_HANDLER,
+		ZEND_FETCH_CLASS_SPEC_UNUSED_CONST_HANDLER,
+		ZEND_FETCH_CLASS_SPEC_UNUSED_TMPVAR_HANDLER,
+		ZEND_FETCH_CLASS_SPEC_UNUSED_TMPVAR_HANDLER,
+		ZEND_FETCH_CLASS_SPEC_UNUSED_UNUSED_HANDLER,
+		ZEND_FETCH_CLASS_SPEC_UNUSED_CV_HANDLER,
 		ZEND_CLONE_SPEC_CONST_HANDLER,
 		ZEND_CLONE_SPEC_TMPVAR_HANDLER,
 		ZEND_CLONE_SPEC_TMPVAR_HANDLER,
@@ -64003,7 +64003,7 @@ void zend_init_opcodes_handlers(void)
 		ZEND_ADD_TRAIT_SPEC_HANDLER,
 		ZEND_BIND_TRAITS_SPEC_HANDLER,
 		ZEND_SEPARATE_SPEC_VAR_UNUSED_HANDLER,
-		ZEND_FETCH_CLASS_NAME_SPEC_HANDLER,
+		ZEND_FETCH_CLASS_NAME_SPEC_UNUSED_HANDLER,
 		ZEND_CALL_TRAMPOLINE_SPEC_HANDLER,
 		ZEND_DISCARD_EXCEPTION_SPEC_HANDLER,
 		ZEND_YIELD_SPEC_CONST_CONST_HANDLER,
