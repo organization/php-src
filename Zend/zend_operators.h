@@ -573,7 +573,7 @@ static zend_always_inline void fast_long_add_function(zval *result, zval *op1, z
 		: "r"(&result->value),
 		  "r"(&op1->value),
 		  "r"(&op2->value),
-		  "n"(~IS_LONG),
+		  "n"(Z_TYPE_TO_RAW(IS_LONG)),
 		  "n"(ZVAL_OFFSETOF_TYPE)
 		: "eax","cc", "memory"
 		: overflow);
@@ -591,7 +591,7 @@ overflow: ZEND_ATTRIBUTE_COLD_LABEL
 		: "r"(&result->value),
 		  "r"(&op1->value),
 		  "r"(&op2->value),
-		  "n"(~IS_LONG),
+		  "n"(Z_TYPE_TO_RAW(IS_LONG)),
 		  "n"(ZVAL_OFFSETOF_TYPE)
 		: "rax","cc", "memory"
 		: overflow);
@@ -663,7 +663,7 @@ static zend_always_inline void fast_long_sub_function(zval *result, zval *op1, z
 		: "r"(&result->value),
 		  "r"(&op1->value),
 		  "r"(&op2->value),
-		  "n"(~IS_LONG),
+		  "n"(Z_TYPE_TO_RAW(IS_LONG)),
 		  "n"(ZVAL_OFFSETOF_TYPE)
 		: "eax","cc", "memory"
 		: overflow);
@@ -681,7 +681,7 @@ overflow: ZEND_ATTRIBUTE_COLD_LABEL
 		: "r"(&result->value),
 		  "r"(&op1->value),
 		  "r"(&op2->value),
-		  "n"(~IS_LONG),
+		  "n"(Z_TYPE_TO_RAW(IS_LONG)),
 		  "n"(ZVAL_OFFSETOF_TYPE)
 		: "rax","cc", "memory"
 		: overflow);

@@ -96,6 +96,8 @@ MYSQLND_METHOD(mysqlnd_stmt, store_result)(MYSQLND_STMT * const s)
 		if (result->stored_data->type == MYSQLND_BUFFERED_TYPE_ZVAL) {
 			MYSQLND_RES_BUFFERED_ZVAL * set = (MYSQLND_RES_BUFFERED_ZVAL *) result->stored_data;
 			if (result->stored_data->row_count) {
+				size_t i;
+
 				/* don't try to allocate more than possible - mnd_XXalloc expects size_t, and it can have narrower range than uint64_t */
 				if (result->stored_data->row_count * result->meta->field_count * sizeof(zval *) > SIZE_MAX) {
 					SET_OOM_ERROR(conn->error_info);
@@ -107,8 +109,9 @@ MYSQLND_METHOD(mysqlnd_stmt, store_result)(MYSQLND_STMT * const s)
 					SET_OOM_ERROR(conn->error_info);
 					DBG_RETURN(NULL);
 				}
-				/* Initialize to IS_UNDEF */
-				memset(set->data, 0xff, (size_t)(result->stored_data->row_count * result->meta->field_count * sizeof(zval)));
+				for (i = 0; i < (size_t)result->stored_data->row_count * (size_t)result->meta->field_count; i++) {
+					ZVAL_UNDEF(set->data + i);
+				}
 			}
 			/* Position at the first row */
 			set->data_cursor = set->data;

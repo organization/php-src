@@ -93,10 +93,10 @@ typedef struct _sccp_ctx {
 #define PARTIAL_ARRAY_EX        ((IS_TYPE_REFCOUNTED << Z_TYPE_FLAGS_SHIFT) | IS_RESERVE_1)
 #define PARTIAL_OBJECT_EX       ((IS_TYPE_REFCOUNTED << Z_TYPE_FLAGS_SHIFT) | IS_RESERVE_2)
 
-#define IS_TOP(zv)              (Z_RAW_TYPE_INFO_P(zv) == (uint32_t)~TOP)
-#define IS_BOT(zv)              (Z_RAW_TYPE_INFO_P(zv) == (uint32_t)~BOT)
-#define IS_PARTIAL_ARRAY(zv)    (Z_RAW_TYPE_INFO_P(zv) == (uint32_t)~PARTIAL_ARRAY_EX)
-#define IS_PARTIAL_OBJECT(zv)   (Z_RAW_TYPE_INFO_P(zv) == (uint32_t)~PARTIAL_OBJECT_EX)
+#define IS_TOP(zv)              (Z_RAW_TYPE_INFO_P(zv) == Z_TYPE_TO_RAW(TOP))
+#define IS_BOT(zv)              (Z_RAW_TYPE_INFO_P(zv) == Z_TYPE_TO_RAW(BOT))
+#define IS_PARTIAL_ARRAY(zv)    (Z_RAW_TYPE_INFO_P(zv) == Z_TYPE_TO_RAW(PARTIAL_ARRAY_EX))
+#define IS_PARTIAL_OBJECT(zv)   (Z_RAW_TYPE_INFO_P(zv) == Z_TYPE_TO_RAW(PARTIAL_OBJECT_EX))
 
 #define MAKE_PARTIAL_ARRAY(zv)   Z_SET_TYPE_INFO_P(zv, PARTIAL_ARRAY_EX)
 #define MAKE_PARTIAL_OBJECT(zv)  Z_SET_TYPE_INFO_P(zv, PARTIAL_OBJECT_EX)

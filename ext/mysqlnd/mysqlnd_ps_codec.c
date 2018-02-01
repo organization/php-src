@@ -516,9 +516,12 @@ static enum_func_status
 mysqlnd_stmt_copy_it(zval ** copies, zval * original, unsigned int param_count, unsigned int current)
 {
 	if (!*copies) {
+		unsigned int i;
+
 		*copies = mnd_ecalloc(param_count, sizeof(zval));
-		/* Initialize to IS_UNDEF */
-		memset(*copies, 0xff, param_count * sizeof(zval));
+		for (i = 0; i < param_count; i++) {
+			ZVAL_UNDEF(*copies + i);
+		}
 	}
 	if (*copies) {
 		ZVAL_COPY(&(*copies)[current], original);

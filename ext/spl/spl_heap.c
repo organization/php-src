@@ -221,13 +221,15 @@ static int spl_ptr_pqueue_zval_cmp(zval *a, zval *b, zval *object) { /* {{{ */
 static spl_ptr_heap *spl_ptr_heap_init(spl_ptr_heap_cmp_func cmp, spl_ptr_heap_ctor_func ctor, spl_ptr_heap_dtor_func dtor) /* {{{ */
 {
 	spl_ptr_heap *heap = emalloc(sizeof(spl_ptr_heap));
+	size_t i;
 
 	heap->dtor     = dtor;
 	heap->ctor     = ctor;
 	heap->cmp      = cmp;
 	heap->elements = safe_emalloc(PTR_HEAP_BLOCK_SIZE, sizeof(zval), 0);
-	/* Initialize to IS_UNDEF */
-	memset(heap->elements, 0xff, PTR_HEAP_BLOCK_SIZE * sizeof(zval));
+	for (i = 0; i < PTR_HEAP_BLOCK_SIZE; i++) {
+		ZVAL_UNDEF(heap->elements + i);
+	}
 	heap->max_size = PTR_HEAP_BLOCK_SIZE;
 	heap->count    = 0;
 	heap->flags    = 0;
@@ -242,8 +244,9 @@ static void spl_ptr_heap_insert(spl_ptr_heap *heap, zval *elem, void *cmp_userda
 	if (heap->count+1 > heap->max_size) {
 		/* we need to allocate more memory */
 		heap->elements  = erealloc(heap->elements, heap->max_size * 2 * sizeof(zval));
-		/* Initialize to IS_UNDEF */
-		memset(heap->elements + heap->max_size, 0xff, heap->max_size * sizeof(zval));
+		for (i = heap->max_size; i < heap->max_size * 2; i++) {
+			ZVAL_UNDEF(heap->elements + i);
+		}
 		heap->max_size *= 2;
 	}
 
