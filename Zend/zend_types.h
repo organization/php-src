@@ -392,8 +392,8 @@ struct _zend_ast_ref {
 #define Z_TYPE_MASK					0x0f
 #define Z_TYPE_FLAGS_SHIFT			0
 
-#define Z_TYPE_TO_RAW(t)			((uint32_t)~(t))
-#define Z_RAW_TO_TYPE(t)            ((uint32_t)~(t))
+#define Z_TYPE_TO_RAW(t)			((uint32_t)(t)-32)
+#define Z_RAW_TO_TYPE(t)            ((uint32_t)(t)+32)
 
 static zend_always_inline void zval_set_type_info(zval* pz, uint32_t type_info) {
 	if (type_info != IS_DOUBLE) {
@@ -406,15 +406,15 @@ static zend_always_inline zend_bool zend_type_is_double(uint32_t type_info) {
 }
 
 static zend_always_inline zend_bool zend_type_is_refcounted(uint32_t type_info) {
-	return type_info >= MIN_NAN && type_info < Z_TYPE_TO_RAW(IS_TYPE_REFCOUNTED << Z_TYPE_FLAGS_SHIFT);
+	return type_info >= (uint32_t)~Z_TYPE_MASK;
 }
 
 static zend_always_inline zend_uchar zval_get_type(const zval* pz) {
-	return zend_type_is_double(pz->u1.type_info) ? IS_DOUBLE : (Z_RAW_TO_TYPE(pz->u1.v.type) & Z_TYPE_MASK);
+	return zend_type_is_double(pz->u1.type_info) ? IS_DOUBLE : (pz->u1.v.type & Z_TYPE_MASK);
 }
 
 static zend_always_inline zend_uchar zval_get_type_flags(const zval* pz) {
-	return zend_type_is_double(pz->u1.type_info) ? 0 : (Z_RAW_TO_TYPE(pz->u1.v.type) & IS_TYPE_REFCOUNTED);
+	return zend_type_is_double(pz->u1.type_info) ? 0 : (pz->u1.v.type & IS_TYPE_REFCOUNTED);
 }
 
 static zend_always_inline uint32_t zval_get_type_info(const zval* pz) {
@@ -561,33 +561,33 @@ static zend_always_inline uint32_t zval_get_raw_type_info(const zval* pz) {
 #define T_IS_TRUE(t)				((t) == Z_TYPE_TO_RAW(IS_TRUE))
 #define T_IS_LONG(t)				((t) == Z_TYPE_TO_RAW(IS_LONG))
 #define T_IS_DOUBLE(t)				zend_type_is_double(t)
-#define T_IS_STRING(t)				(((t) | (uint32_t)(IS_TYPE_REFCOUNTED << Z_TYPE_FLAGS_SHIFT)) == Z_TYPE_TO_RAW(IS_STRING))
-#define T_IS_ARRAY(t)				(((t) | (uint32_t)(IS_TYPE_REFCOUNTED << Z_TYPE_FLAGS_SHIFT)) == Z_TYPE_TO_RAW(IS_ARRAY))
+#define T_IS_STRING(t)				(((t) | (uint32_t)(IS_TYPE_REFCOUNTED << Z_TYPE_FLAGS_SHIFT)) == Z_TYPE_TO_RAW(IS_STRING_EX))
+#define T_IS_ARRAY(t)				(((t) | (uint32_t)(IS_TYPE_REFCOUNTED << Z_TYPE_FLAGS_SHIFT)) == Z_TYPE_TO_RAW(IS_ARRAY_EX))
 #define T_IS_OBJECT(t)				((t) == Z_TYPE_TO_RAW(IS_OBJECT_EX))
 #define T_IS_RESOURCE(t)			((t) == Z_TYPE_TO_RAW(IS_RESOURCE_EX))
 #define T_IS_REFERENCE(t)			((t) == Z_TYPE_TO_RAW(IS_REFERENCE_EX))
 #define T_IS_INDIRECT(t)			((t) == Z_TYPE_TO_RAW(IS_INDIRECT))
 
-#define T_IS_CONSTANT(t)			(((t) | (uint32_t)(IS_TYPE_REFCOUNTED << Z_TYPE_FLAGS_SHIFT)) == Z_TYPE_TO_RAW(IS_CONSTANT_AST))
+#define T_IS_CONSTANT(t)			(((t) | (uint32_t)(IS_TYPE_REFCOUNTED << Z_TYPE_FLAGS_SHIFT)) == Z_TYPE_TO_RAW(IS_CONSTANT_AST_EX))
 #define T_IS_PTR(t)					((t) == Z_TYPE_TO_RAW(IS_PTR))
 #define T_IS_ERROR(t)				((t) == Z_TYPE_TO_RAW(_IS_ERROR))
 
 // IS_UNDEF, IS_NULL, IS_FALSE or IS_TRUE
-#define T_IS_PRIMITIVE(t)			((t) >= Z_TYPE_TO_RAW(IS_TRUE))
+#define T_IS_PRIMITIVE(t)			((t) <= Z_TYPE_TO_RAW(IS_TRUE) && (t) >= Z_TYPE_TO_RAW(IS_UNDEF))
 // IS_UNDEF, IS_NULL or IS_FALSE
-#define T_IS_LESS_THAN_TRUE(t)	    ((t) > Z_TYPE_TO_RAW(IS_TRUE))
+#define T_IS_LESS_THAN_TRUE(t)	    ((t) < Z_TYPE_TO_RAW(IS_TRUE) && (t) >= Z_TYPE_TO_RAW(IS_UNDEF))
 // !IS_UNDEF and !IS_NULL
-#define T_IS_SET(t)					((t) < Z_TYPE_TO_RAW(IS_NULL))
+#define T_IS_SET(t)					((t) > Z_TYPE_TO_RAW(IS_NULL) || (t) < Z_TYPE_TO_RAW(IS_UNDEF))
 // IS_FALSE or IS_TRUE
 #define T_IS_BOOL(t)				(T_IS_FALSE(t) || T_IS_TRUE(t))
 // IS_LONG or IS_DOUBLE
 #define T_IS_NUMBER(t)				(T_IS_LONG(t) || T_IS_DOUBLE(t))
 // IS_UNDEF, IS_NULL, IS_FALSE, IS_TRUE, IS_LONG or IS_DOUBLE
-#define T_IS_SCALAR(t)				(T_IS_DOUBLE(t) || (t) >= Z_TYPE_TO_RAW(IS_LONG))
+#define T_IS_SCALAR(t)				(T_IS_DOUBLE(t) || (t) <= Z_TYPE_TO_RAW(IS_LONG))
 // IS_UNDEF, IS_NULL, IS_FALSE, IS_TRUE, IS_LONG, IS_DOUBLE or IS_STRING
-#define T_IS_SCALAR_OR_STRING(t)	(T_IS_DOUBLE(t) || ((t) | (uint32_t)(IS_TYPE_REFCOUNTED << Z_TYPE_FLAGS_SHIFT)) >= Z_TYPE_TO_RAW(IS_STRING))
+#define T_IS_SCALAR_OR_STRING(t)	(T_IS_DOUBLE(t) || ((t) & Z_TYPE_MASK) <= IS_STRING)
 // IS_UNDEF, IS_NULL, IS_FALSE, IS_TRUE, IS_LONG, S_DOUBLE, IS_STRING or IS_ARRAY
-#define T_IS_PERSISTABLE(t)			(T_IS_DOUBLE(t) || ((t) | (uint32_t)(IS_TYPE_REFCOUNTED << Z_TYPE_FLAGS_SHIFT)) >= Z_TYPE_TO_RAW(IS_ARRAY))
+#define T_IS_PERSISTABLE(t)			(T_IS_DOUBLE(t) || ((t) | Z_TYPE_MASK) <= IS_ARRAY)
 
 #define T_IS_REFCOUNTED(t)			zend_type_is_refcounted(t)
 
