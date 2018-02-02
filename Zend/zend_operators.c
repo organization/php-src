@@ -2152,7 +2152,7 @@ static int hash_zval_identical_function(zval *z1, zval *z2) /* {{{ */
 
 ZEND_API int ZEND_FASTCALL zend_is_identical(zval *op1, zval *op2) /* {{{ */
 {
-	if (Z_TYPE_P(op1) != Z_TYPE_P(op2)) {
+	if (Z_RAW_TYPE_P(op1) != Z_RAW_TYPE_P(op2)) {
 		return 0;
 	}
 	switch (Z_TYPE_P(op1)) {

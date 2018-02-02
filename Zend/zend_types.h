@@ -421,6 +421,10 @@ static zend_always_inline uint32_t zval_get_type_info(const zval* pz) {
 	return zend_type_is_double(pz->u1.type_info) ? IS_DOUBLE : Z_RAW_TO_TYPE(pz->u1.type_info);
 }
 
+static zend_always_inline uint32_t zval_get_raw_type(const zval* pz) {
+	return pz->u1.type_info & (uint32_t)~IS_TYPE_REFCOUNTED;
+}
+
 static zend_always_inline uint32_t zval_get_raw_type_info(const zval* pz) {
 	return pz->u1.type_info;
 }
@@ -439,6 +443,9 @@ static zend_always_inline uint32_t zval_get_raw_type_info(const zval* pz) {
 
 #define Z_TYPE_INFO(zval)			zval_get_type_info(&(zval))
 #define Z_TYPE_INFO_P(zval_p)		Z_TYPE_INFO(*(zval_p))
+
+#define Z_RAW_TYPE(zval)			zval_get_raw_type(&(zval))
+#define Z_RAW_TYPE_P(zval_p)		Z_RAW_TYPE(*(zval_p))
 
 #define Z_RAW_TYPE_INFO(zval)		zval_get_raw_type_info(&(zval))
 #define Z_RAW_TYPE_INFO_P(zval_p)	Z_RAW_TYPE_INFO(*(zval_p))
