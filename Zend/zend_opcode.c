@@ -458,7 +458,6 @@ void init_op(zend_op *op)
 {
 	memset(op, 0, sizeof(zend_op));
 	op->lineno = CG(zend_lineno);
-	op->cache_slot = (uint32_t)-1;
 }
 
 zend_op *get_next_op(zend_op_array *op_array)
@@ -664,7 +663,7 @@ ZEND_API int pass_two(zend_op_array *op_array)
 				opline->extended_value = ZEND_OPLINE_NUM_TO_OFFSET(op_array, opline, opline->extended_value);
 				break;
 			case ZEND_CATCH:
-				if (opline->extended_value != ZEND_LAST_CATCH) {
+				if (!(opline->extended_value & ZEND_LAST_CATCH)) {
 					ZEND_PASS_TWO_UPDATE_JMP_TARGET(op_array, opline, opline->op2);
 				}
 				break;

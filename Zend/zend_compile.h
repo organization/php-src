@@ -145,7 +145,6 @@ struct _zend_op {
 	znode_op result;
 	uint32_t extended_value;
 	uint32_t lineno;
-	uint32_t cache_slot;
 	zend_uchar opcode;
 	zend_uchar op1_type;
 	zend_uchar op2_type;
