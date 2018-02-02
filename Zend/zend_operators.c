@@ -1346,18 +1346,18 @@ ZEND_API int ZEND_FASTCALL boolean_xor_function(zval *result, zval *op1, zval *o
 
 ZEND_API int ZEND_FASTCALL boolean_not_function(zval *result, zval *op1) /* {{{ */
 {
-	if (Z_IS_LESS_THAN_TRUE_P(op1)) {
-		ZVAL_TRUE(result);
-	} else if (EXPECTED(Z_IS_TRUE_P(op1))) {
+	if (Z_IS_TRUE_P(op1)) {
 		ZVAL_FALSE(result);
+	} else if (EXPECTED(Z_IS_LESS_THAN_TRUE_P(op1))) {
+		ZVAL_TRUE(result);
 	} else {
 		if (Z_ISREF_P(op1)) {
 			op1 = Z_REFVAL_P(op1);
-			if (Z_IS_LESS_THAN_TRUE_P(op1)) {
-				ZVAL_TRUE(result);
-				return SUCCESS;
-			} else if (EXPECTED(Z_IS_TRUE_P(op1))) {
+			if (Z_IS_TRUE_P(op1)) {
 				ZVAL_FALSE(result);
+				return SUCCESS;
+			} else if (EXPECTED(Z_IS_LESS_THAN_TRUE_P(op1))) {
+				ZVAL_TRUE(result);
 				return SUCCESS;
 			}
 		}
