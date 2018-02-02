@@ -3194,14 +3194,14 @@ static zend_string *zend_create_method_string(zend_string *class_name, zend_stri
 ZEND_API zend_string *zend_get_callable_name_ex(zval *callable, zend_object *object) /* {{{ */
 {
 try_again:
-	switch (Z_TYPE_P(callable)) {
-		case IS_STRING:
+	switch (Z_RAW_TYPE_P(callable)) {
+		case Z_TYPE_TO_RAW(IS_STRING):
 			if (object) {
 				return zend_create_method_string(object->ce->name, Z_STR_P(callable));
 			}
 			return zend_string_copy(Z_STR_P(callable));
 
-		case IS_ARRAY:
+		case Z_TYPE_TO_RAW(IS_ARRAY):
 		{
 			zval *method = NULL;
 			zval *obj = NULL;
@@ -3223,7 +3223,7 @@ try_again:
 				return zend_string_init("Array", sizeof("Array")-1, 0);
 			}
 		}
-		case IS_OBJECT:
+		case Z_TYPE_TO_RAW(IS_OBJECT):
 		{
 			zend_class_entry *calling_scope;
 			zend_function *fptr;
@@ -3239,7 +3239,7 @@ try_again:
 			}
 			return zval_get_string(callable);
 		}
-		case IS_REFERENCE:
+		case Z_TYPE_TO_RAW(IS_REFERENCE):
 			callable = Z_REFVAL_P(callable);
 			goto try_again;
 		default:
@@ -3272,8 +3272,8 @@ static zend_bool zend_is_callable_impl(zval *callable, zend_object *object, uint
 	fcc->object = NULL;
 
 again:
-	switch (Z_TYPE_P(callable)) {
-		case IS_STRING:
+	switch (Z_RAW_TYPE_P(callable)) {
+		case Z_TYPE_TO_RAW(IS_STRING):
 			if (object) {
 				fcc->object = object;
 				fcc->calling_scope = object->ce;
@@ -3298,7 +3298,7 @@ again:
 			}
 			return ret;
 
-		case IS_ARRAY:
+		case Z_TYPE_TO_RAW(IS_ARRAY):
 			{
 				zval *method = NULL;
 				zval *obj = NULL;
@@ -3371,14 +3371,14 @@ again:
 				}
 			}
 			return 0;
-		case IS_OBJECT:
+		case Z_TYPE_TO_RAW(IS_OBJECT):
 			if (Z_OBJ_HANDLER_P(callable, get_closure) && Z_OBJ_HANDLER_P(callable, get_closure)(callable, &fcc->calling_scope, &fcc->function_handler, &fcc->object) == SUCCESS) {
 				fcc->called_scope = fcc->calling_scope;
 				return 1;
 			}
 			if (error) zend_spprintf(error, 0, "no array or string given");
 			return 0;
-		case IS_REFERENCE:
+		case Z_TYPE_TO_RAW(IS_REFERENCE):
 			callable = Z_REFVAL_P(callable);
 			goto again;
 		default:
@@ -3680,10 +3680,10 @@ ZEND_API int zend_declare_property_ex(zend_class_entry *ce, zend_string *name, z
 		ZVAL_COPY_VALUE(&ce->default_properties_table[OBJ_PROP_TO_NUM(property_info->offset)], property);
 	}
 	if (ce->type & ZEND_INTERNAL_CLASS) {
-		switch(Z_TYPE_P(property)) {
-			case IS_ARRAY:
-			case IS_OBJECT:
-			case IS_RESOURCE:
+		switch(Z_RAW_TYPE_P(property)) {
+			case Z_TYPE_TO_RAW(IS_ARRAY):
+			case Z_TYPE_TO_RAW(IS_OBJECT):
+			case Z_TYPE_TO_RAW(IS_RESOURCE):
 				zend_error_noreturn(E_CORE_ERROR, "Internal zval's can't be arrays, objects or resources");
 				break;
 			default:
@@ -4270,10 +4270,10 @@ ZEND_API const char *zend_get_object_type(const zend_class_entry *ce) /* {{{ */
 
 ZEND_API zend_bool zend_is_iterable(zval *iterable) /* {{{ */
 {
-	switch (Z_TYPE_P(iterable)) {
-		case IS_ARRAY:
+	switch (Z_RAW_TYPE_P(iterable)) {
+		case Z_TYPE_TO_RAW(IS_ARRAY):
 			return 1;
-		case IS_OBJECT:
+		case Z_TYPE_TO_RAW(IS_OBJECT):
 			return instanceof_function(Z_OBJCE_P(iterable), zend_ce_traversable);
 		default:
 			return 0;

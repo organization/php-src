@@ -159,11 +159,11 @@ ZEND_API zend_long ZEND_FASTCALL zend_atol(const char *str, size_t str_len) /* {
 void ZEND_FASTCALL _convert_scalar_to_number(zval *op, zend_bool silent) /* {{{ */
 {
 try_again:
-	switch (Z_TYPE_P(op)) {
-		case IS_REFERENCE:
+	switch (Z_RAW_TYPE_P(op)) {
+		case Z_TYPE_TO_RAW(IS_REFERENCE):
 			zend_unwrap_reference(op);
 			goto try_again;
-		case IS_STRING:
+		case Z_TYPE_TO_RAW(IS_STRING):
 			{
 				zend_string *str = Z_STR_P(op);
 				zend_uchar type = is_numeric_string(ZSTR_VAL(str), ZSTR_LEN(str), &Z_LVAL_P(op), &Z_DVAL_P(op), silent ? 1 : -1);
@@ -179,21 +179,21 @@ try_again:
 				zend_string_release(str);
 				break;
 			}
-		case IS_NULL:
-		case IS_FALSE:
+		case Z_TYPE_TO_RAW(IS_NULL):
+		case Z_TYPE_TO_RAW(IS_FALSE):
 			ZVAL_LONG(op, 0);
 			break;
-		case IS_TRUE:
+		case Z_TYPE_TO_RAW(IS_TRUE):
 			ZVAL_LONG(op, 1);
 			break;
-		case IS_RESOURCE:
+		case Z_TYPE_TO_RAW(IS_RESOURCE):
 			{
 				zend_long l = Z_RES_HANDLE_P(op);
 				zval_ptr_dtor(op);
 				ZVAL_LONG(op, l);
 			}
 			break;
-		case IS_OBJECT:
+		case Z_TYPE_TO_RAW(IS_OBJECT):
 			{
 				zval dst;
 
@@ -223,8 +223,8 @@ ZEND_API void ZEND_FASTCALL convert_scalar_to_number(zval *op) /* {{{ */
 		if (op==result && !Z_IS_OBJECT_P(op)) {				\
 			_convert_scalar_to_number(op, silent);					\
 		} else {													\
-			switch (Z_TYPE_P(op)) {									\
-				case IS_STRING:										\
+			switch (Z_RAW_TYPE_P(op)) {								\
+				case Z_TYPE_TO_RAW(IS_STRING):						\
 					{												\
 					zend_uchar type = is_numeric_string(Z_STRVAL_P(op), Z_STRLEN_P(op), &Z_LVAL(holder), &Z_DVAL(holder), silent ? 1 : -1);\
 					if (EXPECTED(type != 0)) {                      \
@@ -238,20 +238,20 @@ ZEND_API void ZEND_FASTCALL convert_scalar_to_number(zval *op) /* {{{ */
 					(op) = &(holder);								\
 					}												\
 					break;											\
-				case IS_NULL:										\
-				case IS_FALSE:										\
+				case Z_TYPE_TO_RAW(IS_NULL):						\
+				case Z_TYPE_TO_RAW(IS_FALSE):						\
 					ZVAL_LONG(&(holder), 0);						\
 					(op) = &(holder);								\
 					break;											\
-				case IS_TRUE:										\
+				case Z_TYPE_TO_RAW(IS_TRUE):						\
 					ZVAL_LONG(&(holder), 1);						\
 					(op) = &(holder);								\
 					break;											\
-				case IS_RESOURCE:									\
+				case Z_TYPE_TO_RAW(IS_RESOURCE):					\
 					ZVAL_LONG(&(holder), Z_RES_HANDLE_P(op));		\
 					(op) = &(holder);								\
 					break;											\
-				case IS_OBJECT:										\
+				case Z_TYPE_TO_RAW(IS_OBJECT):						\
 					ZVAL_COPY(&(holder), op);						\
 					_convert_scalar_to_number(&(holder), silent);	\
 					if (UNEXPECTED(EG(exception))) {				\
@@ -2155,26 +2155,24 @@ ZEND_API int ZEND_FASTCALL zend_is_identical(zval *op1, zval *op2) /* {{{ */
 	if (Z_RAW_TYPE_P(op1) != Z_RAW_TYPE_P(op2)) {
 		return 0;
 	}
-	switch (Z_TYPE_P(op1)) {
-		case IS_NULL:
-		case IS_FALSE:
-		case IS_TRUE:
+	switch (Z_RAW_TYPE_P(op1)) {
+		case Z_TYPE_TO_RAW(IS_NULL):
+		case Z_TYPE_TO_RAW(IS_FALSE):
+		case Z_TYPE_TO_RAW(IS_TRUE):
 			return 1;
-		case IS_LONG:
+		case Z_TYPE_TO_RAW(IS_LONG):
 			return (Z_LVAL_P(op1) == Z_LVAL_P(op2));
-		case IS_RESOURCE:
+		case Z_TYPE_TO_RAW(IS_RESOURCE):
 			return (Z_RES_P(op1) == Z_RES_P(op2));
-		case IS_DOUBLE:
-			return (Z_DVAL_P(op1) == Z_DVAL_P(op2));
-		case IS_STRING:
+		case Z_TYPE_TO_RAW(IS_STRING):
 			return zend_string_equals(Z_STR_P(op1), Z_STR_P(op2));
-		case IS_ARRAY:
+		case Z_TYPE_TO_RAW(IS_ARRAY):
 			return (Z_ARRVAL_P(op1) == Z_ARRVAL_P(op2) ||
 				zend_hash_compare(Z_ARRVAL_P(op1), Z_ARRVAL_P(op2), (compare_func_t) hash_zval_identical_function, 1) == 0);
-		case IS_OBJECT:
+		case Z_TYPE_TO_RAW(IS_OBJECT):
 			return (Z_OBJ_P(op1) == Z_OBJ_P(op2) && Z_OBJ_HT_P(op1) == Z_OBJ_HT_P(op2));
 		default:
-			return 0;
+			return Z_IS_DOUBLE_P(op1) && (Z_DVAL_P(op1) == Z_DVAL_P(op2));
 	}
 }
 /* }}} */

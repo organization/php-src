@@ -311,47 +311,45 @@ static zend_always_inline int i_zend_is_true(zval *op)
 	int result = 0;
 
 again:
-	switch (Z_TYPE_P(op)) {
-		case IS_TRUE:
+	switch (Z_RAW_TYPE_P(op)) {
+		case Z_TYPE_TO_RAW(IS_TRUE):
 			result = 1;
 			break;
-		case IS_LONG:
+		case Z_TYPE_TO_RAW(IS_LONG):
 			if (Z_LVAL_P(op)) {
 				result = 1;
 			}
 			break;
-		case IS_DOUBLE:
-			if (Z_DVAL_P(op)) {
-				result = 1;
-			}
-			break;
-		case IS_STRING:
+		case Z_TYPE_TO_RAW(IS_STRING):
 			if (Z_STRLEN_P(op) > 1 || (Z_STRLEN_P(op) && Z_STRVAL_P(op)[0] != '0')) {
 				result = 1;
 			}
 			break;
-		case IS_ARRAY:
+		case Z_TYPE_TO_RAW(IS_ARRAY):
 			if (zend_hash_num_elements(Z_ARRVAL_P(op))) {
 				result = 1;
 			}
 			break;
-		case IS_OBJECT:
+		case Z_TYPE_TO_RAW(IS_OBJECT):
 			if (EXPECTED(Z_OBJ_HT_P(op)->cast_object == zend_std_cast_object_tostring)) {
 				result = 1;
 			} else {
 				result = zend_object_is_true(op);
 			}
 			break;
-		case IS_RESOURCE:
+		case Z_TYPE_TO_RAW(IS_RESOURCE):
 			if (EXPECTED(Z_RES_HANDLE_P(op))) {
 				result = 1;
 			}
 			break;
-		case IS_REFERENCE:
+		case Z_TYPE_TO_RAW(IS_REFERENCE):
 			op = Z_REFVAL_P(op);
 			goto again;
 			break;
 		default:
+			if (Z_IS_DOUBLE_P(op) && Z_DVAL_P(op)) {
+				result = 1;
+			}
 			break;
 	}
 	return result;
