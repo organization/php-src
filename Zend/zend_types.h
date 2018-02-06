@@ -43,6 +43,25 @@
 # define ZEND_ENDIAN_LOHI_C_4(a, b, c, d)  a, b, c, d
 #endif
 
+#ifndef ZEND_NAN_TAG
+# define ZEND_NAN_TAG 1
+#endif
+
+#if ZEND_NAN_TAG
+# if !defined(ZEND_NAN_TAG_32) && (SIZEOF_SIZE_T == 4)
+#  define ZEND_NAN_TAG_32 1
+# endif
+# if !defined(ZEND_NAN_TAG_64) && (SIZEOF_SIZE_T == 8)
+#  define ZEND_NAN_TAG_64 1
+# endif
+#endif
+#if !defined(ZEND_NAN_TAG_32)
+# define ZEND_NAN_TAG_32 0
+#endif
+#if !defined(ZEND_NAN_TAG_64)
+# define ZEND_NAN_TAG_64 0
+#endif
+
 typedef unsigned char zend_bool;
 typedef unsigned char zend_uchar;
 
@@ -81,7 +100,11 @@ typedef struct _zend_class_entry     zend_class_entry;
 typedef union  _zend_function        zend_function;
 typedef struct _zend_execute_data    zend_execute_data;
 
+#if !ZEND_NAN_TAG
+typedef struct _zval_struct     zval;
+#else
 typedef union  _zval_struct     zval;
+#endif
 
 typedef struct _zend_refcounted zend_refcounted;
 typedef struct _zend_string     zend_string;
@@ -158,6 +181,9 @@ typedef uintptr_t zend_type;
 
 typedef union _zend_value {
 	zend_long         lval;				/* long value */
+#if !ZEND_NAN_TAG
+	double            dval;				/* double value */
+#endif
 	zend_refcounted  *counted;
 	zend_string      *str;
 	zend_array       *arr;
@@ -169,12 +195,45 @@ typedef union _zend_value {
 	void             *ptr;
 	zend_class_entry *ce;
 	zend_function    *func;
+#if !ZEND_NAN_TAG
+	struct {
+		uint32_t w1;
+		uint32_t w2;
+	} ww;
+#else
 	uint32_t          fe_pos;           /* Used by FE_RESET/FE_FETCH */
 	uint32_t          fe_iter_idx;      /* Used by FW_RESET/FE_FETCH */
 	uint32_t          opline_num;       /* Used by FAST_CALL  */
 	uint32_t          property_guard;   /* single property guard */
+#endif
 } zend_value;
 
+#if !ZEND_NAN_TAG
+struct _zval_struct {
+	zend_value        value;			/* value */
+	union {
+		struct {
+			ZEND_ENDIAN_LOHI_3(
+				zend_uchar    type,			/* active type */
+				zend_uchar    type_flags,
+				union {
+					uint16_t  call_info;    /* call info for EX(This) */
+					uint16_t  extra;        /* not further specified */
+				} u)
+		} v;
+		uint32_t type_info;
+	} u1;
+	union {
+		uint32_t     next;                 /* hash collision chain */
+		uint32_t     opline_num;           /* opline number (for FAST_CALL) */
+		uint32_t     num_args;             /* arguments number for EX(This) */
+		uint32_t     fe_pos;               /* foreach position */
+		uint32_t     fe_iter_idx;          /* foreach iterator index */
+		uint32_t     access_flags;         /* class constant access flags */
+		uint32_t     property_guard;       /* single property guard */
+	} u2;
+};
+#else
 union _zval_struct {
 	uint64_t          u64;
 	int64_t           i64;
@@ -195,6 +254,7 @@ union _zval_struct {
 		)
 	};
 };
+#endif
 
 typedef struct _zend_refcounted_h {
 	uint32_t         refcount;			/* reference counter 32-bit */
@@ -224,7 +284,9 @@ typedef struct _Bucket {
 	zval              val;
 	zend_ulong        h;                /* hash value (or numeric index)   */
 	zend_string      *key;              /* string key or NULL for numerics */
+#if ZEND_NAN_TAG
 	uint32_t          next;
+#endif
 } Bucket;
 
 typedef struct _zend_array HashTable;
@@ -385,48 +447,98 @@ struct _zend_ast_ref {
 #define IS_VOID						19
 #define _IS_NUMBER					20
 
-#define MIN_NAN                     0xffffffe0
+#if ZEND_NAN_TAG
+# if ZEND_NAN_TAG_32
+#  define MIN_NAN					0xffffffe0
 
-#define IS_TYPE_REFCOUNTED			(1<<4)
+#  define IS_TYPE_REFCOUNTED		(1<<4)
 
-#define Z_TYPE_MASK					0x0f
-#define Z_TYPE_FLAGS_SHIFT			0
+#  define Z_TYPE_MASK				0x0f
+#  define Z_TYPE_FLAGS_SHIFT		0
 
-#define Z_TYPE_TO_RAW(t)			((uint32_t)(t)-32)
-#define Z_RAW_TO_TYPE(t)            ((uint32_t)(t)+32)
+#  define Z_TYPE_TO_RAW(t)			((uint32_t)(t)-32)
+#  define Z_RAW_TO_TYPE(t)			((uint32_t)(t)+32)
+
+#  define ZVAL_UNDEF_INITIALIZER		{.u64=0xffffffef00000000LL}
+# elif ZEND_NAN_TAG_64
+#  error "64-bit NaN tagging is not implemented yet"
+# elif ZEND_NAN_TAG_64
+#  error "Unknown NaN tagging"
+# endif
+#else
+# define IS_TYPE_REFCOUNTED			(1<<0)
+
+# define Z_TYPE_MASK				0xff
+# define Z_TYPE_FLAGS_SHIFT			8
+
+# define Z_TYPE_TO_RAW(t)			(t)
+# define Z_RAW_TO_TYPE(t)			(t)
+
+# define ZVAL_UNDEF_INITIALIZER		{{0}, {{0}}, {0}}
+#endif
 
 static zend_always_inline void zval_set_type_info(zval* pz, uint32_t type_info) {
+#if ZEND_NAN_TAG
 	if (type_info != IS_DOUBLE) {
 		pz->u1.type_info = Z_TYPE_TO_RAW(type_info);
 	}
+#else
+	pz->u1.type_info = type_info;
+#endif
 }
 
+#if ZEND_NAN_TAG
 static zend_always_inline zend_bool zend_type_is_double(uint32_t type_info) {
 	return type_info < MIN_NAN;
 }
+#endif
 
 static zend_always_inline zend_bool zend_type_is_refcounted(uint32_t type_info) {
+#if ZEND_NAN_TAG
 	return type_info >= (uint32_t)~Z_TYPE_MASK;
+#else
+	return (type_info & (IS_TYPE_REFCOUNTED << Z_TYPE_FLAGS_SHIFT)) != 0;
+#endif
 }
 
 static zend_always_inline zend_uchar zval_get_type(const zval* pz) {
+#if ZEND_NAN_TAG
 	return zend_type_is_double(pz->u1.type_info) ? IS_DOUBLE : (pz->u1.v.type & Z_TYPE_MASK);
+#else
+	return pz->u1.v.type;
+#endif
 }
 
 static zend_always_inline zend_uchar zval_get_type_flags(const zval* pz) {
+#if ZEND_NAN_TAG
 	return zend_type_is_double(pz->u1.type_info) ? 0 : (pz->u1.v.type & IS_TYPE_REFCOUNTED);
+#else
+	return pz->u1.v.type_flags;
+#endif
 }
 
 static zend_always_inline uint32_t zval_get_type_info(const zval* pz) {
+#if ZEND_NAN_TAG
 	return zend_type_is_double(pz->u1.type_info) ? IS_DOUBLE : Z_RAW_TO_TYPE(pz->u1.type_info);
+#else
+	return pz->u1.type_info;
+#endif
 }
 
 static zend_always_inline uint32_t zval_get_raw_type(const zval* pz) {
+#if ZEND_NAN_TAG
 	return pz->u1.type_info & (uint32_t)~IS_TYPE_REFCOUNTED;
+#else
+	return pz->u1.v.type;
+#endif
 }
 
 static zend_always_inline uint32_t zval_get_raw_type_info(const zval* pz) {
+#if ZEND_NAN_TAG
 	return pz->u1.type_info;
+#else
+	return pz->u1.type_info;
+#endif
 }
 
 #define ZEND_SAME_FAKE_TYPE(faketype, realtype) ( \
@@ -453,26 +565,47 @@ static zend_always_inline uint32_t zval_get_raw_type_info(const zval* pz) {
 #define Z_SET_TYPE_INFO(zv, t)		zval_set_type_info(&(zv), (t))
 #define Z_SET_TYPE_INFO_P(pzv, t)	Z_SET_TYPE_INFO(*(pzv), (t))
 
-#define Z_NEXT(zval)				(((Bucket*)(&(zval)))->next)
+#if ZEND_NAN_TAG
+# define Z_NEXT(zval)				(((Bucket*)(&(zval)))->next)
+#else
+# define Z_NEXT(zval)				(zval).u2.next
+#endif
 #define Z_NEXT_P(zval_p)			Z_NEXT(*(zval_p))
 
-#define Z_FE_POS(zval)				((&zval)+1)->value.fe_pos
+#if ZEND_NAN_TAG
+# define Z_FE_POS(zval)				((&zval)+1)->value.fe_pos
+#else
+# define Z_FE_POS(zval)				(zval).u2.fe_pos
+#endif
 #define Z_FE_POS_P(zval_p)			Z_FE_POS(*(zval_p))
 
-#define Z_FE_ITER(zval)				((&zval)+1)->value.fe_iter_idx
+#if ZEND_NAN_TAG
+# define Z_FE_ITER(zval)			((&zval)+1)->value.fe_iter_idx
+#else
+# define Z_FE_ITER(zval)			(zval).u2.fe_iter_idx
+#endif
 #define Z_FE_ITER_P(zval_p)			Z_FE_ITER(*(zval_p))
 
-#define Z_OPLINE_NUM(zval)			((&zval)+1)->value.opline_num
+#if ZEND_NAN_TAG
+# define Z_OPLINE_NUM(zval)			((&zval)+1)->value.opline_num
+#else
+# define Z_OPLINE_NUM(zval)			(zval).u2.opline_num
+#endif
 #define Z_OPLINE_NUM_P(zval_p)		Z_OPLINE_NUM(*(zval_p))
 
-#define Z_ACCESS_FLAGS(zval)		(((zend_class_constant*)(&(zval)))->access_flags) //(zval).u2.access_flags
+#if ZEND_NAN_TAG
+# define Z_ACCESS_FLAGS(zval)		(((zend_class_constant*)(&(zval)))->access_flags)
+#else
+# define Z_ACCESS_FLAGS(zval)		(zval).u2.access_flags
+#endif
 #define Z_ACCESS_FLAGS_P(zval_p)	Z_ACCESS_FLAGS(*(zval_p))
 
-#define Z_PROPERTY_GUARD(zval)		((&zval)+1)->value.property_guard
+#if ZEND_NAN_TAG
+# define Z_PROPERTY_GUARD(zval)		((&zval)+1)->value.property_guard
+#else
+# define Z_PROPERTY_GUARD(zval)		(zval).u2.property_guard
+#endif
 #define Z_PROPERTY_GUARD_P(zval_p)	Z_PROPERTY_GUARD(*(zval_p))
-
-#define Z_EXTRA(zval)				_Pragma("GCC error: unsupported ZVAL macro") //???(zval).u2.extra
-#define Z_EXTRA_P(zval_p)			Z_EXTRA(*(zval_p))
 
 #define Z_COUNTED(zval)				(zval).value.counted
 #define Z_COUNTED_P(zval_p)			Z_COUNTED(*(zval_p))
@@ -562,39 +695,75 @@ static zend_always_inline uint32_t zval_get_raw_type_info(const zval* pz) {
 #define Z_UNPROTECT_RECURSION_P(zv) Z_UNPROTECT_RECURSION(*(zv))
 
 /* Type checks */
-#define T_IS_UNDEF(t)				((t) == Z_TYPE_TO_RAW(IS_UNDEF))
-#define T_IS_NULL(t)				((t) == Z_TYPE_TO_RAW(IS_NULL))
-#define T_IS_FALSE(t)				((t) == Z_TYPE_TO_RAW(IS_FALSE))
-#define T_IS_TRUE(t)				((t) == Z_TYPE_TO_RAW(IS_TRUE))
-#define T_IS_LONG(t)				((t) == Z_TYPE_TO_RAW(IS_LONG))
-#define T_IS_DOUBLE(t)				zend_type_is_double(t)
-#define T_IS_STRING(t)				(((t) & (uint32_t)~(IS_TYPE_REFCOUNTED << Z_TYPE_FLAGS_SHIFT)) == Z_TYPE_TO_RAW(IS_STRING))
-#define T_IS_ARRAY(t)				(((t) & (uint32_t)~(IS_TYPE_REFCOUNTED << Z_TYPE_FLAGS_SHIFT)) == Z_TYPE_TO_RAW(IS_ARRAY))
-#define T_IS_OBJECT(t)				((t) == Z_TYPE_TO_RAW(IS_OBJECT_EX))
-#define T_IS_RESOURCE(t)			((t) == Z_TYPE_TO_RAW(IS_RESOURCE_EX))
-#define T_IS_REFERENCE(t)			((t) == Z_TYPE_TO_RAW(IS_REFERENCE_EX))
-#define T_IS_INDIRECT(t)			((t) == Z_TYPE_TO_RAW(IS_INDIRECT))
+#if ZEND_NAN_TAG
+# define T_IS_UNDEF(t)				((t) == Z_TYPE_TO_RAW(IS_UNDEF))
+# define T_IS_NULL(t)				((t) == Z_TYPE_TO_RAW(IS_NULL))
+# define T_IS_FALSE(t)				((t) == Z_TYPE_TO_RAW(IS_FALSE))
+# define T_IS_TRUE(t)				((t) == Z_TYPE_TO_RAW(IS_TRUE))
+# define T_IS_LONG(t)				((t) == Z_TYPE_TO_RAW(IS_LONG))
+# define T_IS_DOUBLE(t)				zend_type_is_double(t)
+# define T_IS_STRING(t)				(((t) & (uint32_t)~(IS_TYPE_REFCOUNTED << Z_TYPE_FLAGS_SHIFT)) == Z_TYPE_TO_RAW(IS_STRING))
+# define T_IS_ARRAY(t)				(((t) & (uint32_t)~(IS_TYPE_REFCOUNTED << Z_TYPE_FLAGS_SHIFT)) == Z_TYPE_TO_RAW(IS_ARRAY))
+# define T_IS_OBJECT(t)				((t) == Z_TYPE_TO_RAW(IS_OBJECT_EX))
+# define T_IS_RESOURCE(t)			((t) == Z_TYPE_TO_RAW(IS_RESOURCE_EX))
+# define T_IS_REFERENCE(t)			((t) == Z_TYPE_TO_RAW(IS_REFERENCE_EX))
+# define T_IS_CONSTANT(t)			(((t) & (uint32_t)~(IS_TYPE_REFCOUNTED << Z_TYPE_FLAGS_SHIFT)) == Z_TYPE_TO_RAW(IS_CONSTANT_AST))
+# define T_IS_INDIRECT(t)			((t) == Z_TYPE_TO_RAW(IS_INDIRECT))
+# define T_IS_PTR(t)				((t) == Z_TYPE_TO_RAW(IS_PTR))
+# define T_IS_ERROR(t)				((t) == Z_TYPE_TO_RAW(_IS_ERROR))
+#else
+# define T_IS_UNDEF(t)				(((t) & Z_TYPE_MASK) == IS_UNDEF)
+# define T_IS_NULL(t)				(((t) & Z_TYPE_MASK) == IS_NULL)
+# define T_IS_FALSE(t)				(((t) & Z_TYPE_MASK) == IS_FALSE)
+# define T_IS_TRUE(t)				(((t) & Z_TYPE_MASK) == IS_TRUE)
+# define T_IS_LONG(t)				(((t) & Z_TYPE_MASK) == IS_LONG)
+# define T_IS_DOUBLE(t)				(((t) & Z_TYPE_MASK) == IS_DOUBLE)
+# define T_IS_STRING(t)				(((t) & Z_TYPE_MASK) == IS_STRING)
+# define T_IS_ARRAY(t)				(((t) & Z_TYPE_MASK) == IS_ARRAY)
+# define T_IS_OBJECT(t)				(((t) & Z_TYPE_MASK) == IS_OBJECT)
+# define T_IS_RESOURCE(t)			(((t) & Z_TYPE_MASK) == IS_RESOURCE)
+# define T_IS_REFERENCE(t)			(((t) & Z_TYPE_MASK) == IS_REFERENCE)
+# define T_IS_CONSTANT(t)			(((t) & Z_TYPE_MASK) == IS_CONSTANT_AST)
+# define T_IS_INDIRECT(t)			(((t) & Z_TYPE_MASK) == IS_INDIRECT)
+# define T_IS_PTR(t)				(((t) & Z_TYPE_MASK) == IS_PTR)
+# define T_IS_ERROR(t)				(((t) & Z_TYPE_MASK) == _IS_ERROR)
+#endif
 
-#define T_IS_CONSTANT(t)			(((t) & (uint32_t)~(IS_TYPE_REFCOUNTED << Z_TYPE_FLAGS_SHIFT)) == Z_TYPE_TO_RAW(IS_CONSTANT_AST))
-#define T_IS_PTR(t)					((t) == Z_TYPE_TO_RAW(IS_PTR))
-#define T_IS_ERROR(t)				((t) == Z_TYPE_TO_RAW(_IS_ERROR))
-
-// IS_UNDEF, IS_NULL, IS_FALSE or IS_TRUE
-#define T_IS_PRIMITIVE(t)			((t) <= Z_TYPE_TO_RAW(IS_TRUE) && (t) >= Z_TYPE_TO_RAW(IS_UNDEF))
-// IS_UNDEF, IS_NULL or IS_FALSE
-#define T_IS_LESS_THAN_TRUE(t)	    ((t) < Z_TYPE_TO_RAW(IS_TRUE) && (t) >= Z_TYPE_TO_RAW(IS_UNDEF))
-// !IS_UNDEF and !IS_NULL
-#define T_IS_SET(t)					((t) > Z_TYPE_TO_RAW(IS_NULL) || (t) < Z_TYPE_TO_RAW(IS_UNDEF))
-// IS_FALSE or IS_TRUE
-#define T_IS_BOOL(t)				(T_IS_FALSE(t) || T_IS_TRUE(t))
-// IS_LONG or IS_DOUBLE
-#define T_IS_NUMBER(t)				(T_IS_LONG(t) || T_IS_DOUBLE(t))
-// IS_UNDEF, IS_NULL, IS_FALSE, IS_TRUE, IS_LONG or IS_DOUBLE
-#define T_IS_SCALAR(t)				((t) <= Z_TYPE_TO_RAW(IS_LONG))
-// IS_UNDEF, IS_NULL, IS_FALSE, IS_TRUE, IS_LONG, IS_DOUBLE or IS_STRING
-#define T_IS_SCALAR_OR_STRING(t)	(((t) & (uint32_t)~(IS_TYPE_REFCOUNTED << Z_TYPE_FLAGS_SHIFT)) <= Z_TYPE_TO_RAW(IS_STRING))
-// IS_UNDEF, IS_NULL, IS_FALSE, IS_TRUE, IS_LONG, S_DOUBLE, IS_STRING or IS_ARRAY
-#define T_IS_PERSISTABLE(t)			(((t) & (uint32_t)~(IS_TYPE_REFCOUNTED << Z_TYPE_FLAGS_SHIFT)) <= Z_TYPE_TO_RAW(IS_ARRAY))
+#if ZEND_NAN_TAG
+  // IS_UNDEF, IS_NULL, IS_FALSE or IS_TRUE
+# define T_IS_PRIMITIVE(t)			((t) <= Z_TYPE_TO_RAW(IS_TRUE) && (t) >= Z_TYPE_TO_RAW(IS_UNDEF))
+  // IS_UNDEF, IS_NULL or IS_FALSE
+# define T_IS_LESS_THAN_TRUE(t)	    ((t) < Z_TYPE_TO_RAW(IS_TRUE) && (t) >= Z_TYPE_TO_RAW(IS_UNDEF))
+  // !IS_UNDEF and !IS_NULL
+# define T_IS_SET(t)				((t) > Z_TYPE_TO_RAW(IS_NULL) || (t) < Z_TYPE_TO_RAW(IS_UNDEF))
+  // IS_FALSE or IS_TRUE
+# define T_IS_BOOL(t)				(T_IS_FALSE(t) || T_IS_TRUE(t))
+  // IS_LONG or IS_DOUBLE
+# define T_IS_NUMBER(t)				(T_IS_LONG(t) || T_IS_DOUBLE(t))
+	  // IS_UNDEF, IS_NULL, IS_FALSE, IS_TRUE, IS_LONG or IS_DOUBLE
+# define T_IS_SCALAR(t)				((t) <= Z_TYPE_TO_RAW(IS_LONG))
+  // IS_UNDEF, IS_NULL, IS_FALSE, IS_TRUE, IS_LONG, IS_DOUBLE or IS_STRING
+# define T_IS_SCALAR_OR_STRING(t)	(((t) & (uint32_t)~(IS_TYPE_REFCOUNTED << Z_TYPE_FLAGS_SHIFT)) <= Z_TYPE_TO_RAW(IS_STRING))
+  // IS_UNDEF, IS_NULL, IS_FALSE, IS_TRUE, IS_LONG, S_DOUBLE, IS_STRING or IS_ARRAY
+# define T_IS_PERSISTABLE(t)		(((t) & (uint32_t)~(IS_TYPE_REFCOUNTED << Z_TYPE_FLAGS_SHIFT)) <= Z_TYPE_TO_RAW(IS_ARRAY))
+#else
+  // IS_UNDEF, IS_NULL, IS_FALSE or IS_TRUE
+# define T_IS_PRIMITIVE(t)			(((t) & Z_TYPE_MASK) <= IS_TRUE)
+  // IS_UNDEF, IS_NULL or IS_FALSE
+# define T_IS_LESS_THAN_TRUE(t)	    (((t) & Z_TYPE_MASK) < IS_TRUE)
+  // !IS_UNDEF and !IS_NULL
+# define T_IS_SET(t)				(((t) & Z_TYPE_MASK) > IS_NULL)
+  // IS_FALSE or IS_TRUE
+# define T_IS_BOOL(t)				(T_IS_FALSE(t) || T_IS_TRUE(t))
+  // IS_LONG or IS_DOUBLE
+# define T_IS_NUMBER(t)				(T_IS_LONG(t) || T_IS_DOUBLE(t))
+  // IS_UNDEF, IS_NULL, IS_FALSE, IS_TRUE, IS_LONG or IS_DOUBLE
+# define T_IS_SCALAR(t)				(((t) & Z_TYPE_MASK) <= IS_DOUBLE)
+  // IS_UNDEF, IS_NULL, IS_FALSE, IS_TRUE, IS_LONG, IS_DOUBLE or IS_STRING
+# define T_IS_SCALAR_OR_STRING(t)	(((t) & Z_TYPE_MASK) <= IS_STRING)
+  // IS_UNDEF, IS_NULL, IS_FALSE, IS_TRUE, IS_LONG, S_DOUBLE, IS_STRING or IS_ARRAY
+# define T_IS_PERSISTABLE(t)		(((t) & Z_TYPE_MASK) <= IS_ARRAY)
+#endif
 
 #define T_IS_REFCOUNTED(t)			zend_type_is_refcounted(t)
 
@@ -699,7 +868,11 @@ static zend_always_inline uint32_t zval_get_raw_type_info(const zval* pz) {
 #define Z_LVAL(zval)				(zval).value.lval
 #define Z_LVAL_P(zval_p)			Z_LVAL(*(zval_p))
 
-#define Z_DVAL(zval)				(zval).dval
+#if ZEND_NAN_TAG
+# define Z_DVAL(zval)				(zval).dval
+#else
+# define Z_DVAL(zval)				(zval).value.dval
+#endif
 #define Z_DVAL_P(zval_p)			Z_DVAL(*(zval_p))
 
 #define Z_STR(zval)					(zval).value.str
@@ -1090,10 +1263,18 @@ static zend_always_inline uint32_t zval_delref_p(zval* pz) {
 	return GC_DELREF(Z_COUNTED_P(pz));
 }
 
-#if SIZEOF_SIZE_T == 4
+#if SIZEOF_SIZE_T == 4 && ZEND_NAN_TAG
 # define ZVAL_COPY_VALUE_EX(z, v, gc, t)				\
 	do {												\
 		Z_COUNTED_P(z) = gc;							\
+		z->u1.type_info = t;							\
+	} while (0)
+#elif SIZEOF_SIZE_T == 4
+# define ZVAL_COPY_VALUE_EX(z, v, gc, t)				\
+	do {												\
+		uint32_t _w2 = v->value.ww.w2;					\
+		Z_COUNTED_P(z) = gc;							\
+		z->value.ww.w2 = _w2;							\
 		z->u1.type_info = t;							\
 	} while (0)
 #elif SIZEOF_SIZE_T == 8

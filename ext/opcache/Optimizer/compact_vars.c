@@ -38,10 +38,12 @@ void zend_optimizer_compact_vars(zend_op_array *op_array) {
 		zend_op *opline = &op_array->opcodes[i];
 		if (opline->op1_type & (IS_CV|IS_VAR|IS_TMP_VAR)) {
 			zend_bitset_incl(used_vars, VAR_NUM(opline->op1.var));
+#if ZEND_NAN_TAG
 			if (opline->opcode == ZEND_FAST_RET ||
 			    opline->opcode == ZEND_DISCARD_EXCEPTION) {
 				zend_bitset_incl(used_vars, VAR_NUM(opline->op1.var) + 1);
 			}
+#endif
 		}
 		if (opline->op2_type & (IS_CV|IS_VAR|IS_TMP_VAR)) {
 			zend_bitset_incl(used_vars, VAR_NUM(opline->op2.var));
@@ -54,10 +56,12 @@ void zend_optimizer_compact_vars(zend_op_array *op_array) {
 					num--;
 					zend_bitset_incl(used_vars, VAR_NUM(opline->result.var) + num);
 				}
+#if ZEND_NAN_TAG
 			} else if (opline->opcode == ZEND_FE_RESET_R ||
 			           opline->opcode == ZEND_FE_RESET_RW ||
 			           opline->opcode == ZEND_FAST_CALL) {
 				zend_bitset_incl(used_vars, VAR_NUM(opline->result.var) + 1);
+#endif
 			}
 		}
 	}

@@ -148,6 +148,7 @@ void zend_optimize_temporary_variables(zend_op_array *op_array, zend_optimizer_c
 							}
 						}
 					}
+#if ZEND_NAN_TAG
 					if (opline->opcode == ZEND_FE_FREE ||
 					    opline->opcode == ZEND_FE_FETCH_R ||
 					    opline->opcode == ZEND_FE_FETCH_RW ||
@@ -161,13 +162,16 @@ void zend_optimize_temporary_variables(zend_op_array *op_array, zend_optimizer_c
 							GET_AVAILABLE_T(2);
 						}
 					} else {
+#endif
 						if (use_new_var) {
 							i = ++max;
 							zend_bitset_incl(taken_T, i);
 						} else {
 							GET_AVAILABLE_T(1);
 						}
+#if ZEND_NAN_TAG
 					}
+#endif
 					map_T[currT] = i;
 					zend_bitset_incl(valid_T, currT);
 				}
@@ -205,11 +209,13 @@ void zend_optimize_temporary_variables(zend_op_array *op_array, zend_optimizer_c
 							zend_bitset_excl(taken_T, map_T[currT]+num);
 						}
 					}
+#if ZEND_NAN_TAG
 				} else if (opline->opcode == ZEND_FE_RESET_R ||
 				           opline->opcode == ZEND_FE_RESET_RW) {
 					if (start_of_T[currT] == opline) {
 						zend_bitset_excl(taken_T, map_T[currT]+1);
 					}
+#endif
 				}
 			} else {
 				/* Code which gets here is using a wrongly built opcode such as RECV() */

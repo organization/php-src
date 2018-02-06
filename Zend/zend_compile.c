@@ -4875,8 +4875,10 @@ void zend_compile_foreach(zend_ast *ast) /* {{{ */
 	opnum_reset = get_next_op_number(CG(active_op_array));
 	opline = zend_emit_op(&reset_node, by_ref ? ZEND_FE_RESET_RW : ZEND_FE_RESET_R, &expr_node, NULL);
 
+#if ZEND_NAN_TAG
 	/* Reserve additional variable for Z_FE_POS() or Z_FE_ITER() */
 	get_temporary_variable(CG(active_op_array));
+#endif
 
 	zend_begin_loop(ZEND_FE_FREE, &reset_node);
 
@@ -5190,8 +5192,10 @@ void zend_compile_try(zend_ast *ast) /* {{{ */
 		}
 		CG(context).fast_call_var = get_temporary_variable(CG(active_op_array));
 
+#if ZEND_NAN_TAG
 		/* Reserve additional variable for Z_OPLINE_NUM() */
 		get_temporary_variable(CG(active_op_array));
+#endif
 
 		/* Push FAST_CALL on unwind stack */
 		fast_call.opcode = ZEND_FAST_CALL;

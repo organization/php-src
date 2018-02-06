@@ -1156,16 +1156,28 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_GENERATOR_CREATE_SPEC_HANDLER(
 		gen_execute_data->opline = opline + 1;
 		/* EX(return_value) keeps pointer to zend_object (not a real zval) */
 		gen_execute_data->return_value = (zval*)generator;
+#if ZEND_NAN_TAG
 		call_info = EX_CALL_INFO();
+#else
+		call_info = Z_TYPE_INFO(EX(This));
+#endif
 		if (Z_IS_OBJECT(EX(This))
+#if ZEND_NAN_TAG
 		 && (!(call_info & (ZEND_CALL_CLOSURE|ZEND_CALL_RELEASE_THIS))
+#else
+		 && (!(call_info & ((ZEND_CALL_CLOSURE|ZEND_CALL_RELEASE_THIS) << ZEND_CALL_INFO_SHIFT))
+#endif
 			 /* Bug #72523 */
 			|| UNEXPECTED(zend_execute_ex != execute_ex))) {
 			ZEND_ADD_CALL_FLAG_EX(call_info, ZEND_CALL_RELEASE_THIS);
 			Z_ADDREF(gen_execute_data->This);
 		}
 		ZEND_ADD_CALL_FLAG_EX(call_info, (ZEND_CALL_TOP_FUNCTION | ZEND_CALL_ALLOCATED | ZEND_CALL_GENERATOR));
+#if ZEND_NAN_TAG
 		gen_execute_data->call_info = call_info;
+#else
+		Z_SET_TYPE_INFO(gen_execute_data->This, call_info);
+#endif
 		gen_execute_data->prev_execute_data = NULL;
 
 		call_info = EX_CALL_INFO();

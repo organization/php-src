@@ -81,7 +81,9 @@ struct _zend_generator {
 	 * This zval also uses the u2 structure in the same way as
 	 * by-value foreach. */
 	zval values;
+#if ZEND_NAN_TAG
 	zval fe; /* used for Z_FE_POS() */
+#endif
 
 	/* Node of waiting generators when multiple "yield from" expressions
 	 * are nested. */

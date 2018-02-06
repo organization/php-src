@@ -2137,19 +2137,19 @@ static zend_never_inline void zend_copy_extra_args(EXECUTE_DATA_D)
 	if (EXPECTED(delta != 0)) {
 		delta *= sizeof(zval);
 		do {
-#if 0
-			type_flags |= Z_TYPE_INFO_P(src);
-#else
+#if ZEND_NAN_TAG
 			type_flags |= Z_REFCOUNTED_P(src);
+#else
+			type_flags |= Z_TYPE_INFO_P(src);
 #endif
 			ZVAL_COPY_VALUE((zval*)(((char*)src) + delta), src);
 			ZVAL_UNDEF(src);
 			src--;
 		} while (--count);
-#if 0
-		if (type_flags & (IS_TYPE_REFCOUNTED << Z_TYPE_FLAGS_SHIFT)) {
-#else
+#if ZEND_NAN_TAG
 		if (type_flags) {
+#else
+		if (type_flags & (IS_TYPE_REFCOUNTED << Z_TYPE_FLAGS_SHIFT)) {
 #endif
 			ZEND_ADD_CALL_FLAG(execute_data, ZEND_CALL_FREE_EXTRA_ARGS);
 		}
