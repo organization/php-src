@@ -288,7 +288,7 @@ void phpdbg_dump_backtrace(size_t num) /* {{{ */
 
 	Z_LVAL(startline) = zend_get_executed_lineno();
 	startfilename = zend_get_executed_filename();
-	Z_STR(startfile) = zend_string_init(startfilename, strlen(startfilename), 0);
+	Z_SET_PTR(startfile, IS_STRING_EX, zend_string_init(startfilename, strlen(startfilename), 0));
 
 	zend_hash_internal_pointer_reset_ex(Z_ARRVAL(zbacktrace), &position);
 	tmp = zend_hash_get_current_data_ex(Z_ARRVAL(zbacktrace), &position);

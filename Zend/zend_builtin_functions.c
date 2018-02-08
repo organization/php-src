@@ -1292,21 +1292,22 @@ ZEND_FUNCTION(method_exists)
 		union _zend_function *func = NULL;
 
 		if (Z_IS_OBJECT_P(klass)
-		&& Z_OBJ_HT_P(klass)->get_method != NULL
-		&& (func = Z_OBJ_HT_P(klass)->get_method(&Z_OBJ_P(klass), method_name, NULL)) != NULL
-		) {
-			if (func->common.fn_flags & ZEND_ACC_CALL_VIA_TRAMPOLINE) {
-				/* Returns true to the fake Closure's __invoke */
-				RETVAL_BOOL(func->common.scope == zend_ce_closure
-					&& zend_string_equals_literal(method_name, ZEND_INVOKE_FUNC_NAME));
+		&& Z_OBJ_HT_P(klass)->get_method != NULL) {
+			zend_object *obj = Z_OBJ_P(klass);
+			if ((func = Z_OBJ_HT_P(klass)->get_method(&obj, method_name, NULL)) != NULL) {
+				if (func->common.fn_flags & ZEND_ACC_CALL_VIA_TRAMPOLINE) {
+					/* Returns true to the fake Closure's __invoke */
+					RETVAL_BOOL(func->common.scope == zend_ce_closure
+						&& zend_string_equals_literal(method_name, ZEND_INVOKE_FUNC_NAME));
 
+					zend_string_release(lcname);
+					zend_string_release(func->common.function_name);
+					zend_free_trampoline(func);
+					return;
+				}
 				zend_string_release(lcname);
-				zend_string_release(func->common.function_name);
-				zend_free_trampoline(func);
-				return;
+				RETURN_TRUE;
 			}
-			zend_string_release(lcname);
-			RETURN_TRUE;
 		}
 	}
 	zend_string_release(lcname);

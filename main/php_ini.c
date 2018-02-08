@@ -239,7 +239,7 @@ static void php_ini_parser_cb(zval *arg1, zval *arg2, zval *arg3, int callback_t
 				} else {
 					/* Store in active hash */
 					entry = zend_hash_update(active_hash, Z_STR_P(arg1), arg2);
-					Z_STR_P(entry) = zend_string_dup(Z_STR_P(entry), 1);
+					Z_SET_PTR2_P(entry, IS_STRING_EX, zend_string_dup(Z_STR_P(entry), 1));
 				}
 			}
 			break;
@@ -268,7 +268,7 @@ static void php_ini_parser_cb(zval *arg1, zval *arg2, zval *arg3, int callback_t
 				} else {
 					entry = zend_hash_next_index_insert(Z_ARRVAL_P(find_arr), arg2);
 				}
-				Z_STR_P(entry) = zend_string_dup(Z_STR_P(entry), 1);
+				Z_SET_PTR2_P(entry, IS_STRING_EX, zend_string_dup(Z_STR_P(entry), 1));
 			}
 			break;
 

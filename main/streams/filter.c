@@ -272,7 +272,7 @@ PHPAPI php_stream_filter *_php_stream_filter_alloc(const php_stream_filter_ops *
 	memset(filter, 0, sizeof(php_stream_filter));
 
 	filter->fops = fops;
-	Z_PTR(filter->abstract) = abstract;
+	Z_SET_PTR2(filter->abstract, IS_PTR, abstract);
 	filter->is_persistent = persistent;
 
 	return filter;

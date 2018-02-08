@@ -119,13 +119,13 @@ static void zend_persist_ast_calc(zend_ast *ast)
 static void zend_persist_zval_calc(zval *z)
 {
 	uint32_t size;
+	zend_string *s;
 
 	switch (Z_TYPE_P(z)) {
 		case IS_STRING:
-			ADD_INTERNED_STRING(Z_STR_P(z), 0);
-			if (ZSTR_IS_INTERNED(Z_STR_P(z))) {
-				Z_SET_TYPE_INFO_P(z, IS_STRING);
-			}
+			s = Z_STR_P(z);
+			ADD_INTERNED_STRING(s, 0);
+			ZVAL_STR(z, s);
 			break;
 		case IS_ARRAY:
 			size = zend_shared_memdup_size(Z_ARR_P(z), sizeof(zend_array));
@@ -271,7 +271,7 @@ static void zend_persist_class_method_calc(zval *zv)
 	ZEND_ASSERT(op_array->type == ZEND_USER_FUNCTION);
 	old_op_array = zend_shared_alloc_get_xlat_entry(op_array);
 	if (old_op_array) {
-		Z_PTR_P(zv) = old_op_array;
+		Z_SET_PTR2_P(zv, IS_PTR, old_op_array);
 	} else {
 		ADD_ARENA_SIZE(sizeof(zend_op_array));
 		zend_persist_op_array_calc_ex(Z_PTR_P(zv));

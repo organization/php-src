@@ -831,7 +831,7 @@ static inline void phpdbg_create_conditional_break(phpdbg_breakcond_t *brake, co
 	new_break.code = estrndup(expr, expr_len);
 	new_break.code_len = expr_len;
 
-	Z_STR(pv) = zend_string_alloc(expr_len + sizeof("return ;") - 1, 0);
+	Z_SET_PTR(pv, IS_STRING_EX, zend_string_alloc(expr_len + sizeof("return ;") - 1, 0));
 	memcpy(Z_STRVAL(pv), "return ", sizeof("return ") - 1);
 	memcpy(Z_STRVAL(pv) + sizeof("return ") - 1, expr, expr_len);
 	Z_STRVAL(pv)[Z_STRLEN(pv) - 1] = ';';

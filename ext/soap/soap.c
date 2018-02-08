@@ -78,12 +78,12 @@ static void soap_error_handler(int error_num, const char *error_filename, const 
 	int _old_soap_version = SOAP_GLOBAL(soap_version);\
 	SOAP_GLOBAL(use_soap_error_handler) = 1;\
 	SOAP_GLOBAL(error_code) = "Server";\
-	Z_OBJ(SOAP_GLOBAL(error_object)) = Z_OBJ(EX(This));
+	Z_SET_PTR2(SOAP_GLOBAL(error_object), IS_OBJECT_EX, Z_OBJ(EX(This)));
 
 #define SOAP_SERVER_END_CODE() \
 	SOAP_GLOBAL(use_soap_error_handler) = _old_handler;\
 	SOAP_GLOBAL(error_code) = _old_error_code;\
-	Z_OBJ(SOAP_GLOBAL(error_object)) = _old_error_object;\
+	Z_SET_PTR2(SOAP_GLOBAL(error_object), IS_OBJECT_EX, _old_error_object);\
 	SOAP_GLOBAL(soap_version) = _old_soap_version;
 
 #define SOAP_CLIENT_BEGIN_CODE() \
@@ -97,7 +97,7 @@ static void soap_error_handler(int error_num, const char *error_filename, const 
 	int _bailout = 0;\
 	SOAP_GLOBAL(use_soap_error_handler) = 1;\
 	SOAP_GLOBAL(error_code) = "Client";\
-	Z_OBJ(SOAP_GLOBAL(error_object)) = Z_OBJ(EX(This));\
+	Z_SET_PTR2(SOAP_GLOBAL(error_object), IS_OBJECT_EX, Z_OBJ(EX(This)));\
 	zend_try {
 
 #define SOAP_CLIENT_END_CODE() \
@@ -122,7 +122,7 @@ static void soap_error_handler(int error_num, const char *error_filename, const 
 	} zend_end_try();\
 	SOAP_GLOBAL(use_soap_error_handler) = _old_handler;\
 	SOAP_GLOBAL(error_code) = _old_error_code;\
-	Z_OBJ(SOAP_GLOBAL(error_object)) = _old_error_object;\
+	Z_SET_PTR2(SOAP_GLOBAL(error_object), IS_OBJECT_EX, _old_error_object);\
 	SOAP_GLOBAL(soap_version) = _old_soap_version;\
 	if (_bailout) {\
 		zend_bailout();\

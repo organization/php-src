@@ -2317,11 +2317,10 @@ static void ZEND_FASTCALL increment_string(zval *str) /* {{{ */
 	}
 
 	if (!Z_REFCOUNTED_P(str)) {
-		Z_STR_P(str) = zend_string_init(Z_STRVAL_P(str), Z_STRLEN_P(str), 0);
-		Z_SET_TYPE_INFO_P(str, IS_STRING_EX);
+		ZVAL_NEW_STR(str, zend_string_init(Z_STRVAL_P(str), Z_STRLEN_P(str), 0));
 	} else if (Z_REFCOUNT_P(str) > 1) {
 		Z_DELREF_P(str);
-		Z_STR_P(str) = zend_string_init(Z_STRVAL_P(str), Z_STRLEN_P(str), 0);
+		Z_SET_PTR2_P(str, IS_STRING_EX, zend_string_init(Z_STRVAL_P(str), Z_STRLEN_P(str), 0));
 	} else {
 		zend_string_forget_hash_val(Z_STR_P(str));
 	}

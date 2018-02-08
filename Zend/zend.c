@@ -721,8 +721,7 @@ static zend_bool php_auto_globals_create_globals(zend_string *name) /* {{{ */
 	zval globals;
 
 	/* IS_ARRAY, but with ref-counter 1 and not IS_TYPE_REFCOUNTED */
-	ZVAL_ARR(&globals, &EG(symbol_table));
-	Z_SET_TYPE_INFO_P(&globals, IS_ARRAY);
+	Z_SET_PTR(globals, IS_ARRAY, &EG(symbol_table));
 	ZVAL_NEW_REF(&globals, &globals);
 	zend_hash_update(&EG(symbol_table), name, &globals);
 	return 0;

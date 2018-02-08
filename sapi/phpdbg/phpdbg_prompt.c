@@ -1714,7 +1714,7 @@ int phpdbg_interactive(zend_bool allow_async_unsafe, char *input) /* {{{ */
 					EG(current_execute_data)->opline = backup_opline; \
 					EG(exception) = exception; \
 				} else { \
-					Z_OBJ(zv) = exception; \
+					Z_SET_PTR2(zv, IS_OBJECT_EX, exception); \
 					zend_throw_exception_internal(&zv); \
 				} \
 				EG(opline_before_exception) = before_ex; \

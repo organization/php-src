@@ -212,7 +212,7 @@ PHPAPI void var_destroy(php_unserialize_data_t *var_hashx)
 			/* Perform delayed __wakeup calls */
 			if (Z_TYPE_P(zv) == IS_OBJECT
 			 && ((uintptr_t)Z_OBJ_P(zv) & VAR_WAKEUP_FLAG)) {
-				Z_OBJ_P(zv) = (zend_object*)((uintptr_t)Z_OBJ_P(zv) & ~VAR_WAKEUP_FLAG);
+				Z_SET_PTR_P(zv, IS_OBJECT_EX, (zend_object*)((uintptr_t)Z_OBJ_P(zv) & ~VAR_WAKEUP_FLAG));
 				if (!wakeup_failed) {
 					zval retval;
 					if (Z_ISUNDEF(wakeup_name)) {

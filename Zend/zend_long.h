@@ -26,7 +26,9 @@
 
 /* This is the heart of the whole int64 enablement in zval. */
 #if defined(__x86_64__) || defined(__LP64__) || defined(_LP64) || defined(_WIN64)
-# define ZEND_ENABLE_ZVAL_LONG64 1
+# if !ZEND_NAN_TAG_64
+#  define ZEND_ENABLE_ZVAL_LONG64 1
+# endif
 #endif
 
 /* Integer types. */
@@ -121,10 +123,13 @@ static const char long_min_digits[] = LONG_MIN_DIGITS;
 
 #ifdef _WIN64
 # define ZEND_ADDR_FMT "0x%016I64x"
+# define ZEND_SIZE_T_FMT "%I64x"
 #elif SIZEOF_SIZE_T == 4
 # define ZEND_ADDR_FMT "0x%08zx"
+# define ZEND_SIZE_T_FMT "%zx"
 #elif SIZEOF_SIZE_T == 8
 # define ZEND_ADDR_FMT "0x%016zx"
+# define ZEND_SIZE_T_FMT "%zx"
 #else
 # error "Unknown SIZEOF_SIZE_T"
 #endif

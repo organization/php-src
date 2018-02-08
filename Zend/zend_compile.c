@@ -441,10 +441,7 @@ void zend_del_literal(zend_op_array *op_array, int n) /* {{{ */
 static inline zend_string *zval_make_interned_string(zval *zv) /* {{{ */
 {
 	ZEND_ASSERT(Z_IS_STRING_P(zv));
-	Z_STR_P(zv) = zend_new_interned_string(Z_STR_P(zv));
-	if (ZSTR_IS_INTERNED(Z_STR_P(zv))) {
-		Z_SET_TYPE_INFO_P(zv, IS_STRING);
-	}
+	ZVAL_STR(zv, zend_new_interned_string(Z_STR_P(zv)));
 	return Z_STR_P(zv);
 }
 
@@ -1867,7 +1864,7 @@ zend_ast *zend_negate_num_string(zend_ast *ast) /* {{{ */
 		}
 	} else if (Z_IS_STRING_P(zv)) {
 		size_t orig_len = Z_STRLEN_P(zv);
-		Z_STR_P(zv) = zend_string_extend(Z_STR_P(zv), orig_len + 1, 0);
+		Z_SET_PTR2_P(zv, IS_STRING_EX, zend_string_extend(Z_STR_P(zv), orig_len + 1, 0));
 		memmove(Z_STRVAL_P(zv) + 1, Z_STRVAL_P(zv), orig_len + 1);
 		Z_STRVAL_P(zv)[0] = '-';
 	} else {
@@ -3848,7 +3845,7 @@ static int zend_compile_func_in_array(znode *result, zend_ast_list *args) /* {{{
 		if (!ok) {
 			return FAILURE;
 		}
-		Z_ARRVAL(array.u.constant) = dst;
+		Z_SET_PTR2(array.u.constant, IS_ARRAY_EX, dst);
 	}
 	array.op_type = IS_CONST;
 

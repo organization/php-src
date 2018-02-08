@@ -509,8 +509,8 @@ struct _zend_execute_data {
 	ZEND_CALL_KIND_EX(ZEND_CALL_INFO(call))
 
 #if ZEND_NAN_TAG
-# define ZEND_SET_CALL_INFO(call, object, info) do { \
-		Z_SET_TYPE_INFO((call)->This, ((object) ? IS_OBJECT_EX : IS_UNDEF)); \
+# define ZEND_SET_CALL_INFO(call, is_object, ptr, info) do { \
+		Z_SET_PTR((call)->This, ((is_object) ? IS_OBJECT_EX : IS_UNDEF), ptr); \
 		(call)->call_info = (info); \
 	} while (0)
 
@@ -533,8 +533,8 @@ struct _zend_execute_data {
 # define ZEND_CALL_NUM_ARGS(call) \
 	(call)->num_args
 #else
-# define ZEND_SET_CALL_INFO(call, object, info) do { \
-		Z_SET_TYPE_INFO((call)->This, ((object) ? IS_OBJECT_EX : IS_UNDEF) | ((info) << ZEND_CALL_INFO_SHIFT)); \
+# define ZEND_SET_CALL_INFO(call, is_object, ptr, info) do { \
+		Z_SET_PTR((call)->This, ((is_object) ? IS_OBJECT_EX : IS_UNDEF) | ((info) << ZEND_CALL_INFO_SHIFT), ptr); \
 	} while (0)
 
 # define ZEND_ADD_CALL_FLAG_EX(call_info, flag) do { \

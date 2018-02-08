@@ -169,11 +169,9 @@ static zend_always_inline void zend_vm_init_call_frame(zend_execute_data *call, 
 {
 	call->func = func;
 	if (object) {
-		Z_OBJ(call->This) = object;
-		ZEND_SET_CALL_INFO(call, 1, call_info);
+		ZEND_SET_CALL_INFO(call, 1, object, call_info);
 	} else {
-		Z_CE(call->This) = called_scope;
-		ZEND_SET_CALL_INFO(call, 0, call_info);
+		ZEND_SET_CALL_INFO(call, 0, called_scope, call_info);
 	}
 	ZEND_CALL_NUM_ARGS(call) = num_args;
 }

@@ -395,7 +395,7 @@ ZEND_API zend_bool ZEND_FASTCALL zend_string_equal_val(zend_string *s1, zend_str
 	char *ptr = ZSTR_VAL(s1);
 	size_t delta = (char*)s2 - (char*)s1;
 	size_t len = ZSTR_LEN(s1);
-	zend_ulong ret;
+	uint64_t ret;
 
 	__asm__ (
 		".LL0%=:\n\t"
@@ -433,7 +433,7 @@ ZEND_API zend_bool ZEND_FASTCALL I_WRAP_SONAME_FNNAME_ZU(NONE,zend_string_equal_
 	size_t len = ZSTR_LEN(s1);
 	char *ptr1 = ZSTR_VAL(s1);
 	char *ptr2 = ZSTR_VAL(s2);
-	zend_ulong ret;
+	uint64_t ret;
 
 	__asm__ (
 		"test %1, %1\n\t"

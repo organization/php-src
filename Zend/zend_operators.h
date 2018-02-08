@@ -460,7 +460,7 @@ ZEND_API void zend_update_current_locale(void);
 
 static zend_always_inline void fast_long_increment_function(zval *op1)
 {
-#if defined(HAVE_ASM_GOTO) && defined(__i386__)
+#if defined(HAVE_ASM_GOTO) && SIZEOF_ZEND_LONG == 4 && (defined(__i386__) || defined(__x86_64__))
 	__asm__ goto(
 		"incl (%0)\n\t"
 		"jo  %l1\n"
@@ -471,7 +471,7 @@ static zend_always_inline void fast_long_increment_function(zval *op1)
 	return;
 overflow: ZEND_ATTRIBUTE_COLD_LABEL
 	ZVAL_DOUBLE(op1, (double)ZEND_LONG_MAX + 1.0);
-#elif defined(HAVE_ASM_GOTO) && defined(__x86_64__)
+#elif defined(HAVE_ASM_GOTO) && SIZEOF_ZEND_LONG == 8 && defined(__x86_64__)
 	__asm__ goto(
 		"incq (%0)\n\t"
 		"jo  %l1\n"
@@ -510,7 +510,7 @@ overflow: ZEND_ATTRIBUTE_COLD_LABEL
 
 static zend_always_inline void fast_long_decrement_function(zval *op1)
 {
-#if defined(HAVE_ASM_GOTO) && defined(__i386__)
+#if defined(HAVE_ASM_GOTO) && SIZEOF_ZEND_LONG == 4 && (defined(__i386__) || defined(__x86_64__))
 	__asm__ goto(
 		"decl (%0)\n\t"
 		"jo  %l1\n"
@@ -521,7 +521,7 @@ static zend_always_inline void fast_long_decrement_function(zval *op1)
 	return;
 overflow: ZEND_ATTRIBUTE_COLD_LABEL
 	ZVAL_DOUBLE(op1, (double)ZEND_LONG_MIN - 1.0);
-#elif defined(HAVE_ASM_GOTO) && defined(__x86_64__)
+#elif defined(HAVE_ASM_GOTO) && SIZEOF_ZEND_LONG == 8 && defined(__x86_64__)
 	__asm__ goto(
 		"decq (%0)\n\t"
 		"jo  %l1\n"
@@ -560,7 +560,7 @@ overflow: ZEND_ATTRIBUTE_COLD_LABEL
 
 static zend_always_inline void fast_long_add_function(zval *result, zval *op1, zval *op2)
 {
-#if defined(HAVE_ASM_GOTO) && defined(__i386__)
+#if defined(HAVE_ASM_GOTO) && SIZEOF_ZEND_LONG == 4 && (defined(__i386__) || defined(__x86_64__))
 	__asm__ goto(
 		"movl	(%1), %%eax\n\t"
 		"addl   (%2), %%eax\n\t"
@@ -571,14 +571,14 @@ static zend_always_inline void fast_long_add_function(zval *result, zval *op1, z
 		: "r"(&result->value),
 		  "r"(&op1->value),
 		  "r"(&op2->value),
-		  "n"(Z_TYPE_TO_RAW(IS_LONG)),
+		  "n"(Z_TYPE_TO_RAW_WORD(IS_LONG)),
 		  "n"(ZVAL_OFFSETOF_TYPE)
 		: "eax","cc", "memory"
 		: overflow);
 	return;
 overflow: ZEND_ATTRIBUTE_COLD_LABEL
 	ZVAL_DOUBLE(result, (double) Z_LVAL_P(op1) + (double) Z_LVAL_P(op2));
-#elif defined(HAVE_ASM_GOTO) && defined(__x86_64__)
+#elif defined(HAVE_ASM_GOTO) && SIZEOF_ZEND_LONG == 8 && defined(__x86_64__)
 	__asm__ goto(
 		"movq	(%1), %%rax\n\t"
 		"addq   (%2), %%rax\n\t"
@@ -589,7 +589,7 @@ overflow: ZEND_ATTRIBUTE_COLD_LABEL
 		: "r"(&result->value),
 		  "r"(&op1->value),
 		  "r"(&op2->value),
-		  "n"(Z_TYPE_TO_RAW(IS_LONG)),
+		  "n"(Z_TYPE_TO_RAW_WORD(IS_LONG)),
 		  "n"(ZVAL_OFFSETOF_TYPE)
 		: "rax","cc", "memory"
 		: overflow);
@@ -650,7 +650,7 @@ static zend_always_inline int fast_add_function(zval *result, zval *op1, zval *o
 
 static zend_always_inline void fast_long_sub_function(zval *result, zval *op1, zval *op2)
 {
-#if defined(HAVE_ASM_GOTO) && defined(__i386__)
+#if defined(HAVE_ASM_GOTO)  && SIZEOF_ZEND_LONG == 4 && (defined(__i386__) || defined(__x86_64__))
 	__asm__ goto(
 		"movl	(%1), %%eax\n\t"
 		"subl   (%2), %%eax\n\t"
@@ -661,14 +661,14 @@ static zend_always_inline void fast_long_sub_function(zval *result, zval *op1, z
 		: "r"(&result->value),
 		  "r"(&op1->value),
 		  "r"(&op2->value),
-		  "n"(Z_TYPE_TO_RAW(IS_LONG)),
+		  "n"(Z_TYPE_TO_RAW_WORD(IS_LONG)),
 		  "n"(ZVAL_OFFSETOF_TYPE)
 		: "eax","cc", "memory"
 		: overflow);
 	return;
 overflow: ZEND_ATTRIBUTE_COLD_LABEL
 	ZVAL_DOUBLE(result, (double) Z_LVAL_P(op1) - (double) Z_LVAL_P(op2));
-#elif defined(HAVE_ASM_GOTO) && defined(__x86_64__)
+#elif defined(HAVE_ASM_GOTO)  && SIZEOF_ZEND_LONG == 8 && defined(__x86_64__)
 	__asm__ goto(
 		"movq	(%1), %%rax\n\t"
 		"subq   (%2), %%rax\n\t"
@@ -679,7 +679,7 @@ overflow: ZEND_ATTRIBUTE_COLD_LABEL
 		: "r"(&result->value),
 		  "r"(&op1->value),
 		  "r"(&op2->value),
-		  "n"(Z_TYPE_TO_RAW(IS_LONG)),
+		  "n"(Z_TYPE_TO_RAW_WORD(IS_LONG)),
 		  "n"(ZVAL_OFFSETOF_TYPE)
 		: "rax","cc", "memory"
 		: overflow);

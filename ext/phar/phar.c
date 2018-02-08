@@ -628,10 +628,13 @@ int phar_parse_metadata(char **buffer, zval *metadata, uint32_t zip_metadata_len
 		PHP_VAR_UNSERIALIZE_DESTROY(var_hash);
 
 		if (PHAR_G(persist)) {
+			void *p;
+
 			/* lazy init metadata */
 			zval_ptr_dtor(metadata);
-			Z_PTR_P(metadata) = pemalloc(zip_metadata_len, 1);
-			memcpy(Z_PTR_P(metadata), *buffer, zip_metadata_len);
+			p = pemalloc(zip_metadata_len, 1);
+			memcpy(p, *buffer, zip_metadata_len);
+			Z_SET_PTR2_P(metadata, IS_PTR, p);
 			return SUCCESS;
 		}
 	} else {

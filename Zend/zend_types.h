@@ -43,25 +43,6 @@
 # define ZEND_ENDIAN_LOHI_C_4(a, b, c, d)  a, b, c, d
 #endif
 
-#ifndef ZEND_NAN_TAG
-# define ZEND_NAN_TAG 1
-#endif
-
-#if ZEND_NAN_TAG
-# if !defined(ZEND_NAN_TAG_32) && (SIZEOF_SIZE_T == 4)
-#  define ZEND_NAN_TAG_32 1
-# endif
-# if !defined(ZEND_NAN_TAG_64) && (SIZEOF_SIZE_T == 8)
-#  define ZEND_NAN_TAG_64 1
-# endif
-#endif
-#if !defined(ZEND_NAN_TAG_32)
-# define ZEND_NAN_TAG_32 0
-#endif
-#if !defined(ZEND_NAN_TAG_64)
-# define ZEND_NAN_TAG_64 0
-#endif
-
 typedef unsigned char zend_bool;
 typedef unsigned char zend_uchar;
 
@@ -180,10 +161,13 @@ typedef uintptr_t zend_type;
 	ZEND_TYPE_ENCODE_CLASS_CONST_Q1(allow_null, class_name)
 
 typedef union _zend_value {
+#if !ZEND_NAN_TAG || SIZEOF_ZEND_LONG == 4
 	zend_long         lval;				/* long value */
+#endif
 #if !ZEND_NAN_TAG
 	double            dval;				/* double value */
 #endif
+#if !ZEND_NAN_TAG_64
 	zend_refcounted  *counted;
 	zend_string      *str;
 	zend_array       *arr;
@@ -195,6 +179,7 @@ typedef union _zend_value {
 	void             *ptr;
 	zend_class_entry *ce;
 	zend_function    *func;
+#endif
 #if !ZEND_NAN_TAG
 	struct {
 		uint32_t w1;
@@ -242,6 +227,7 @@ union _zval_struct {
 		ZEND_ENDIAN_LOHI(
 			zend_value        value,			/* value */
 			union {
+#if 0
 				struct {
 					ZEND_ENDIAN_LOHI_3(
 						zend_uchar    type,			/* active type */
@@ -249,6 +235,7 @@ union _zval_struct {
 						uint16_t      _unused_word
 					)
 				} v;
+#endif
 				uint32_t type_info;
 			} u1;
 		)
@@ -449,20 +436,34 @@ struct _zend_ast_ref {
 
 #if ZEND_NAN_TAG
 # if ZEND_NAN_TAG_32
-#  define MIN_NAN					0xffffffe0
-
 #  define IS_TYPE_REFCOUNTED		(1<<4)
 
 #  define Z_TYPE_MASK				0x0f
 #  define Z_TYPE_FLAGS_SHIFT		0
 
+#  define Z_RAW_TYPE_INFO(zv)       (zv).u1.type_info
+#  define Z_RAW_TYPE(zv)            (Z_RAW_TYPE_INFO(zv) & (uint32_t)~IS_TYPE_REFCOUNTED)
+
 #  define Z_TYPE_TO_RAW(t)			((uint32_t)(t)-32)
+#  define Z_TYPE_TO_RAW_WORD(t)		((uint32_t)(t)-32)
 #  define Z_RAW_TO_TYPE(t)			((uint32_t)(t)+32)
 
-#  define ZVAL_UNDEF_INITIALIZER		{.u64=0xffffffef00000000LL}
+#  define ZVAL_UNDEF_INITIALIZER	{.u64=0xffffffef00000000LL}
 # elif ZEND_NAN_TAG_64
-#  error "64-bit NaN tagging is not implemented yet"
-# elif ZEND_NAN_TAG_64
+#  define IS_TYPE_REFCOUNTED		(1<<4)
+
+#  define Z_TYPE_MASK				0x0f
+#  define Z_TYPE_FLAGS_SHIFT		0
+
+#  define Z_RAW_TYPE_INFO(zv)       ((zv).i64 >> 47)
+#  define Z_RAW_TYPE(zv)            (Z_RAW_TYPE_INFO(zv) & (uint32_t)~IS_TYPE_REFCOUNTED)
+
+#  define Z_TYPE_TO_RAW(t)			((t) + 0xffe0)
+#  define Z_TYPE_TO_RAW_WORD(t)		(((t) + 0xffe0) << (47 - 32))
+#  define Z_RAW_TO_TYPE(t)			((t) & (Z_TYPE_MASK | IS_TYPE_REFCOUNTED))
+
+#  define ZVAL_UNDEF_INITIALIZER		{.u64=0x7ff0000000000000LL}
+# else
 #  error "Unknown NaN tagging"
 # endif
 #else
@@ -471,39 +472,86 @@ struct _zend_ast_ref {
 # define Z_TYPE_MASK				0xff
 # define Z_TYPE_FLAGS_SHIFT			8
 
+#  define Z_RAW_TYPE_INFO(zv)       (zv).u1.type_info
+#  define Z_RAW_TYPE(zv)            (zv).u1.v.type
+
 # define Z_TYPE_TO_RAW(t)			(t)
+# define Z_TYPE_TO_RAW_WORD(t)		(t)
 # define Z_RAW_TO_TYPE(t)			(t)
 
 # define ZVAL_UNDEF_INITIALIZER		{{0}, {{0}}, {0}}
 #endif
 
+#define Z_RAW_TYPE_INFO_P(zval_p)	Z_RAW_TYPE_INFO(*(zval_p))
+#define Z_RAW_TYPE_P(zval_p)		Z_RAW_TYPE(*(zval_p))
+
 static zend_always_inline void zval_set_type_info(zval* pz, uint32_t type_info) {
-#if ZEND_NAN_TAG
+#if ZEND_NAN_TAG_32
 	if (type_info != IS_DOUBLE) {
 		pz->u1.type_info = Z_TYPE_TO_RAW(type_info);
+	}
+#elif ZEND_NAN_TAG_64
+	if (type_info != IS_DOUBLE) {
+		ZEND_ASSERT(type_info <= IS_LONG || type_info == _IS_ERROR || type_info == IS_RESERVE_1 || type_info == IS_RESERVE_2);
+		pz->u1.type_info = (Z_TYPE_TO_RAW(type_info) << (47-32));
 	}
 #else
 	pz->u1.type_info = type_info;
 #endif
 }
 
-#if ZEND_NAN_TAG
+static zend_always_inline void zval_set_ptr(zval* pz, uint32_t type_info, void *ptr) {
+#if ZEND_NAN_TAG_64
+	pz->i64 = ((int64_t)Z_TYPE_TO_RAW(type_info) << 47) | (int64_t)(intptr_t)ptr;
+#else
+	pz->value.ptr = ptr;
+	pz->u1.type_info = Z_TYPE_TO_RAW(type_info);
+#endif
+}
+
+static zend_always_inline void zval_set_ptr2(zval* pz, uint32_t type_info, void *ptr) {
+#if ZEND_NAN_TAG_64
+	pz->i64 = ((int64_t)Z_TYPE_TO_RAW(type_info) << 47) | (int64_t)(intptr_t)ptr;
+#else
+	pz->value.ptr = ptr;
+#endif
+}
+
+static zend_always_inline void* zval_get_ptr(const zval* pz) {
+#if ZEND_NAN_TAG_64
+	return (void*)(pz->i64 & 0x00007fffffffffffLL);
+#else
+	return (void*)pz->value.ptr;
+#endif
+}
+
+#if ZEND_NAN_TAG_32
 static zend_always_inline zend_bool zend_type_is_double(uint32_t type_info) {
-	return type_info < MIN_NAN;
+	return type_info < 0xffffffe0;
+}
+#elif ZEND_NAN_TAG_64
+static zend_always_inline zend_bool zend_type_is_double(int64_t type_info) {
+	return type_info < 0xffe0;
 }
 #endif
 
+#if ZEND_NAN_TAG_32
 static zend_always_inline zend_bool zend_type_is_refcounted(uint32_t type_info) {
-#if ZEND_NAN_TAG
 	return type_info >= (uint32_t)~Z_TYPE_MASK;
-#else
-	return (type_info & (IS_TYPE_REFCOUNTED << Z_TYPE_FLAGS_SHIFT)) != 0;
-#endif
 }
+#elif ZEND_NAN_TAG_64
+static zend_always_inline zend_bool zend_type_is_refcounted(int64_t type_info) {
+	return type_info > 0xfff0;
+}
+#else
+static zend_always_inline zend_bool zend_type_is_refcounted(uint32_t type_info) {
+	return (type_info & (IS_TYPE_REFCOUNTED << Z_TYPE_FLAGS_SHIFT)) != 0;
+}
+#endif
 
 static zend_always_inline zend_uchar zval_get_type(const zval* pz) {
 #if ZEND_NAN_TAG
-	return zend_type_is_double(pz->u1.type_info) ? IS_DOUBLE : (pz->u1.v.type & Z_TYPE_MASK);
+	return zend_type_is_double(Z_RAW_TYPE_INFO_P(pz)) ? IS_DOUBLE : (Z_RAW_TYPE_INFO_P(pz) & Z_TYPE_MASK);
 #else
 	return pz->u1.v.type;
 #endif
@@ -511,7 +559,7 @@ static zend_always_inline zend_uchar zval_get_type(const zval* pz) {
 
 static zend_always_inline zend_uchar zval_get_type_flags(const zval* pz) {
 #if ZEND_NAN_TAG
-	return zend_type_is_double(pz->u1.type_info) ? 0 : (pz->u1.v.type & IS_TYPE_REFCOUNTED);
+	return zend_type_is_double(Z_RAW_TYPE_INFO_P(pz)) ? 0 : (Z_RAW_TYPE_INFO_P(pz) & IS_TYPE_REFCOUNTED);
 #else
 	return pz->u1.v.type_flags;
 #endif
@@ -519,23 +567,7 @@ static zend_always_inline zend_uchar zval_get_type_flags(const zval* pz) {
 
 static zend_always_inline uint32_t zval_get_type_info(const zval* pz) {
 #if ZEND_NAN_TAG
-	return zend_type_is_double(pz->u1.type_info) ? IS_DOUBLE : Z_RAW_TO_TYPE(pz->u1.type_info);
-#else
-	return pz->u1.type_info;
-#endif
-}
-
-static zend_always_inline uint32_t zval_get_raw_type(const zval* pz) {
-#if ZEND_NAN_TAG
-	return pz->u1.type_info & (uint32_t)~IS_TYPE_REFCOUNTED;
-#else
-	return pz->u1.v.type;
-#endif
-}
-
-static zend_always_inline uint32_t zval_get_raw_type_info(const zval* pz) {
-#if ZEND_NAN_TAG
-	return pz->u1.type_info;
+	return zend_type_is_double(Z_RAW_TYPE_INFO_P(pz)) ? IS_DOUBLE : Z_RAW_TO_TYPE(pz->u1.type_info);
 #else
 	return pz->u1.type_info;
 #endif
@@ -556,14 +588,13 @@ static zend_always_inline uint32_t zval_get_raw_type_info(const zval* pz) {
 #define Z_TYPE_INFO(zval)			zval_get_type_info(&(zval))
 #define Z_TYPE_INFO_P(zval_p)		Z_TYPE_INFO(*(zval_p))
 
-#define Z_RAW_TYPE(zval)			zval_get_raw_type(&(zval))
-#define Z_RAW_TYPE_P(zval_p)		Z_RAW_TYPE(*(zval_p))
-
-#define Z_RAW_TYPE_INFO(zval)		zval_get_raw_type_info(&(zval))
-#define Z_RAW_TYPE_INFO_P(zval_p)	Z_RAW_TYPE_INFO(*(zval_p))
-
 #define Z_SET_TYPE_INFO(zv, t)		zval_set_type_info(&(zv), (t))
 #define Z_SET_TYPE_INFO_P(pzv, t)	Z_SET_TYPE_INFO(*(pzv), (t))
+
+#define Z_SET_PTR(zv, t, p)			zval_set_ptr(&(zv), (t), (p))
+#define Z_SET_PTR_P(pzv, t, p)		Z_SET_PTR(*(pzv), (t), (p))
+#define Z_SET_PTR2(zv, t, p)		zval_set_ptr2(&(zv), (t), (p))
+#define Z_SET_PTR2_P(pzv, t, p)		Z_SET_PTR2(*(pzv), (t), (p))
 
 #if ZEND_NAN_TAG
 # define Z_NEXT(zval)				(((Bucket*)(&(zval)))->next)
@@ -607,7 +638,10 @@ static zend_always_inline uint32_t zval_get_raw_type_info(const zval* pz) {
 #endif
 #define Z_PROPERTY_GUARD_P(zval_p)	Z_PROPERTY_GUARD(*(zval_p))
 
-#define Z_COUNTED(zval)				(zval).value.counted
+#define Z_PTR(zval)					zval_get_ptr(&(zval))
+#define Z_PTR_P(zval_p)				Z_PTR(*(zval_p))
+
+#define Z_COUNTED(zval)				((zend_refcounted*)Z_PTR(zval))
 #define Z_COUNTED_P(zval_p)			Z_COUNTED(*(zval_p))
 
 #define GC_REFCOUNT(p)				zend_gc_refcount(&(p)->gc)
@@ -767,18 +801,27 @@ static zend_always_inline uint32_t zval_get_raw_type_info(const zval* pz) {
 
 #define T_IS_REFCOUNTED(t)			zend_type_is_refcounted(t)
 
-#define Z_IS_UNDEF(zval)			T_IS_UNDEF((zval).u1.type_info)
-#define Z_IS_NULL(zval)				T_IS_NULL((zval).u1.type_info)
-#define Z_IS_FALSE(zval)			T_IS_FALSE((zval).u1.type_info)
-#define Z_IS_TRUE(zval)				T_IS_TRUE((zval).u1.type_info)
-#define Z_IS_LONG(zval)				T_IS_LONG((zval).u1.type_info)
-#define Z_IS_DOUBLE(zval)			T_IS_DOUBLE((zval).u1.type_info)
-#define Z_IS_STRING(zval)			T_IS_STRING((zval).u1.type_info)
-#define Z_IS_ARRAY(zval)			T_IS_ARRAY((zval).u1.type_info)
-#define Z_IS_OBJECT(zval)			T_IS_OBJECT((zval).u1.type_info)
-#define Z_IS_RESOURCE(zval)			T_IS_RESOURCE((zval).u1.type_info)
-#define Z_IS_REFERENCE(zval)		T_IS_REFERENCE((zval).u1.type_info)
-#define Z_IS_INDIRECT(zval)			T_IS_INDIRECT((zval).u1.type_info)
+#define Z_IS_UNDEF(zval)			T_IS_UNDEF(Z_RAW_TYPE_INFO(zval))
+#define Z_IS_NULL(zval)				T_IS_NULL(Z_RAW_TYPE_INFO(zval))
+#define Z_IS_FALSE(zval)			T_IS_FALSE(Z_RAW_TYPE_INFO(zval))
+#define Z_IS_TRUE(zval)				T_IS_TRUE(Z_RAW_TYPE_INFO(zval))
+#define Z_IS_LONG(zval)				T_IS_LONG(Z_RAW_TYPE_INFO(zval))
+#define Z_IS_DOUBLE(zval)			T_IS_DOUBLE(Z_RAW_TYPE_INFO(zval))
+#define Z_IS_STRING(zval)			T_IS_STRING(Z_RAW_TYPE_INFO(zval))
+#define Z_IS_ARRAY(zval)			T_IS_ARRAY(Z_RAW_TYPE_INFO(zval))
+#define Z_IS_OBJECT(zval)			T_IS_OBJECT(Z_RAW_TYPE_INFO(zval))
+#define Z_IS_RESOURCE(zval)			T_IS_RESOURCE(Z_RAW_TYPE_INFO(zval))
+#define Z_IS_REFERENCE(zval)		T_IS_REFERENCE(Z_RAW_TYPE_INFO(zval))
+#define Z_IS_INDIRECT(zval)			T_IS_INDIRECT(Z_RAW_TYPE_INFO(zval))
+#define Z_IS_PTR(zval)				T_IS_PTR(Z_RAW_TYPE_INFO(zval))
+#define Z_IS_SET(zval)				T_IS_SET(Z_RAW_TYPE_INFO(zval))
+#define Z_IS_PRIMITIVE(zval)		T_IS_PRIMITIVE(Z_RAW_TYPE_INFO(zval))
+#define Z_IS_BOOL(zval)				T_IS_BOOL(Z_RAW_TYPE_INFO(zval))
+#define Z_IS_NUMBER(zval)			T_IS_NUMBER(Z_RAW_TYPE_INFO(zval))
+#define Z_IS_SCALAR(zval)			T_IS_SCALAR(Z_RAW_TYPE_INFO(zval))
+#define Z_IS_SCALAR_OR_STRING(zval)	T_IS_SCALAR_OR_STRING(Z_RAW_TYPE_INFO(zval))
+#define Z_IS_PERSISTABLE(zval)		T_IS_PERSISTABLE(Z_RAW_TYPE_INFO(zval))
+#define Z_IS_LESS_THAN_TRUE(zval)	T_IS_LESS_THAN_TRUE(Z_RAW_TYPE_INFO(zval))
 
 #define Z_IS_UNDEF_P(zval)			Z_IS_UNDEF(*(zval))
 #define Z_IS_NULL_P(zval)			Z_IS_NULL(*(zval))
@@ -792,38 +835,20 @@ static zend_always_inline uint32_t zval_get_raw_type_info(const zval* pz) {
 #define Z_IS_RESOURCE_P(zval)		Z_IS_RESOURCE(*(zval))
 #define Z_IS_REFERENCE_P(zval)		Z_IS_REFERENCE(*(zval))
 #define Z_IS_INDIRECT_P(zval)		Z_IS_INDIRECT(*(zval))
-
-#define Z_IS_PTR(zval)				T_IS_PTR((zval).u1.type_info)
 #define Z_IS_PTR_P(zval)			Z_IS_PTR(*(zval))
-
-#define Z_IS_SET(zval)				T_IS_SET((zval).u1.type_info)
 #define Z_IS_SET_P(zval)			Z_IS_SET(*(zval))
-
-#define Z_IS_PRIMITIVE(zval)		T_IS_PRIMITIVE((zval).u1.type_info)
 #define Z_IS_PRIMITIVE_P(zval)		Z_IS_PRIMITIVE(*(zval))
-
-#define Z_IS_BOOL(zval)				T_IS_BOOL((zval).u1.type_info)
 #define Z_IS_BOOL_P(zval)			Z_IS_BOOL(*(zval))
-
-#define Z_IS_NUMBER(zval)			T_IS_NUMBER((zval).u1.type_info)
 #define Z_IS_NUMBER_P(zval)			Z_IS_NUMBER(*(zval))
-
-#define Z_IS_SCALAR(zval)			T_IS_SCALAR((zval).u1.type_info)
 #define Z_IS_SCALAR_P(zval)			Z_IS_SCALAR(*(zval))
-
-#define Z_IS_SCALAR_OR_STRING(zval)		T_IS_SCALAR_OR_STRING((zval).u1.type_info)
 #define Z_IS_SCALAR_OR_STRING_P(zval)	Z_IS_SCALAR_OR_STRING(*(zval))
-
-#define Z_IS_PERSISTABLE(zval)		T_IS_PERSISTABLE((zval).u1.type_info)
 #define Z_IS_PERSISTABLE_P(zval)	Z_IS_PERSISTABLE(*(zval))
-
-#define Z_IS_LESS_THAN_TRUE(zval)	T_IS_LESS_THAN_TRUE((zval).u1.type_info)
 #define Z_IS_LESS_THAN_TRUE_P(zval)	Z_IS_LESS_THAN_TRUE(*(zval))
 
-#define Z_CONSTANT(zval)			T_IS_CONSTANT((zval).u1.type_info)
+#define Z_CONSTANT(zval)			T_IS_CONSTANT(Z_RAW_TYPE_INFO(zval))
 #define Z_CONSTANT_P(zval_p)		Z_CONSTANT(*(zval_p))
 
-#define Z_REFCOUNTED(zval)			T_IS_REFCOUNTED((zval).u1.type_info)
+#define Z_REFCOUNTED(zval)			T_IS_REFCOUNTED(Z_RAW_TYPE_INFO(zval))
 #define Z_REFCOUNTED_P(zval_p)		Z_REFCOUNTED(*(zval_p))
 
 /* deprecated: (COPYABLE is the same as IS_ARRAY) */
@@ -862,9 +887,10 @@ static zend_always_inline uint32_t zval_get_raw_type_info(const zval* pz) {
 #define Z_ISNULL(zval)				Z_IS_NULL(zval)
 #define Z_ISNULL_P(zval_p)			Z_ISNULL(*(zval_p))
 
-#define Z_ISERROR(zval)				T_IS_ERROR((zval).u1.type_info)
+#define Z_ISERROR(zval)				T_IS_ERROR(Z_RAW_TYPE_INFO(zval))
 #define Z_ISERROR_P(zval_p)			Z_ISERROR(*(zval_p))
 
+// TODO: ???
 #define Z_LVAL(zval)				(zval).value.lval
 #define Z_LVAL_P(zval_p)			Z_LVAL(*(zval_p))
 
@@ -875,7 +901,7 @@ static zend_always_inline uint32_t zval_get_raw_type_info(const zval* pz) {
 #endif
 #define Z_DVAL_P(zval_p)			Z_DVAL(*(zval_p))
 
-#define Z_STR(zval)					(zval).value.str
+#define Z_STR(zval)					((zend_string*)Z_PTR(zval))
 #define Z_STR_P(zval_p)				Z_STR(*(zval_p))
 
 #define Z_STRVAL(zval)				ZSTR_VAL(Z_STR(zval))
@@ -887,13 +913,13 @@ static zend_always_inline uint32_t zval_get_raw_type_info(const zval* pz) {
 #define Z_STRHASH(zval)				ZSTR_HASH(Z_STR(zval))
 #define Z_STRHASH_P(zval_p)			Z_STRHASH(*(zval_p))
 
-#define Z_ARR(zval)					(zval).value.arr
+#define Z_ARR(zval)					((zend_array*)Z_PTR(zval))
 #define Z_ARR_P(zval_p)				Z_ARR(*(zval_p))
 
 #define Z_ARRVAL(zval)				Z_ARR(zval)
 #define Z_ARRVAL_P(zval_p)			Z_ARRVAL(*(zval_p))
 
-#define Z_OBJ(zval)					(zval).value.obj
+#define Z_OBJ(zval)					((zend_object*)Z_PTR(zval))
 #define Z_OBJ_P(zval_p)				Z_OBJ(*(zval_p))
 
 #define Z_OBJ_HT(zval)				Z_OBJ(zval)->handlers
@@ -914,7 +940,7 @@ static zend_always_inline uint32_t zval_get_raw_type_info(const zval* pz) {
 #define Z_OBJDEBUG(zval,tmp)		(Z_OBJ_HANDLER((zval),get_debug_info)?Z_OBJ_HANDLER((zval),get_debug_info)(&(zval),&tmp):(tmp=0,Z_OBJ_HANDLER((zval),get_properties)?Z_OBJPROP(zval):NULL))
 #define Z_OBJDEBUG_P(zval_p,tmp)	Z_OBJDEBUG(*(zval_p), tmp)
 
-#define Z_RES(zval)					(zval).value.res
+#define Z_RES(zval)					((zend_resource*)Z_PTR(zval))
 #define Z_RES_P(zval_p)				Z_RES(*zval_p)
 
 #define Z_RES_HANDLE(zval)			Z_RES(zval)->handle
@@ -926,13 +952,13 @@ static zend_always_inline uint32_t zval_get_raw_type_info(const zval* pz) {
 #define Z_RES_VAL(zval)				Z_RES(zval)->ptr
 #define Z_RES_VAL_P(zval_p)			Z_RES_VAL(*zval_p)
 
-#define Z_REF(zval)					(zval).value.ref
+#define Z_REF(zval)					((zend_reference*)Z_PTR(zval))
 #define Z_REF_P(zval_p)				Z_REF(*(zval_p))
 
 #define Z_REFVAL(zval)				&Z_REF(zval)->val
 #define Z_REFVAL_P(zval_p)			Z_REFVAL(*(zval_p))
 
-#define Z_AST(zval)					(zval).value.ast
+#define Z_AST(zval)					((zend_ast_ref*)Z_PTR(zval))
 #define Z_AST_P(zval_p)				Z_AST(*(zval_p))
 
 #define GC_AST(p)					((zend_ast*)(((char*)p) + sizeof(zend_ast_ref)))
@@ -940,17 +966,14 @@ static zend_always_inline uint32_t zval_get_raw_type_info(const zval* pz) {
 #define Z_ASTVAL(zval)				GC_AST(Z_AST(zval))
 #define Z_ASTVAL_P(zval_p)			Z_ASTVAL(*(zval_p))
 
-#define Z_INDIRECT(zval)			(zval).value.zv
+#define Z_INDIRECT(zv)				((zval*)Z_PTR(zv))
 #define Z_INDIRECT_P(zval_p)		Z_INDIRECT(*(zval_p))
 
-#define Z_CE(zval)					(zval).value.ce
+#define Z_CE(zval)					((zend_class_entry*)Z_PTR(zval))
 #define Z_CE_P(zval_p)				Z_CE(*(zval_p))
 
-#define Z_FUNC(zval)				(zval).value.func
+#define Z_FUNC(zval)				((zend_function*)Z_PTR(zval))
 #define Z_FUNC_P(zval_p)			Z_FUNC(*(zval_p))
-
-#define Z_PTR(zval)					(zval).value.ptr
-#define Z_PTR_P(zval_p)				Z_PTR(*(zval_p))
 
 #define ZVAL_UNDEF(z) do {				\
 		Z_SET_TYPE_INFO_P(z, IS_UNDEF);	\
@@ -988,117 +1011,86 @@ static zend_always_inline uint32_t zval_get_raw_type_info(const zval* pz) {
 #define ZVAL_STR(z, s) do {						\
 		zval *__z = (z);						\
 		zend_string *__s = (s);					\
-		Z_STR_P(__z) = __s;						\
-		/* interned strings support */			\
-		Z_SET_TYPE_INFO_P(__z, ZSTR_IS_INTERNED(__s) ? \
-			IS_INTERNED_STRING_EX : 			\
-			IS_STRING_EX);						\
+		Z_SET_PTR_P(__z,                        \
+			/* interned strings support */		\
+			ZSTR_IS_INTERNED(__s) ?				\
+				IS_INTERNED_STRING_EX :			\
+				IS_STRING_EX, __s);				\
 	} while (0)
 
-#define ZVAL_INTERNED_STR(z, s) do {				\
-		zval *__z = (z);							\
-		zend_string *__s = (s);						\
-		Z_STR_P(__z) = __s;							\
-		Z_SET_TYPE_INFO_P(__z, IS_INTERNED_STRING_EX);	\
-	} while (0)
+#define ZVAL_INTERNED_STR(z, s) \
+	Z_SET_PTR_P(z, IS_INTERNED_STRING_EX, s)
 
-#define ZVAL_NEW_STR(z, s) do {					\
-		zval *__z = (z);						\
-		zend_string *__s = (s);					\
-		Z_STR_P(__z) = __s;						\
-		Z_SET_TYPE_INFO_P(__z, IS_STRING_EX);	\
-	} while (0)
+#define ZVAL_NEW_STR(z, s) \
+	Z_SET_PTR_P(z, IS_STRING_EX, s)
 
 #define ZVAL_STR_COPY(z, s) do {						\
 		zval *__z = (z);								\
 		zend_string *__s = (s);							\
-		Z_STR_P(__z) = __s;								\
 		/* interned strings support */					\
 		if (ZSTR_IS_INTERNED(__s)) {					\
-			Z_SET_TYPE_INFO_P(__z, IS_INTERNED_STRING_EX);	\
+			Z_SET_PTR_P(__z, IS_INTERNED_STRING_EX, __s);\
 		} else {										\
 			GC_ADDREF(__s);								\
-			Z_SET_TYPE_INFO_P(__z, IS_STRING_EX);		\
+			Z_SET_PTR_P(__z, IS_STRING_EX, __s);		\
 		}												\
 	} while (0)
 
-#define ZVAL_ARR(z, a) do {						\
-		zend_array *__arr = (a);				\
-		zval *__z = (z);						\
-		Z_ARR_P(__z) = __arr;					\
-		Z_SET_TYPE_INFO_P(__z, IS_ARRAY_EX);	\
-	} while (0)
+#define ZVAL_ARR(z, a) \
+	Z_SET_PTR_P(z, IS_ARRAY_EX, a)
 
 #define ZVAL_NEW_ARR(z) do {									\
 		zval *__z = (z);										\
 		zend_array *_arr =										\
-		(zend_array *) emalloc(sizeof(zend_array));				\
-		Z_ARR_P(__z) = _arr;									\
-		Z_SET_TYPE_INFO_P(__z, IS_ARRAY_EX);					\
+			(zend_array *) emalloc(sizeof(zend_array));			\
+		Z_SET_PTR_P(__z, IS_ARRAY_EX, __arr);					\
 	} while (0)
 
 #define ZVAL_NEW_PERSISTENT_ARR(z) do {							\
 		zval *__z = (z);										\
 		zend_array *_arr =										\
-		(zend_array *) malloc(sizeof(zend_array));				\
-		Z_ARR_P(__z) = _arr;									\
-		Z_SET_TYPE_INFO_P(__z, IS_ARRAY_EX);					\
+			(zend_array *) malloc(sizeof(zend_array));			\
+		Z_SET_PTR_P(__z, IS_ARRAY_EX, _arr);					\
 	} while (0)
 
-#define ZVAL_OBJ(z, o) do {						\
-		zval *__z = (z);						\
-		Z_OBJ_P(__z) = (o);						\
-		Z_SET_TYPE_INFO_P(__z, IS_OBJECT_EX);	\
-	} while (0)
+#define ZVAL_OBJ(z, o) \
+	Z_SET_PTR_P(z, IS_OBJECT_EX, o)
 
-#define ZVAL_RES(z, r) do {						\
-		zval *__z = (z);						\
-		Z_RES_P(__z) = (r);						\
-		Z_SET_TYPE_INFO_P(__z, IS_RESOURCE_EX);	\
-	} while (0)
+#define ZVAL_RES(z, r) \
+	Z_SET_PTR_P(z, IS_RESOURCE_EX, r)
 
 #define ZVAL_NEW_RES(z, h, p, t) do {							\
 		zend_resource *_res =									\
 		(zend_resource *) emalloc(sizeof(zend_resource));		\
-		zval *__z;												\
 		GC_SET_REFCOUNT(_res, 1);								\
 		GC_TYPE_INFO(_res) = IS_RESOURCE;						\
 		_res->handle = (h);										\
 		_res->type = (t);										\
 		_res->ptr = (p);										\
-		__z = (z);												\
-		Z_RES_P(__z) = _res;									\
-		Z_SET_TYPE_INFO_P(__z, IS_RESOURCE_EX);					\
+		Z_SET_PTR_P(z, IS_RESOURCE_EX, _res);					\
 	} while (0)
 
 #define ZVAL_NEW_PERSISTENT_RES(z, h, p, t) do {				\
 		zend_resource *_res =									\
 		(zend_resource *) malloc(sizeof(zend_resource));		\
-		zval *__z;												\
 		GC_SET_REFCOUNT(_res, 1);								\
 		GC_TYPE_INFO(_res) = IS_RESOURCE |						\
 			(GC_PERSISTENT << GC_FLAGS_SHIFT);					\
 		_res->handle = (h);										\
 		_res->type = (t);										\
 		_res->ptr = (p);										\
-		__z = (z);												\
-		Z_RES_P(__z) = _res;									\
-		Z_SET_TYPE_INFO_P(__z, IS_RESOURCE_EX);					\
+		Z_SET_PTR_P(z, IS_RESOURCE_EX, _res);					\
 	} while (0)
 
-#define ZVAL_REF(z, r) do {										\
-		zval *__z = (z);										\
-		Z_REF_P(__z) = (r);										\
-		Z_SET_TYPE_INFO_P(__z, IS_REFERENCE_EX);				\
-	} while (0)
+#define ZVAL_REF(z, r) \
+	Z_SET_PTR_P(z, IS_REFERENCE_EX, r)
 
 #define ZVAL_NEW_EMPTY_REF(z) do {								\
 		zend_reference *_ref =									\
 		(zend_reference *) emalloc(sizeof(zend_reference));		\
 		GC_SET_REFCOUNT(_ref, 1);								\
 		GC_TYPE_INFO(_ref) = IS_REFERENCE;						\
-		Z_REF_P(z) = _ref;										\
-		Z_SET_TYPE_INFO_P(z, IS_REFERENCE_EX);					\
+		Z_SET_PTR_P(z, IS_REFERENCE_EX, _ref);					\
 	} while (0)
 
 #define ZVAL_NEW_REF(z, r) do {									\
@@ -1107,8 +1099,7 @@ static zend_always_inline uint32_t zval_get_raw_type_info(const zval* pz) {
 		GC_SET_REFCOUNT(_ref, 1);								\
 		GC_TYPE_INFO(_ref) = IS_REFERENCE;						\
 		ZVAL_COPY_VALUE(&_ref->val, r);							\
-		Z_REF_P(z) = _ref;										\
-		Z_SET_TYPE_INFO_P(z, IS_REFERENCE_EX);					\
+		Z_SET_PTR_P(z, IS_REFERENCE_EX, _ref);					\
 	} while (0)
 
 #define ZVAL_MAKE_REF_EX(z, refcount) do {						\
@@ -1118,8 +1109,7 @@ static zend_always_inline uint32_t zval_get_raw_type_info(const zval* pz) {
 		GC_SET_REFCOUNT(_ref, (refcount));						\
 		GC_TYPE_INFO(_ref) = IS_REFERENCE;						\
 		ZVAL_COPY_VALUE(&_ref->val, _z);						\
-		Z_REF_P(_z) = _ref;										\
-		Z_SET_TYPE_INFO_P(_z, IS_REFERENCE_EX);					\
+		Z_SET_PTR_P(z, IS_REFERENCE_EX, _ref);					\
 	} while (0)
 
 #define ZVAL_NEW_PERSISTENT_REF(z, r) do {						\
@@ -1129,39 +1119,26 @@ static zend_always_inline uint32_t zval_get_raw_type_info(const zval* pz) {
 		GC_TYPE_INFO(_ref) = IS_REFERENCE |						\
 			(GC_PERSISTENT << GC_FLAGS_SHIFT);					\
 		ZVAL_COPY_VALUE(&_ref->val, r);							\
-		Z_REF_P(z) = _ref;										\
-		Z_SET_TYPE_INFO_P(z, IS_REFERENCE_EX);					\
+		Z_SET_PTR_P(z, IS_REFERENCE_EX, _ref);					\
 	} while (0)
 
-#define ZVAL_AST(z, ast) do {									\
-		zval *__z = (z);										\
-		Z_AST_P(__z) = ast;										\
-		Z_SET_TYPE_INFO_P(__z, IS_CONSTANT_AST_EX);				\
-	} while (0)
+#define ZVAL_AST(z, ast) \
+	Z_SET_PTR_P(z, IS_CONSTANT_AST_EX, ast)
 
-#define ZVAL_INDIRECT(z, v) do {								\
-		Z_INDIRECT_P(z) = (v);									\
-		Z_SET_TYPE_INFO_P(z, IS_INDIRECT);						\
-	} while (0)
+#define ZVAL_INDIRECT(z, v) \
+	Z_SET_PTR_P(z, IS_INDIRECT, v)
 
-#define ZVAL_PTR(z, p) do {										\
-		Z_PTR_P(z) = (p);										\
-		Z_SET_TYPE_INFO_P(z, IS_PTR);							\
-	} while (0)
+#define ZVAL_PTR(z, p) \
+	Z_SET_PTR_P(z, IS_PTR, p)
 
-#define ZVAL_FUNC(z, f) do {									\
-		Z_FUNC_P(z) = (f);										\
-		Z_SET_TYPE_INFO_P(z, IS_PTR);							\
-	} while (0)
+#define ZVAL_FUNC(z, f) \
+	ZVAL_PTR(z, f)
 
-#define ZVAL_CE(z, c) do {										\
-		Z_CE_P(z) = (c);										\
-		Z_SET_TYPE_INFO_P(z, IS_PTR);							\
-	} while (0)
+#define ZVAL_CE(z, c) \
+	ZVAL_PTR(z, c)
 
-#define ZVAL_ERROR(z) do {				\
-		Z_SET_TYPE_INFO_P(z, _IS_ERROR);\
-	} while (0)
+#define ZVAL_ERROR(z) \
+	Z_SET_TYPE_INFO_P(z, _IS_ERROR)
 
 #define Z_REFCOUNT_P(pz)			zval_refcount_p(pz)
 #define Z_SET_REFCOUNT_P(pz, rc)	zval_set_refcount_p(pz, rc)
@@ -1263,31 +1240,41 @@ static zend_always_inline uint32_t zval_delref_p(zval* pz) {
 	return GC_DELREF(Z_COUNTED_P(pz));
 }
 
-#if SIZEOF_SIZE_T == 4 && ZEND_NAN_TAG
+#if ZEND_NAN_TAG_64
+	/* pass */	
+#elif SIZEOF_SIZE_T == 4 && ZEND_NAN_TAG_32
 # define ZVAL_COPY_VALUE_EX(z, v, gc, t)				\
 	do {												\
-		Z_COUNTED_P(z) = gc;							\
+		z->value.ptr = gc;								\
 		z->u1.type_info = t;							\
 	} while (0)
 #elif SIZEOF_SIZE_T == 4
 # define ZVAL_COPY_VALUE_EX(z, v, gc, t)				\
 	do {												\
 		uint32_t _w2 = v->value.ww.w2;					\
-		Z_COUNTED_P(z) = gc;							\
+		z->value.ptr = gc;								\
 		z->value.ww.w2 = _w2;							\
 		z->u1.type_info = t;							\
 	} while (0)
 #elif SIZEOF_SIZE_T == 8
 # define ZVAL_COPY_VALUE_EX(z, v, gc, t)				\
 	do {												\
-		Z_COUNTED_P(z) = gc;							\
+		z->value.ptr = gc;								\
 		z->u1.type_info = t;							\
 	} while (0)
 #else
 # error "Unknown SIZEOF_SIZE_T"
 #endif
 
-#define ZVAL_COPY_VALUE(z, v)							\
+#if ZEND_NAN_TAG_64
+# define ZVAL_COPY_VALUE(z, v)							\
+	do {												\
+		zval *_z1 = (z);								\
+		const zval *_z2 = (v);							\
+		_z1->i64 = _z2->i64;							\
+	} while (0)	
+#else
+# define ZVAL_COPY_VALUE(z, v)							\
 	do {												\
 		zval *_z1 = (z);								\
 		const zval *_z2 = (v);							\
@@ -1295,8 +1282,20 @@ static zend_always_inline uint32_t zval_delref_p(zval* pz) {
 		uint32_t _t = _z2->u1.type_info;				\
 		ZVAL_COPY_VALUE_EX(_z1, _z2, _gc, _t);			\
 	} while (0)
+#endif
 
-#define ZVAL_COPY(z, v)									\
+#if ZEND_NAN_TAG_64
+# define ZVAL_COPY(z, v)								\
+	do {												\
+		zval *_z1 = (z);								\
+		const zval *_z2 = (v);							\
+		_z1->i64 = _z2->i64;							\
+		if (Z_REFCOUNTED_P(_z1)) {						\
+			Z_ADDREF_P(_z1);							\
+		}												\
+	} while (0)	
+#else
+# define ZVAL_COPY(z, v)								\
 	do {												\
 		zval *_z1 = (z);								\
 		const zval *_z2 = (v);							\
@@ -1307,8 +1306,24 @@ static zend_always_inline uint32_t zval_delref_p(zval* pz) {
 			GC_ADDREF(_gc);								\
 		}												\
 	} while (0)
+#endif
 
-#define ZVAL_DUP(z, v)									\
+#if ZEND_NAN_TAG_64
+# define ZVAL_DUP(z, v)									\
+	do {												\
+		zval *_z1 = (z);								\
+		const zval *_z2 = (v);							\
+		if (Z_IS_ARRAY_P(_z2)) {						\
+			ZVAL_ARR(_z1, zend_array_dup(Z_ARR_P(_z2)));\
+		} else {										\
+			_z1->i64 = _z2->i64;						\
+			if (Z_REFCOUNTED_P(_z1)) {					\
+				Z_ADDREF_P(_z1);						\
+			}											\
+		}												\
+	} while (0)	
+#else
+# define ZVAL_DUP(z, v)									\
 	do {												\
 		zval *_z1 = (z);								\
 		const zval *_z2 = (v);							\
@@ -1323,12 +1338,28 @@ static zend_always_inline uint32_t zval_delref_p(zval* pz) {
 			ZVAL_COPY_VALUE_EX(_z1, _z2, _gc, _t);		\
 		}												\
 	} while (0)
-
+#endif
 
 /* ZVAL_COPY_OR_DUP() should be used instead of ZVAL_COPY() and ZVAL_DUP()
  * in all places where the source may be a persistent zval.
  */
-#define ZVAL_COPY_OR_DUP(z, v)											\
+#if ZEND_NAN_TAG_64
+# define ZVAL_COPY_OR_DUP(z, v)							\
+	do {												\
+		zval *_z1 = (z);								\
+		const zval *_z2 = (v);							\
+		_z1->i64 = _z2->i64;							\
+		if (Z_REFCOUNTED_P(_z1)) {						\
+			zend_refcounted *_gc = Z_COUNTED_P(_z1);	\
+			if (EXPECTED(!(GC_FLAGS(_gc) & GC_PERSISTENT))) {\
+				GC_ADDREF(_gc);							\
+			} else {									\
+				zval_copy_ctor_func(_z1);				\
+			}											\
+		}												\
+	} while (0)	
+#else
+# define ZVAL_COPY_OR_DUP(z, v)											\
 	do {																\
 		zval *_z1 = (z);												\
 		const zval *_z2 = (v);											\
@@ -1343,6 +1374,7 @@ static zend_always_inline uint32_t zval_delref_p(zval* pz) {
 			}															\
 		}																\
 	} while (0)
+#endif
 
 #define ZVAL_DEREF(z) do {								\
 		if (UNEXPECTED(Z_ISREF_P(z))) {					\

@@ -3874,7 +3874,7 @@ PHPAPI zend_string *php_addslashes(zend_string *str, int should_free) __attribut
 
 static void *resolve_addslashes() {
 	if (zend_cpu_supports(ZEND_CPU_FEATURE_SSE42)) {
-		return php_addslashes_sse42;
+//???		return php_addslashes_sse42;
 	}
 	return  php_addslashes_default;
 }

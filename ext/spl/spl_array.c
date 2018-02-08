@@ -82,18 +82,18 @@ static inline spl_array_object *spl_array_from_obj(zend_object *obj) /* {{{ */ {
 
 #define Z_SPLARRAY_P(zv)  spl_array_from_obj(Z_OBJ_P((zv)))
 
-static inline HashTable **spl_array_get_hash_table_ptr(spl_array_object* intern) { /* {{{ */
+static inline HashTable *spl_array_get_hash_table(spl_array_object* intern) { /* {{{ */
 	//??? TODO: Delay duplication for arrays; only duplicate for write operations
 	if (intern->ar_flags & SPL_ARRAY_IS_SELF) {
 		if (!intern->std.properties) {
 			rebuild_object_properties(&intern->std);
 		}
-		return &intern->std.properties;
+		return intern->std.properties;
 	} else if (intern->ar_flags & SPL_ARRAY_USE_OTHER) {
 		spl_array_object *other = Z_SPLARRAY_P(&intern->array);
-		return spl_array_get_hash_table_ptr(other);
+		return spl_array_get_hash_table(other);
 	} else if (Z_IS_ARRAY(intern->array)) {
-		return &Z_ARRVAL(intern->array);
+		return Z_ARRVAL(intern->array);
 	} else {
 		zend_object *obj = Z_OBJ(intern->array);
 		if (!obj->properties) {
@@ -104,20 +104,34 @@ static inline HashTable **spl_array_get_hash_table_ptr(spl_array_object* intern)
 			}
 			obj->properties = zend_array_dup(obj->properties);
 		}
-		return &obj->properties;
+		return obj->properties;
 	}
 }
 /* }}} */
 
-static inline HashTable *spl_array_get_hash_table(spl_array_object* intern) { /* {{{ */
-	return *spl_array_get_hash_table_ptr(intern);
-}
-/* }}} */
-
 static inline void spl_array_replace_hash_table(spl_array_object* intern, HashTable *ht) { /* {{{ */
-	HashTable **ht_ptr = spl_array_get_hash_table_ptr(intern);
-	zend_array_destroy(*ht_ptr);
-	*ht_ptr = ht;
+    HashTable *old = NULL;
+	if (intern->ar_flags & SPL_ARRAY_IS_SELF) {
+		old = intern->std.properties;
+		intern->std.properties = ht;
+	} else if (intern->ar_flags & SPL_ARRAY_USE_OTHER) {
+		spl_array_object *other = Z_SPLARRAY_P(&intern->array);
+		spl_array_replace_hash_table(other, ht);
+	} else if (Z_IS_ARRAY(intern->array)) {
+		old = Z_ARRVAL(intern->array);
+		Z_SET_PTR2(intern->array, IS_ARRAY_EX, ht);
+	} else {
+		zend_object *obj = Z_OBJ(intern->array);
+		old = obj->properties;
+		obj->properties = ht;
+	}
+	if (old) {
+		if (EXPECTED(!(GC_FLAGS(old) & IS_ARRAY_IMMUTABLE))) {
+			if (GC_DELREF(old) == 0) {
+				zend_array_destroy(old);
+			}
+		}
+	}
 }
 /* }}} */
 

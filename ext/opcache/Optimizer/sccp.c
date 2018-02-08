@@ -98,34 +98,29 @@ typedef struct _sccp_ctx {
 #define IS_PARTIAL_ARRAY(zv)    (Z_RAW_TYPE_INFO_P(zv) == Z_TYPE_TO_RAW(PARTIAL_ARRAY_EX))
 #define IS_PARTIAL_OBJECT(zv)   (Z_RAW_TYPE_INFO_P(zv) == Z_TYPE_TO_RAW(PARTIAL_OBJECT_EX))
 
-#define MAKE_PARTIAL_ARRAY(zv)   Z_SET_TYPE_INFO_P(zv, PARTIAL_ARRAY_EX)
-#define MAKE_PARTIAL_OBJECT(zv)  Z_SET_TYPE_INFO_P(zv, PARTIAL_OBJECT_EX)
+#define MAKE_PARTIAL_ARRAY(zv)   Z_SET_PTR_P(zv, PARTIAL_ARRAY_EX, Z_ARR_P(zv))
 
 #define MAKE_TOP(zv)             Z_SET_TYPE_INFO_P(zv, TOP)
 #define MAKE_BOT(zv)             Z_SET_TYPE_INFO_P(zv, BOT)
 
 static void empty_partial_array(zval *zv)
 {
-	MAKE_PARTIAL_ARRAY(zv);
-	Z_ARR_P(zv) = zend_new_array(8);
+	Z_SET_PTR_P(zv, PARTIAL_ARRAY_EX, zend_new_array(8));
 }
 
 static void dup_partial_array(zval *dst, zval *src)
 {
-	MAKE_PARTIAL_ARRAY(dst);
-	Z_ARR_P(dst) = zend_array_dup(Z_ARR_P(src));
+	Z_SET_PTR_P(dst, PARTIAL_ARRAY_EX, zend_array_dup(Z_ARR_P(src)));
 }
 
 static void empty_partial_object(zval *zv)
 {
-	MAKE_PARTIAL_OBJECT(zv);
-	Z_ARR_P(zv) = zend_new_array(8);
+	Z_SET_PTR_P(zv, PARTIAL_OBJECT_EX, zend_new_array(8));
 }
 
 static void dup_partial_object(zval *dst, zval *src)
 {
-	MAKE_PARTIAL_OBJECT(dst);
-	Z_ARR_P(dst) = zend_array_dup(Z_ARR_P(src));
+	Z_SET_PTR_P(dst, PARTIAL_OBJECT_EX, zend_array_dup(Z_ARR_P(src)));
 }
 
 static inline zend_bool value_known(zval *zv) {

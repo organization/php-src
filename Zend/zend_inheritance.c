@@ -641,7 +641,7 @@ static zend_function *do_inherit_method(zend_string *key, zend_function *parent,
 			/* Lazy duplication */
 			zend_function *new_function = zend_arena_alloc(&CG(arena), sizeof(zend_op_array));
 			memcpy(new_function, func, sizeof(zend_op_array));
-			Z_PTR_P(child) = new_function;
+			Z_SET_PTR2_P(child, IS_PTR, new_function);
 			func->common.prototype = orig_prototype;
 		}
 		return NULL;

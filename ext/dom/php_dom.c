@@ -539,7 +539,7 @@ static zend_object *dom_objects_store_clone_obj(zval *zobject) /* {{{ */
 static void dom_copy_prop_handler(zval *zv) /* {{{ */
 {
 	dom_prop_handler *hnd = Z_PTR_P(zv);
-	Z_PTR_P(zv) = malloc(sizeof(dom_prop_handler));
+	Z_SET_PTR2_P(zv, IS_PTR, malloc(sizeof(dom_prop_handler)));
 	memcpy(Z_PTR_P(zv), hnd, sizeof(dom_prop_handler));
 }
 /* }}} */

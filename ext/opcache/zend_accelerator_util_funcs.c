@@ -38,7 +38,7 @@
 	(void*)(((char*)(ptr)) + ((char*)ZCG(arena_mem) - (char*)ZCG(current_persistent_script)->arena_mem))
 
 typedef int (*id_function_t)(void *, void *);
-typedef void (*unique_copy_ctor_func_t)(void *pElement);
+typedef void (*unique_copy_ctor_func_t)(zval *pElement);
 
 static void zend_accel_destroy_zend_function(zval *zv)
 {
@@ -154,16 +154,17 @@ static inline void zend_clone_zval(zval *src)
 	void *ptr;
 
 	if (Z_IS_REFERENCE_P(src)) {
-		ptr = accel_xlat_get(Z_REF_P(src));
+		zend_reference *old = Z_REF_P(src);
+		ptr = accel_xlat_get(old);
 		if (ptr != NULL) {
-			Z_REF_P(src) = ptr;
+			Z_SET_PTR2_P(src, IS_REFERENCE_EX, ptr);
 			return;
 		} else {
-			zend_reference *old = Z_REF_P(src);
 			ZVAL_NEW_REF(src, &old->val);
 			Z_REF_P(src)->gc = old->gc;
+			// TODO: backport to master ???
+			//ZVAL_COPY_VALUE(Z_REFVAL_P(src), &old->val);
 			accel_xlat_set(old, Z_REF_P(src));
-			src = Z_REFVAL_P(src);
 		}
 	}
 }
@@ -337,13 +338,14 @@ static void zend_hash_clone_prop_info(HashTable *ht, HashTable *source, zend_cla
 }
 
 /* Protects class' refcount, copies default properties, functions and class name */
-static void zend_class_copy_ctor(zend_class_entry **pce)
+static void zend_class_copy_ctor(zval *zv)
 {
-	zend_class_entry *ce = *pce;
-	zend_class_entry *old_ce = ce;
+	zend_class_entry *ce, *old_ce;
 	zval *src, *dst, *end;
 
-	*pce = ce = ARENA_REALLOC(old_ce);
+	old_ce = Z_PTR_P(zv);
+	ce = ARENA_REALLOC(old_ce);
+	Z_SET_PTR2_P(zv, IS_PTR, ce);
 	ce->refcount = 1;
 
 	if (old_ce->default_properties_table) {
@@ -588,7 +590,7 @@ static void zend_accel_class_hash_copy(HashTable *target, HashTable *source, uni
 		} else {
 			t = _zend_hash_append_ptr(target, p->key, Z_PTR(p->val));
 			if (pCopyConstructor) {
-				pCopyConstructor(&Z_PTR_P(t));
+				pCopyConstructor(t);
 			}
 		}
 	}

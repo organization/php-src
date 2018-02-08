@@ -46,6 +46,26 @@
 # define ZEND_PATHS_SEPARATOR		':'
 #endif
 
+/* NaN tagging (TODO: move these macros into config.h) */
+#ifndef ZEND_NAN_TAG
+# define ZEND_NAN_TAG 1
+#endif
+
+#if ZEND_NAN_TAG
+# if !defined(ZEND_NAN_TAG_32) && (SIZEOF_SIZE_T == 4)
+#  define ZEND_NAN_TAG_32 1
+# endif
+# if !defined(ZEND_NAN_TAG_64) && (SIZEOF_SIZE_T == 8)
+#  define ZEND_NAN_TAG_64 1
+# endif
+#endif
+#if !defined(ZEND_NAN_TAG_32)
+# define ZEND_NAN_TAG_32 0
+#endif
+#if !defined(ZEND_NAN_TAG_64)
+# define ZEND_NAN_TAG_64 0
+#endif
+
 #include "../TSRM/TSRM.h"
 
 #include <stdio.h>
@@ -459,16 +479,16 @@ static zend_always_inline double _zend_get_inf(void) /* {{{ */
 
 static zend_always_inline double _zend_get_nan(void) /* {{{ */
 {
-#ifdef NAN
-	return NAN;
-#elif HAVE_HUGE_VAL_NAN
-	return HUGE_VAL + -HUGE_VAL;
-#elif defined(__i386__) || defined(_X86_) || defined(ALPHA) || defined(_ALPHA) || defined(__alpha)
+#if defined(__i386__) || defined(_X86_) || defined(ALPHA) || defined(_ALPHA) || defined(__alpha)
 # define _zend_DOUBLE_QUIET_NAN_HIGH      0xfff80000
 	double val = 0.0;
 	((uint32_t*)&val)[1] = _zend_DOUBLE_QUIET_NAN_HIGH;
 	((uint32_t*)&val)[0] = 0;
 	return val;
+#elif defined(NAN)
+	return NAN;
+#elif HAVE_HUGE_VAL_NAN
+	return HUGE_VAL + -HUGE_VAL;
 #elif HAVE_ATOF_ACCEPTS_NAN
 	return atof("NAN");
 #else

@@ -1245,14 +1245,14 @@ ZEND_API int _object_and_properties_init(zval *arg, zend_class_entry *class_type
 			zend_throw_error(NULL, "Cannot instantiate abstract class %s", ZSTR_VAL(class_type->name));
 		}
 		ZVAL_NULL(arg);
-		Z_OBJ_P(arg) = NULL;
+		//???Z_OBJ_P(arg) = NULL;
 		return FAILURE;
 	}
 
 	if (UNEXPECTED(!(class_type->ce_flags & ZEND_ACC_CONSTANTS_UPDATED))) {
 		if (UNEXPECTED(zend_update_class_constants(class_type) != SUCCESS)) {
 			ZVAL_NULL(arg);
-			Z_OBJ_P(arg) = NULL;
+			//???Z_OBJ_P(arg) = NULL;
 			return FAILURE;
 		}
 	}
@@ -3622,10 +3622,7 @@ ZEND_API const char *zend_get_module_version(const char *module_name) /* {{{ */
 static inline zend_string *zval_make_interned_string(zval *zv) /* {{{ */
 {
 	ZEND_ASSERT(Z_IS_STRING_P(zv));
-	Z_STR_P(zv) = zend_new_interned_string(Z_STR_P(zv));
-	if (ZSTR_IS_INTERNED(Z_STR_P(zv))) {
-		Z_SET_TYPE_INFO_P(zv, IS_STRING);
-	}
+	ZVAL_STR(zv, zend_new_interned_string(Z_STR_P(zv)));
 	return Z_STR_P(zv);
 }
 

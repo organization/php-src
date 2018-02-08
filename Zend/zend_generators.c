@@ -220,7 +220,7 @@ static void zend_generator_dtor_storage(zend_object *object) /* {{{ */
 		zend_generator_cleanup_unfinished_execution(generator, finally_op_num);
 
 		fast_call = ZEND_CALL_VAR(ex, ex->func->op_array.opcodes[finally_op_end].op1.var);
-		Z_OBJ_P(fast_call) = EG(exception);
+		Z_SET_PTR2_P(fast_call, IS_OBJECT_EX, EG(exception));
 		EG(exception) = NULL;
 		Z_OPLINE_NUM_P(fast_call) = (uint32_t)-1;
 

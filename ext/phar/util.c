@@ -2011,7 +2011,7 @@ static void phar_manifest_copy_ctor(zval *zv) /* {{{ */
 {
 	phar_entry_info *info = emalloc(sizeof(phar_entry_info));
 	memcpy(info, Z_PTR_P(zv), sizeof(phar_entry_info));
-	Z_PTR_P(zv) = info;
+	Z_SET_PTR2_P(zv, IS_PTR, info);
 }
 /* }}} */
 
@@ -2079,8 +2079,9 @@ int phar_copy_on_write(phar_archive_data **pphar) /* {{{ */
 		return FAILURE;
 	}
 
-	phar_copy_cached_phar((phar_archive_data **)&Z_PTR_P(pzv));
 	newpphar = Z_PTR_P(pzv);
+	phar_copy_cached_phar(&newpphar);
+	Z_SET_PTR2_P(pzv, IS_PTR, newpphar);
 	/* invalidate phar cache */
 	PHAR_G(last_phar) = NULL;
 	PHAR_G(last_phar_name) = PHAR_G(last_alias) = NULL;

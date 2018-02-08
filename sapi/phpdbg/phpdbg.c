@@ -1876,7 +1876,7 @@ phpdbg_main:
 			memcpy(&wops, tmp_wrapper->wops, sizeof(wops));
 			wops.stream_opener = phpdbg_stream_url_wrap_php;
 			wrapper.wops = (const php_stream_wrapper_ops*)&wops;
-			Z_PTR_P(zv) = &wrapper;
+			Z_SET_PTR2_P(zv, IS_PTR, &wrapper);
 		}
 
 		/* Make stdin, stdout and stderr accessible from PHP scripts */
@@ -2156,7 +2156,7 @@ phpdbg_out:
 
 		{
 			zval *zv = zend_hash_str_find(php_stream_get_url_stream_wrappers_hash(), ZEND_STRL("php"));
-			Z_PTR_P(zv) = (void*)PHPDBG_G(orig_url_wrap_php);
+			Z_SET_PTR2_P(zv, IS_PTR, (void*)PHPDBG_G(orig_url_wrap_php));
 		}
 
 		zend_hash_destroy(&PHPDBG_G(file_sources));

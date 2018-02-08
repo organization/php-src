@@ -569,14 +569,14 @@ void cgi_php_import_environment_variables(zval *array_ptr) /* {{{ */
 		zend_hash_num_elements(Z_ARRVAL(PG(http_globals)[TRACK_VARS_ENV])) > 0
 	) {
 		zend_array_destroy(Z_ARR_P(array_ptr));
-		Z_ARR_P(array_ptr) = zend_array_dup(Z_ARR(PG(http_globals)[TRACK_VARS_ENV]));
+		Z_SET_PTR2_P(array_ptr, IS_ARRAY_EX, zend_array_dup(Z_ARR(PG(http_globals)[TRACK_VARS_ENV])));
 		return;
 	} else if (Z_IS_ARRAY(PG(http_globals)[TRACK_VARS_SERVER]) &&
 		Z_ARR_P(array_ptr) != Z_ARR(PG(http_globals)[TRACK_VARS_SERVER]) &&
 		zend_hash_num_elements(Z_ARRVAL(PG(http_globals)[TRACK_VARS_SERVER])) > 0
 	) {
 		zend_array_destroy(Z_ARR_P(array_ptr));
-		Z_ARR_P(array_ptr) = zend_array_dup(Z_ARR(PG(http_globals)[TRACK_VARS_SERVER]));
+		Z_SET_PTR2_P(array_ptr, IS_ARRAY_EX, zend_array_dup(Z_ARR(PG(http_globals)[TRACK_VARS_SERVER])));
 		return;
 	}
 

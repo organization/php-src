@@ -3088,7 +3088,7 @@ static sdlPtr make_persistent_sdl(sdlPtr sdl)
 			if ((preq = zend_hash_str_find_ptr(&ptr_map, (char*)&tmp, sizeof(tmp))) == NULL) {
 				assert(0);
 			}
-			Z_PTR_P(zv) = preq;
+			Z_SET_PTR2_P(zv, IS_PTR, preq);
 			if (key) {
 				/* We have to duplicate key emalloc->malloc */
 				zend_hash_str_add_ptr(psdl->requests, ZSTR_VAL(key), ZSTR_LEN(key), preq);
