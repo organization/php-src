@@ -320,7 +320,11 @@ struct _zend_array {
 # define HT_HASH_TO_IDX(idx) \
 	((idx) / sizeof(Bucket))
 #elif SIZEOF_SIZE_T == 8
-# define HT_MAX_SIZE 0x80000000
+# if SIZEOF_ZEND_LONG == 4
+#  define HT_MAX_SIZE 0x40000000
+# else
+#  define HT_MAX_SIZE 0x80000000
+# endif
 # define HT_HASH_TO_BUCKET_EX(data, idx) \
 	((data) + (idx))
 # define HT_IDX_TO_HASH(idx) \
