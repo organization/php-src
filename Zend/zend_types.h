@@ -415,8 +415,8 @@ struct _zend_ast_ref {
 #define IS_PTR						13
 #define _IS_ERROR					13
 
-#define IS_RESERVE_1				14
-#define IS_RESERVE_2				15
+#define IS_RESERVE_1				13
+#define IS_RESERVE_2				14
 
 /* fake types used only for type hinting (Z_TYPE(zv) can not use them) */
 #define _IS_BOOL					16
