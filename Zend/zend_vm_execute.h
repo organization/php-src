@@ -22288,7 +22288,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FE_FETCH_R_SPEC_VAR_HANDLER(ZE
 	USE_OPLINE
 	zval *array;
 	zval *value;
-	uint32_t value_type;
+	zend_raw_type value_type;
 	HashTable *fe_ht;
 	HashPosition pos;
 	Bucket *p;
@@ -22452,7 +22452,7 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FE_FETCH_RW_SPEC_VAR_HANDLER(Z
 	USE_OPLINE
 	zval *array;
 	zval *value;
-	uint32_t value_type;
+	zend_raw_type value_type;
 	HashTable *fe_ht;
 	HashPosition pos;
 	Bucket *p;
@@ -31756,7 +31756,11 @@ static ZEND_VM_HOT ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FE_FETCH_R_SIMPLE_
 	USE_OPLINE
 	zval *array;
 	zval *value, *variable_ptr;
+#if ZEND_NAN_TAG_64
+	uint64_t value_type;
+#else
 	uint32_t value_type;
+#endif
 	HashTable *fe_ht;
 	HashPosition pos;
 	Bucket *p;
@@ -31808,7 +31812,11 @@ static ZEND_VM_HOT ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_FE_FETCH_R_SIMPLE_
 	USE_OPLINE
 	zval *array;
 	zval *value, *variable_ptr;
+#if ZEND_NAN_TAG_64
+	uint64_t value_type;
+#else
 	uint32_t value_type;
+#endif
 	HashTable *fe_ht;
 	HashPosition pos;
 	Bucket *p;

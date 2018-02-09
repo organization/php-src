@@ -479,16 +479,16 @@ static zend_always_inline double _zend_get_inf(void) /* {{{ */
 
 static zend_always_inline double _zend_get_nan(void) /* {{{ */
 {
-#if defined(__i386__) || defined(_X86_) || defined(ALPHA) || defined(_ALPHA) || defined(__alpha)
-# define _zend_DOUBLE_QUIET_NAN_HIGH      0xfff80000
+#if defined(NAN)
+	return NAN;
+#elif HAVE_HUGE_VAL_NAN
+	return HUGE_VAL + -HUGE_VAL;
+#elif defined(__i386__) || defined(_X86_) || defined(ALPHA) || defined(_ALPHA) || defined(__alpha)
+# define _zend_DOUBLE_QUIET_NAN_HIGH      0x7ff80000
 	double val = 0.0;
 	((uint32_t*)&val)[1] = _zend_DOUBLE_QUIET_NAN_HIGH;
 	((uint32_t*)&val)[0] = 0;
 	return val;
-#elif defined(NAN)
-	return NAN;
-#elif HAVE_HUGE_VAL_NAN
-	return HUGE_VAL + -HUGE_VAL;
 #elif HAVE_ATOF_ACCEPTS_NAN
 	return atof("NAN");
 #else

@@ -30,7 +30,7 @@
 # define accel_xlat_set(old, new)	zend_hash_index_add_new_ptr(&ZCG(bind_hash), (zend_ulong)(zend_uintptr_t)(old), (new))
 # define accel_xlat_get(old)		zend_hash_index_find_ptr(&ZCG(bind_hash), (zend_ulong)(zend_uintptr_t)(old))
 #else
-# define accel_xlat_set(old, new)	zend_hash_str_add_new_ptr(&ZCG(bind_hash), (char*)&(old), sizeof(void*), (old))
+# define accel_xlat_set(old, new)	zend_hash_str_add_new_ptr(&ZCG(bind_hash), (char*)&(old), sizeof(void*), (new))
 # define accel_xlat_get(old)	    zend_hash_str_find_ptr(&ZCG(bind_hash), (char*)&(old), sizeof(void*))
 #endif
 
@@ -162,8 +162,6 @@ static inline void zend_clone_zval(zval *src)
 		} else {
 			ZVAL_NEW_REF(src, &old->val);
 			Z_REF_P(src)->gc = old->gc;
-			// TODO: backport to master ???
-			//ZVAL_COPY_VALUE(Z_REFVAL_P(src), &old->val);
 			accel_xlat_set(old, Z_REF_P(src));
 		}
 	}

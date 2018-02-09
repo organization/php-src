@@ -5974,7 +5974,7 @@ ZEND_VM_HANDLER(78, ZEND_FE_FETCH_R, VAR, ANY, JMP_ADDR)
 	USE_OPLINE
 	zval *array;
 	zval *value;
-	uint32_t value_type;
+	zend_raw_type value_type;
 	HashTable *fe_ht;
 	HashPosition pos;
 	Bucket *p;
@@ -6138,7 +6138,7 @@ ZEND_VM_HANDLER(126, ZEND_FE_FETCH_RW, VAR, ANY, JMP_ADDR)
 	USE_OPLINE
 	zval *array;
 	zval *value;
-	uint32_t value_type;
+	zend_raw_type value_type;
 	HashTable *fe_ht;
 	HashPosition pos;
 	Bucket *p;
@@ -8981,7 +8981,11 @@ ZEND_VM_HOT_TYPE_SPEC_HANDLER(ZEND_FE_FETCH_R, op->op2_type == IS_CV && (op1_inf
 	USE_OPLINE
 	zval *array;
 	zval *value, *variable_ptr;
+#if ZEND_NAN_TAG_64
+	uint64_t value_type;
+#else
 	uint32_t value_type;
+#endif
 	HashTable *fe_ht;
 	HashPosition pos;
 	Bucket *p;
