@@ -269,8 +269,8 @@ struct _zend_string {
 
 typedef struct _Bucket {
 	zval              val;
-	zend_ulong        h;                /* hash value (or numeric index)   */
 	zend_string      *key;              /* string key or NULL for numerics */
+	zend_ulong        h;                /* hash value (or numeric index)   */
 #if ZEND_NAN_TAG
 	uint32_t          next;
 #endif
