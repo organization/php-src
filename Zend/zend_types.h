@@ -227,15 +227,6 @@ union _zval_struct {
 		ZEND_ENDIAN_LOHI(
 			zend_value        value,			/* value */
 			union {
-#if 0
-				struct {
-					ZEND_ENDIAN_LOHI_3(
-						zend_uchar    type,			/* active type */
-						zend_uchar    _unused_byte,
-						uint16_t      _unused_word
-					)
-				} v;
-#endif
 				uint32_t type_info;
 			} u1;
 		)
@@ -565,16 +556,6 @@ static zend_always_inline zend_uchar zval_get_type(const zval* pz) {
 #endif
 }
 
-static zend_always_inline zend_uchar zval_get_type_flags(const zval* pz) {
-#if ZEND_NAN_TAG_64
-	return zend_type_is_double(Z_RAW_TYPE_INFO_P(pz)) ? 0 : (Z_RAW_TYPE_INFO_P(pz) ^ IS_TYPE_REFCOUNTED);
-#elif ZEND_NAN_TAG_32
-	return zend_type_is_double(Z_RAW_TYPE_INFO_P(pz)) ? 0 : (Z_RAW_TYPE_INFO_P(pz) & IS_TYPE_REFCOUNTED);
-#else
-	return pz->u1.v.type_flags;
-#endif
-}
-
 static zend_always_inline uint32_t zval_get_type_info(const zval* pz) {
 #if ZEND_NAN_TAG_64
 	return zend_type_is_double(Z_RAW_TYPE_INFO_P(pz)) ? IS_DOUBLE : ~Z_RAW_TO_TYPE(pz->u1.type_info);
@@ -593,9 +574,6 @@ static zend_always_inline uint32_t zval_get_type_info(const zval* pz) {
 /* we should never set just Z_TYPE, we should set Z_TYPE_INFO */
 #define Z_TYPE(zval)				zval_get_type(&(zval))
 #define Z_TYPE_P(zval_p)			Z_TYPE(*(zval_p))
-
-#define Z_TYPE_FLAGS(zval)			zval_get_type_flags(&(zval))
-#define Z_TYPE_FLAGS_P(zval_p)		Z_TYPE_FLAGS(*(zval_p))
 
 #define Z_TYPE_INFO(zval)			zval_get_type_info(&(zval))
 #define Z_TYPE_INFO_P(zval_p)		Z_TYPE_INFO(*(zval_p))
