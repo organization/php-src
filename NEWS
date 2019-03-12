@@ -3,6 +3,8 @@ PHP                                                                        NEWS
 ?? ??? ????, PHP 7.4.0alpha1
 
 - Core:
+  . Fixed bug #77345 (Stack Overflow caused by circular reference in garbage
+    collection). (Alexandru Patranescu, Nikita, Dmitry)
   . Implemented request #76148 (Add array_key_exists() to the list of
     specially compiled functions). (Majkl578)
   . Fixed bug #76430 (__METHOD__ inconsistent outside of method).
@@ -41,6 +43,7 @@ PHP                                                                        NEWS
 - Hash:
   . The hash extension is now an integral part of PHP and cannot be disabled
     as per RFC: https://wiki.php.net/rfc/permanent_hash_ext. (Kalle)
+  . Implemented FR #71890 (crc32c checksum algorithm). (Andrew Brampton)
 
 - Intl:
   . Raised requirements to ICU ≥ 50.1. (cmb)
