@@ -927,6 +927,17 @@ else
   ZEND_DEBUG=no
 fi
 
+PHP_ARG_ENABLE([rtld-now],
+  [whether to dlopen extensions with RTLD_NOW instead of RTLD_LAZY],
+  [AS_HELP_STRING([--enable-rtld-now],
+    [Use dlopen with RTLD_NOW instead of RTLD_LAZY])],
+  [no],
+  [no])
+
+if test "$PHP_RTLD_NOW" = "yes"; then
+  AC_DEFINE(PHP_USE_RTLD_NOW, 1, [ Use dlopen with RTLD_NOW instead of RTLD_LAZY ])
+fi
+
 PHP_ARG_WITH([layout],
   [layout of installed files],
   [AS_HELP_STRING([--with-layout=TYPE],
@@ -1558,7 +1569,7 @@ PHP_ADD_SOURCES(Zend, \
     zend_list.c zend_builtin_functions.c \
     zend_ini.c zend_sort.c zend_multibyte.c zend_ts_hash.c zend_stream.c \
     zend_iterators.c zend_interfaces.c zend_exceptions.c zend_strtod.c zend_gc.c \
-    zend_closures.c zend_float.c zend_string.c zend_signal.c zend_generators.c \
+    zend_closures.c zend_weakrefs.c zend_float.c zend_string.c zend_signal.c zend_generators.c \
     zend_virtual_cwd.c zend_ast.c zend_objects.c zend_object_handlers.c zend_objects_API.c \
     zend_default_classes.c zend_inheritance.c zend_smart_str.c zend_cpuinfo.c zend_gdb.c, \
 	-DZEND_ENABLE_STATIC_TSRMLS_CACHE=1)
