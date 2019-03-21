@@ -25,6 +25,11 @@ PHP                                                                        NEWS
 - FFI:
   . Added FFI extension. (Dmitry)
 
+- Filter:
+  . The filter extension no longer have the --with-pcre-dir on Unix builds, 
+    allowing the extension to be once more compiled as shared using 
+    ./configure. (Kalle)
+
 - FPM:
   . Implemented FR #72510 (systemd service should be hardened). (Craig Andrews)
 
@@ -60,6 +65,11 @@ PHP                                                                        NEWS
   . Added openssl_x509_verify function. (Ben Scholzen)
   . openssl_random_pseudo_bytes() now throws in error conditions.
     (Sammy Kaye Powers)
+
+- PCRE:
+  . Fixed bug #72685 (Repeated UTF-8 validation of same string in UTF-8 mode).
+    (Nikita)
+  . Implemented FR #77094 (Support flags in preg_replace_callback). (Nikita)
 
 - PDO_OCI:
   . Support Oracle Database tracing attributes ACTION, MODULE,
@@ -108,6 +118,6 @@ PHP                                                                        NEWS
     tidy_get_root, and tidy_getopt) (tandre)
 
 - WDDX:
-  . Deprecated the WDDX extension. (cmb)
+  . Deprecated and unbundled the WDDX extension. (cmb)
 
 <<< NOTE: Insert NEWS from last stable release here prior to actual release! >>>
