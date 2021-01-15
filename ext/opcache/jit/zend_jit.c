@@ -112,12 +112,7 @@ static zend_bool zend_is_commutative(zend_uchar opcode)
 		opcode == ZEND_MUL ||
 		opcode == ZEND_BW_OR ||
 		opcode == ZEND_BW_AND ||
-		opcode == ZEND_BW_XOR ||
-		opcode == ZEND_ASSIGN_ADD ||
-		opcode == ZEND_ASSIGN_MUL||
-		opcode == ZEND_ASSIGN_BW_OR ||
-		opcode == ZEND_ASSIGN_BW_AND ||
-		opcode == ZEND_ASSIGN_BW_XOR;
+		opcode == ZEND_BW_XOR;
 }
 
 static zend_bool zend_long_is_power_of_two(zend_long x)

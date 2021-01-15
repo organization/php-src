@@ -58,14 +58,14 @@ static zend_execute_data* ZEND_FASTCALL zend_jit_extend_stack_helper(uint32_t us
 {
 	zend_execute_data *call = (zend_execute_data*)zend_vm_stack_extend(used_stack);
 	call->func = fbc;
-	ZEND_SET_CALL_INFO(call, 0, ZEND_CALL_NESTED_FUNCTION|ZEND_CALL_ALLOCATED);
+	ZEND_CALL_INFO(call) = ZEND_CALL_NESTED_FUNCTION | ZEND_CALL_ALLOCATED;
 	return call;
 }
 
 static zend_execute_data* ZEND_FASTCALL zend_jit_int_extend_stack_helper(uint32_t used_stack)
 {
 	zend_execute_data *call = (zend_execute_data*)zend_vm_stack_extend(used_stack);
-	ZEND_SET_CALL_INFO(call, 0, ZEND_CALL_NESTED_FUNCTION|ZEND_CALL_ALLOCATED);
+	ZEND_CALL_INFO(call) = ZEND_CALL_NESTED_FUNCTION | ZEND_CALL_ALLOCATED;
 	return call;
 }
 
@@ -758,18 +758,10 @@ static zend_never_inline ZEND_COLD void zend_wrong_string_offset(void)
 	uint32_t var;
 
 	switch (opline->opcode) {
-		case ZEND_ASSIGN_ADD:
-		case ZEND_ASSIGN_SUB:
-		case ZEND_ASSIGN_MUL:
-		case ZEND_ASSIGN_DIV:
-		case ZEND_ASSIGN_MOD:
-		case ZEND_ASSIGN_SL:
-		case ZEND_ASSIGN_SR:
-		case ZEND_ASSIGN_CONCAT:
-		case ZEND_ASSIGN_BW_OR:
-		case ZEND_ASSIGN_BW_AND:
-		case ZEND_ASSIGN_BW_XOR:
-		case ZEND_ASSIGN_POW:
+		case ZEND_ASSIGN_OP:
+		case ZEND_ASSIGN_DIM_OP:
+		case ZEND_ASSIGN_OBJ_OP:
+		case ZEND_ASSIGN_STATIC_PROP_OP:
 			msg = "Cannot use assign-op operators with string offsets";
 			break;
 		case ZEND_FETCH_DIM_W:
@@ -784,25 +776,15 @@ static zend_never_inline ZEND_COLD void zend_wrong_string_offset(void)
 			while (opline < end) {
 				if (opline->op1_type == IS_VAR && opline->op1.var == var) {
 					switch (opline->opcode) {
-						case ZEND_ASSIGN_ADD:
-						case ZEND_ASSIGN_SUB:
-						case ZEND_ASSIGN_MUL:
-						case ZEND_ASSIGN_DIV:
-						case ZEND_ASSIGN_MOD:
-						case ZEND_ASSIGN_SL:
-						case ZEND_ASSIGN_SR:
-						case ZEND_ASSIGN_CONCAT:
-						case ZEND_ASSIGN_BW_OR:
-						case ZEND_ASSIGN_BW_AND:
-						case ZEND_ASSIGN_BW_XOR:
-						case ZEND_ASSIGN_POW:
-							if (opline->extended_value == ZEND_ASSIGN_OBJ) {
-								msg = "Cannot use string offset as an object";
-							} else if (opline->extended_value == ZEND_ASSIGN_DIM) {
-								msg = "Cannot use string offset as an array";
-							} else {
-								msg = "Cannot use assign-op operators with string offsets";
-							}
+						case ZEND_ASSIGN_OBJ_OP:
+							msg = "Cannot use string offset as an object";
+							break;
+						case ZEND_ASSIGN_DIM_OP:
+							msg = "Cannot use string offset as an array";
+							break;
+						case ZEND_ASSIGN_OP:
+						case ZEND_ASSIGN_STATIC_PROP_OP:
+							msg = "Cannot use assign-op operators with string offsets";
 							break;
 						case ZEND_PRE_INC_OBJ:
 						case ZEND_PRE_DEC_OBJ:
@@ -864,7 +846,7 @@ static zend_never_inline ZEND_COLD void zend_wrong_string_offset(void)
 		EMPTY_SWITCH_DEFAULT_CASE();
 	}
 	ZEND_ASSERT(msg != NULL);
-	zend_throw_error(NULL, msg);
+	zend_throw_error(NULL, "%s", msg);
 }
 
 static zend_never_inline void zend_assign_to_string_offset(zval *str, zval *dim, zval *value, zval *result)
@@ -2083,7 +2065,7 @@ static int ZEND_FASTCALL zend_jit_verify_internal_arg_types_helper(zend_execute_
 	zval *p = ZEND_CALL_ARG(call, 1);
 
 	for (i = 0; i < num_args; ++i) {
-		zend_check_internal_arg_type(fbc, i + 1, p);
+		zend_verify_internal_arg_type(fbc, i + 1, p);
 		if (UNEXPECTED(EG(exception))) {
 			EG(current_execute_data) = call->prev_execute_data;
 			zend_vm_stack_free_args(call);
