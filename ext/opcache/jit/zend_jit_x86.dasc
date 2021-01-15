@@ -5199,7 +5199,7 @@ static int zend_jit_assign_op(dasm_State **Dst, const zend_op *opline, zend_op_a
 	zend_jit_addr op1_addr, op2_addr;
 	int op1_ssa_var, op2_ssa_var;
 
-	if (opline->extended_value == ZEND_DIM) {
+	if (opline->extended_value == ZEND_ASSIGN_DIM) {
 		return zend_jit_assign_dim_op(Dst, opline, op_array, ssa);
 	} else if (opline->extended_value == ZEND_ASSIGN_OBJ || opline->extended_value == ZEND_ASSIGN_STATIC_PROP) {
 		goto fallback;
@@ -7026,7 +7026,7 @@ static int zend_jit_push_call_frame(dasm_State **Dst, const zend_op *opline, zen
 	}
 	|	// zend_vm_init_call_frame(call, call_info, func, num_args, called_scope, object);
 	|	// ZEND_SET_CALL_INFO(call, 0, call_info);
-	|	mov dword EX:RX->This.u1.type_info, (IS_UNDEF | (ZEND_CALL_NESTED_FUNCTION << ZEND_CALL_INFO_SHIFT))
+	|	mov dword EX:RX->This.u1.type_info, (IS_UNDEF | ZEND_CALL_NESTED_FUNCTION)
 	|	// call->func = func;
 #ifdef _WIN32
 	if (0) {
@@ -7097,7 +7097,6 @@ static int zend_jit_needs_call_chain(zend_call_info *call_info, uint32_t b, zend
 				case ZEND_ASSERT_CHECK:
 				case ZEND_CATCH:
 				case ZEND_DECLARE_ANON_CLASS:
-				case ZEND_DECLARE_ANON_INHERITED_CLASS:
 				case ZEND_FE_FETCH_R:
 				case ZEND_FE_FETCH_RW:
 					return 1;
@@ -7575,28 +7574,8 @@ static int zend_jit_do_fcall(dasm_State **Dst, const zend_op *opline, zend_op_ar
 	}
 
 	if (!func || func->type == ZEND_INTERNAL_FUNCTION) {
-		if (!func) {
+		if (!func && (opline->opcode != ZEND_DO_ICALL)) {
 			|8:
-			if (opline->opcode == ZEND_DO_FCALL) {
-				|	jg >8
-				|.cold_code
-				|8:
-				if (!RETURN_VALUE_USED(opline)) {
-					|	sub r4, 16 /* alloca() */
-				}
-				|	// ZVAL_NULL(EX_VAR(opline->result.var));
-				|	LOAD_ZVAL_ADDR FCARG2a, res_addr
-				|	SET_Z_TYPE_INFO FCARG2a, IS_NULL
-				|	mov FCARG1a, RX
-				|	EXT_CALL zend_do_fcall_overloaded, r0
-				|	test r0, r0
-				|	jne >8
-				if (!RETURN_VALUE_USED(opline)) {
-					|	add r4, 16 /* revert alloca() */
-				}
-				|	jmp ->exception_handler
-				|.code
-			}
 		}
 		if (opline->opcode == ZEND_DO_FCALL_BY_NAME) {
 			if (!func) {
