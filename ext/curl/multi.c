@@ -92,6 +92,8 @@ PHP_FUNCTION(curl_multi_add_handle)
 		RETURN_FALSE;
 	}
 
+	_php_curl_verify_handlers(ch, 1);
+
 	_php_curl_cleanup_handle(ch);
 
 	GC_ADDREF(Z_RES_P(z_ch));
@@ -228,7 +230,7 @@ PHP_FUNCTION(curl_multi_select)
 	}
 
 #if LIBCURL_VERSION_NUM >= 0x071c00 /* Available since 7.28.0 */
-	error = curl_multi_wait(mh->multi, NULL, 0, (unsigned long) timeout * 1000.0, &numfds);
+	error = curl_multi_wait(mh->multi, NULL, 0, (unsigned long) (timeout * 1000.0), &numfds);
 	if (CURLM_OK != error) {
 		SAVE_CURLM_ERROR(mh, error);
 		RETURN_LONG(-1);
@@ -290,7 +292,7 @@ PHP_FUNCTION(curl_multi_exec)
 
 	still_running = zval_get_long(z_still_running);
 	error = curl_multi_perform(mh->multi, &still_running);
-	ZEND_TRY_ASSIGN_LONG(z_still_running, still_running);
+	ZEND_TRY_ASSIGN_REF_LONG(z_still_running, still_running);
 
 	SAVE_CURLM_ERROR(mh, error);
 	RETURN_LONG((zend_long) error);
@@ -333,6 +335,7 @@ PHP_FUNCTION(curl_multi_info_read)
 	CURLMsg	  *tmp_msg;
 	int        queued_msgs;
 	zval      *zmsgs_in_queue = NULL;
+	php_curl  *ch;
 
 	ZEND_PARSE_PARAMETERS_START(1, 2)
 		Z_PARAM_RESOURCE(z_mh)
@@ -350,7 +353,7 @@ PHP_FUNCTION(curl_multi_info_read)
 	}
 
 	if (zmsgs_in_queue) {
-		ZEND_TRY_ASSIGN_LONG(zmsgs_in_queue, queued_msgs);
+		ZEND_TRY_ASSIGN_REF_LONG(zmsgs_in_queue, queued_msgs);
 	}
 
 	array_init(return_value);
@@ -369,6 +372,10 @@ PHP_FUNCTION(curl_multi_info_read)
 			   SEPARATE_ZVAL, but those create new zvals, which is already
 			   being done in add_assoc_resource */
 			Z_ADDREF_P(pz_ch);
+
+			/* we must save result to be able to read error message */
+			ch = (php_curl*)zend_fetch_resource(Z_RES_P(pz_ch), le_curl_name, le_curl);
+			SAVE_CURL_ERROR(ch, tmp_msg->data.result);
 
 			/* add_assoc_resource automatically creates a new zval to
 			   wrap the "resource" represented by the current pz_ch */
@@ -564,9 +571,20 @@ static int _php_curl_multi_setopt(php_curlm *mh, zend_long option, zval *zvalue,
 		case CURLMOPT_MAX_PIPELINE_LENGTH:
 		case CURLMOPT_MAX_TOTAL_CONNECTIONS:
 #endif
-			error = curl_multi_setopt(mh->multi, option, zval_get_long(zvalue));
+		{
+			zend_long lval = zval_get_long(zvalue);
+
+			if (option == CURLMOPT_PIPELINING && (lval & 1)) {
+#if LIBCURL_VERSION_NUM >= 0x073e00 /* 7.62.0 */
+				php_error_docref(NULL, E_WARNING, "CURLPIPE_HTTP1 is no longer supported");
+#else
+				php_error_docref(NULL, E_DEPRECATED, "CURLPIPE_HTTP1 is deprecated");
+#endif
+			}
+			error = curl_multi_setopt(mh->multi, option, lval);
 			break;
-#if LIBCURL_VERSION_NUM > 0x072D00 /* Available since 7.46.0 */
+		}
+#if LIBCURL_VERSION_NUM > 0x072D00 /* Available since 7.45.0 */
 		case CURLMOPT_PUSHFUNCTION:
 			if (mh->handlers->server_push == NULL) {
 				mh->handlers->server_push = ecalloc(1, sizeof(php_curlm_server_push));

@@ -139,7 +139,10 @@ static zend_string* php_password_get_salt(zval *unused_, size_t required_salt_le
 		case IS_LONG:
 		case IS_DOUBLE:
 		case IS_OBJECT:
-			buffer = zval_get_string(option_buffer);
+			buffer = zval_try_get_string(option_buffer);
+			if (UNEXPECTED(!buffer)) {
+				return NULL;
+			}
 			break;
 		case IS_FALSE:
 		case IS_TRUE:
@@ -493,7 +496,7 @@ const php_password_algo php_password_algo_argon2id = {
 PHP_MINIT_FUNCTION(password) /* {{{ */
 {
 	zend_hash_init(&php_password_algos, 4, NULL, ZVAL_PTR_DTOR, 1);
-	REGISTER_NULL_CONSTANT("PASSWORD_DEFAULT", CONST_CS | CONST_PERSISTENT);
+	REGISTER_STRING_CONSTANT("PASSWORD_DEFAULT", "2y", CONST_CS | CONST_PERSISTENT);
 
 	if (FAILURE == php_password_algo_register("2y", &php_password_algo_bcrypt)) {
 		return FAILURE;
@@ -517,6 +520,8 @@ PHP_MINIT_FUNCTION(password) /* {{{ */
 	REGISTER_LONG_CONSTANT("PASSWORD_ARGON2_DEFAULT_MEMORY_COST", PHP_PASSWORD_ARGON2_MEMORY_COST, CONST_CS | CONST_PERSISTENT);
 	REGISTER_LONG_CONSTANT("PASSWORD_ARGON2_DEFAULT_TIME_COST", PHP_PASSWORD_ARGON2_TIME_COST, CONST_CS | CONST_PERSISTENT);
 	REGISTER_LONG_CONSTANT("PASSWORD_ARGON2_DEFAULT_THREADS", PHP_PASSWORD_ARGON2_THREADS, CONST_CS | CONST_PERSISTENT);
+
+	REGISTER_STRING_CONSTANT("PASSWORD_ARGON2_PROVIDER", "standard", CONST_CS | CONST_PERSISTENT);
 #endif
 
 	return SUCCESS;
@@ -566,6 +571,21 @@ static const php_password_algo* php_password_algo_find_zval_ex(zval *arg, const 
 #if HAVE_ARGON2LIB
 			case 2: return &php_password_algo_argon2i;
 			case 3: return &php_password_algo_argon2id;
+#else
+			case 2:
+				{
+				zend_string *n = zend_string_init("argon2i", sizeof("argon2i")-1, 0);
+				const php_password_algo* ret = php_password_algo_find(n);
+				zend_string_release(n);
+				return ret;
+				}
+			case 3:
+				{
+				zend_string *n = zend_string_init("argon2id", sizeof("argon2id")-1, 0);
+				const php_password_algo* ret = php_password_algo_find(n);
+				zend_string_release(n);
+				return ret;
+				}
 #endif
 		}
 		return NULL;
@@ -669,7 +689,7 @@ PHP_FUNCTION(password_needs_rehash)
 		Z_PARAM_ARRAY_OR_OBJECT_HT(options)
 	ZEND_PARSE_PARAMETERS_END();
 
-	new_algo = php_password_algo_find_zval_ex(znew_algo, NULL);
+	new_algo = php_password_algo_find_zval(znew_algo);
 	if (!new_algo) {
 		/* Unknown new algorithm, never prompt to rehash. */
 		RETURN_FALSE;

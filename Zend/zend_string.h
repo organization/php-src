@@ -186,12 +186,13 @@ static zend_always_inline zend_string *zend_string_realloc(zend_string *s, size_
 			ZSTR_LEN(ret) = len;
 			zend_string_forget_hash_val(ret);
 			return ret;
-		} else {
-			GC_DELREF(s);
 		}
 	}
 	ret = zend_string_alloc(len, persistent);
 	memcpy(ZSTR_VAL(ret), ZSTR_VAL(s), MIN(len, ZSTR_LEN(s)) + 1);
+	if (!ZSTR_IS_INTERNED(s)) {
+		GC_DELREF(s);
+	}
 	return ret;
 }
 
@@ -206,12 +207,13 @@ static zend_always_inline zend_string *zend_string_extend(zend_string *s, size_t
 			ZSTR_LEN(ret) = len;
 			zend_string_forget_hash_val(ret);
 			return ret;
-		} else {
-			GC_DELREF(s);
 		}
 	}
 	ret = zend_string_alloc(len, persistent);
 	memcpy(ZSTR_VAL(ret), ZSTR_VAL(s), ZSTR_LEN(s) + 1);
+	if (!ZSTR_IS_INTERNED(s)) {
+		GC_DELREF(s);
+	}
 	return ret;
 }
 
@@ -226,12 +228,13 @@ static zend_always_inline zend_string *zend_string_truncate(zend_string *s, size
 			ZSTR_LEN(ret) = len;
 			zend_string_forget_hash_val(ret);
 			return ret;
-		} else {
-			GC_DELREF(s);
 		}
 	}
 	ret = zend_string_alloc(len, persistent);
 	memcpy(ZSTR_VAL(ret), ZSTR_VAL(s), len + 1);
+	if (!ZSTR_IS_INTERNED(s)) {
+		GC_DELREF(s);
+	}
 	return ret;
 }
 
@@ -245,12 +248,13 @@ static zend_always_inline zend_string *zend_string_safe_realloc(zend_string *s, 
 			ZSTR_LEN(ret) = (n * m) + l;
 			zend_string_forget_hash_val(ret);
 			return ret;
-		} else {
-			GC_DELREF(s);
 		}
 	}
 	ret = zend_string_safe_alloc(n, m, l, persistent);
 	memcpy(ZSTR_VAL(ret), ZSTR_VAL(s), MIN((n * m) + l, ZSTR_LEN(s)) + 1);
+	if (!ZSTR_IS_INTERNED(s)) {
+		GC_DELREF(s);
+	}
 	return ret;
 }
 
@@ -361,6 +365,69 @@ static zend_always_inline zend_ulong zend_inline_hash_func(const char *str, size
 {
 	zend_ulong hash = Z_UL(5381);
 
+#if defined(_WIN32) || defined(__i386__) || defined(__x86_64__) || defined(__aarch64__)
+	/* Version with multiplication works better on modern CPU */
+	for (; len >= 8; len -= 8, str += 8) {
+# if defined(__aarch64__) && !defined(WORDS_BIGENDIAN)
+		/* On some architectures it is beneficial to load 8 bytes at a
+		   time and extract each byte with a bit field extract instr. */
+		uint64_t chunk;
+
+		memcpy(&chunk, str, sizeof(chunk));
+		hash =
+			hash                        * 33 * 33 * 33 * 33 +
+			((chunk >> (8 * 0)) & 0xff) * 33 * 33 * 33 +
+			((chunk >> (8 * 1)) & 0xff) * 33 * 33 +
+			((chunk >> (8 * 2)) & 0xff) * 33 +
+			((chunk >> (8 * 3)) & 0xff);
+		hash =
+			hash                        * 33 * 33 * 33 * 33 +
+			((chunk >> (8 * 4)) & 0xff) * 33 * 33 * 33 +
+			((chunk >> (8 * 5)) & 0xff) * 33 * 33 +
+			((chunk >> (8 * 6)) & 0xff) * 33 +
+			((chunk >> (8 * 7)) & 0xff);
+# else
+		hash =
+			hash   * 33 * 33 * 33 * 33 +
+			str[0] * 33 * 33 * 33 +
+			str[1] * 33 * 33 +
+			str[2] * 33 +
+			str[3];
+		hash =
+			hash   * 33 * 33 * 33 * 33 +
+			str[4] * 33 * 33 * 33 +
+			str[5] * 33 * 33 +
+			str[6] * 33 +
+			str[7];
+# endif
+	}
+	if (len >= 4) {
+		hash =
+			hash   * 33 * 33 * 33 * 33 +
+			str[0] * 33 * 33 * 33 +
+			str[1] * 33 * 33 +
+			str[2] * 33 +
+			str[3];
+		len -= 4;
+		str += 4;
+	}
+	if (len >= 2) {
+		if (len > 2) {
+			hash =
+				hash   * 33 * 33 * 33 +
+				str[0] * 33 * 33 +
+				str[1] * 33 +
+				str[2];
+		} else {
+			hash =
+				hash   * 33 * 33 +
+				str[0] * 33 +
+				str[1];
+		}
+	} else if (len != 0) {
+		hash = hash * 33 + *str;
+	}
+#else
 	/* variant with the hash unrolled eight times */
 	for (; len >= 8; len -= 8) {
 		hash = ((hash << 5) + hash) + *str++;
@@ -383,6 +450,7 @@ static zend_always_inline zend_ulong zend_inline_hash_func(const char *str, size
 		case 0: break;
 EMPTY_SWITCH_DEFAULT_CASE()
 	}
+#endif
 
 	/* Hash value can't be zero, so we always set the high bit */
 #if SIZEOF_ZEND_LONG == 8
@@ -442,6 +510,7 @@ EMPTY_SWITCH_DEFAULT_CASE()
 	_(ZEND_STR_NAME,                   "name") \
 	_(ZEND_STR_ARGV,                   "argv") \
 	_(ZEND_STR_ARGC,                   "argc") \
+	_(ZEND_STR_ARRAY_CAPITALIZED,      "Array") \
 
 
 typedef enum _zend_known_string_id {

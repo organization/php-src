@@ -1,5 +1,3 @@
-dnl config.m4 for extension curl
-
 PHP_ARG_WITH([curl],
   [for cURL support],
   [AS_HELP_STRING([--with-curl],
@@ -25,15 +23,10 @@ if test "$PHP_CURL" != "no"; then
   esac
 
   if test "$CURL_SSL" = yes; then
-    AC_DEFINE([HAVE_CURL_SSL], [1], [Have cURL with  SSL support])
-
-    save_CFLAGS="$CFLAGS"
-    CFLAGS=$CURL_CFLAGS
     save_LDFLAGS="$LDFLAGS"
-    LDFLAGS=$CURL_LIBS
+    LDFLAGS="$LDFLAGS $CURL_LIBS"
 
-    AC_PROG_CPP
-    AC_MSG_CHECKING([for openssl support in libcurl])
+    AC_MSG_CHECKING([for libcurl linked against old openssl])
     AC_RUN_IFELSE([AC_LANG_SOURCE([[
 #include <strings.h>
 #include <curl/curl.h>
@@ -46,50 +39,34 @@ int main(int argc, char *argv[])
     const char *ptr = data->ssl_version;
 
     while(*ptr == ' ') ++ptr;
-    return strncasecmp(ptr, "OpenSSL", sizeof("OpenSSL")-1);
+    if (strncasecmp(ptr, "OpenSSL/1.1", sizeof("OpenSSL/1.1")-1) == 0) {
+      /* New OpenSSL version */
+      return 3;
+    }
+    if (strncasecmp(ptr, "OpenSSL", sizeof("OpenSSL")-1) == 0) {
+      /* Old OpenSSL version */
+      return 0;
+    }
+    /* Different SSL library */
+    return 2;
   }
+  /* No SSL support */
   return 1;
 }
     ]])],[
       AC_MSG_RESULT([yes])
-      AC_CHECK_HEADERS([openssl/crypto.h], [
-        AC_DEFINE([HAVE_CURL_OPENSSL], [1], [Have cURL with OpenSSL support])
-      ])
+      AC_DEFINE([HAVE_CURL_OLD_OPENSSL], [1], [Have cURL with old OpenSSL])
+      PKG_CHECK_MODULES([OPENSSL], [openssl], [
+        PHP_EVAL_LIBLINE($OPENSSL_LIBS, CURL_SHARED_LIBADD)
+        PHP_EVAL_INCLINE($OPENSSL_CFLAGS)
+        AC_CHECK_HEADERS([openssl/crypto.h])
+      ], [])
     ], [
       AC_MSG_RESULT([no])
     ], [
       AC_MSG_RESULT([no])
     ])
 
-    AC_MSG_CHECKING([for gnutls support in libcurl])
-    AC_RUN_IFELSE([AC_LANG_SOURCE([[
-#include <strings.h>
-#include <curl/curl.h>
-
-int main(int argc, char *argv[])
-{
-  curl_version_info_data *data = curl_version_info(CURLVERSION_NOW);
-
-  if (data && data->ssl_version && *data->ssl_version) {
-    const char *ptr = data->ssl_version;
-
-    while(*ptr == ' ') ++ptr;
-    return strncasecmp(ptr, "GnuTLS", sizeof("GnuTLS")-1);
-  }
-  return 1;
-}
-]])], [
-      AC_MSG_RESULT([yes])
-      AC_CHECK_HEADER([gcrypt.h], [
-        AC_DEFINE([HAVE_CURL_GNUTLS], [1], [Have cURL with GnuTLS support])
-      ])
-    ], [
-      AC_MSG_RESULT([no])
-    ], [
-      AC_MSG_RESULT([no])
-    ])
-
-    CFLAGS="$save_CFLAGS"
     LDFLAGS="$save_LDFLAGS"
   else
     AC_MSG_RESULT([no])
@@ -101,20 +78,6 @@ int main(int argc, char *argv[])
   ],[
     AC_MSG_ERROR(There is something wrong. Please check config.log for more information.)
   ],[
-    $CURL_LIBS
-  ])
-
-  PHP_CHECK_LIBRARY(curl,curl_easy_strerror,
-  [
-    AC_DEFINE(HAVE_CURL_EASY_STRERROR,1,[ ])
-  ],[],[
-    $CURL_LIBS
-  ])
-
-  PHP_CHECK_LIBRARY(curl,curl_multi_strerror,
-  [
-    AC_DEFINE(HAVE_CURL_MULTI_STRERROR,1,[ ])
-  ],[],[
     $CURL_LIBS
   ])
 

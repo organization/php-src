@@ -35,9 +35,7 @@
 #endif
 
 #if PHP_SIGCHILD
-#if HAVE_SIGNAL_H
 #include <signal.h>
-#endif
 #endif
 
 #include "php_syslog.h"
@@ -370,7 +368,7 @@ PHP_FUNCTION(mail)
 		extra_cmd = php_escape_shell_cmd(ZSTR_VAL(extra_cmd));
 	}
 
-	if (php_mail(to_r, subject_r, message, str_headers ? ZSTR_VAL(str_headers) : NULL, extra_cmd ? ZSTR_VAL(extra_cmd) : NULL)) {
+	if (php_mail(to_r, subject_r, message, str_headers && ZSTR_LEN(str_headers) ? ZSTR_VAL(str_headers) : NULL, extra_cmd ? ZSTR_VAL(extra_cmd) : NULL)) {
 		RETVAL_TRUE;
 	} else {
 		RETVAL_FALSE;

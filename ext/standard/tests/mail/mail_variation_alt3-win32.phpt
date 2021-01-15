@@ -18,7 +18,6 @@ max_execution_time = 120
  * Alias to functions:
  */
 
-error_reporting(E_ALL & ~E_STRICT);
 ini_set("SMTP", "localhost");
 ini_set("smtp_port", 25);
 
@@ -87,5 +86,5 @@ imap_close($imap_stream, CL_EXPUNGE);
 --EXPECTF--
 *** Testing mail() : basic functionality ***
 
-Warning: mail(): "sendmail_from" not set in php.ini or custom "From:" header missing in %s on line %d
+Warning: mail(): Bad Message Return Path in %s on line %d
 TEST COMPLETED : Unable to send test email

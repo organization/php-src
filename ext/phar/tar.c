@@ -181,9 +181,17 @@ static int phar_tar_process_metadata(phar_entry_info *entry, php_stream *fp) /* 
 	}
 
 	if (entry->filename_len == sizeof(".phar/.metadata.bin")-1 && !memcmp(entry->filename, ".phar/.metadata.bin", sizeof(".phar/.metadata.bin")-1)) {
+		if (Z_TYPE(entry->phar->metadata) != IS_UNDEF) {
+			efree(metadata);
+			return FAILURE;
+		}
 		entry->phar->metadata = entry->metadata;
 		ZVAL_UNDEF(&entry->metadata);
 	} else if (entry->filename_len >= sizeof(".phar/.metadata/") + sizeof("/.metadata.bin") - 1 && NULL != (mentry = zend_hash_str_find_ptr(&(entry->phar->manifest), entry->filename + sizeof(".phar/.metadata/") - 1, entry->filename_len - (sizeof("/.metadata.bin") - 1 + sizeof(".phar/.metadata/") - 1)))) {
+		if (Z_TYPE(mentry->metadata) != IS_UNDEF) {
+			efree(metadata);
+			return FAILURE;
+		}
 		/* transfer this metadata to the entry it refers */
 		mentry->metadata = entry->metadata;
 		ZVAL_UNDEF(&entry->metadata);
@@ -262,6 +270,15 @@ int phar_parse_tarfile(php_stream* fp, char *fname, size_t fname_len, char *alia
 		}
 		memset(hdr->checksum, ' ', sizeof(hdr->checksum));
 		sum2 = phar_tar_checksum(buf, old?sizeof(old_tar_header):sizeof(tar_header));
+
+		if (old && sum2 != sum1) {
+			uint32_t sum3 = phar_tar_checksum(buf, sizeof(tar_header));
+			if (sum3 == sum1) {
+				/* apparently a broken tar which is in ustar format w/o setting the ustar marker */
+				sum2 = sum3;
+				old = 0;
+			}
+		}
 
 		size = entry.uncompressed_filesize = entry.compressed_filesize =
 			phar_tar_number(hdr->size, sizeof(hdr->size));
@@ -772,9 +789,9 @@ static int phar_tar_writeheaders_int(phar_entry_info *entry, void *argument) /* 
 		}
 	}
 
-	strncpy(header.magic, "ustar", sizeof("ustar")-1);
-	strncpy(header.version, "00", sizeof("00")-1);
-	strncpy(header.checksum, "        ", sizeof("        ")-1);
+	memcpy(header.magic, "ustar", sizeof("ustar")-1);
+	memcpy(header.version, "00", sizeof("00")-1);
+	memcpy(header.checksum, "        ", sizeof("        ")-1);
 	entry->crc32 = phar_tar_checksum((char *)&header, sizeof(header));
 
 	if (FAILURE == phar_tar_octal(header.checksum, entry->crc32, sizeof(header.checksum)-1)) {

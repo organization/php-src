@@ -20,7 +20,7 @@
 #ifndef ZEND_H
 #define ZEND_H
 
-#define ZEND_VERSION "3.4.0-dev"
+#define ZEND_VERSION "3.4.0"
 
 #define ZEND_ENGINE_3
 
@@ -232,7 +232,7 @@ void zend_register_standard_ini_entries(void);
 int zend_post_startup(void);
 void zend_set_utility_values(zend_utility_values *utility_values);
 
-ZEND_API ZEND_COLD void _zend_bailout(const char *filename, uint32_t lineno);
+ZEND_API ZEND_COLD ZEND_NORETURN void _zend_bailout(const char *filename, uint32_t lineno);
 
 ZEND_API size_t zend_vspprintf(char **pbuf, size_t max_len, const char *format, va_list ap);
 ZEND_API size_t zend_spprintf(char **message, size_t max_len, const char *format, ...) ZEND_ATTRIBUTE_FORMAT(printf, 3, 4);
@@ -291,6 +291,9 @@ extern ZEND_API zend_string *(*zend_resolve_path)(const char *filename, size_t f
 /* These two callbacks are especially for opcache */
 extern ZEND_API int (*zend_post_startup_cb)(void);
 extern ZEND_API void (*zend_post_shutdown_cb)(void);
+
+/* Callback for loading of not preloaded part of the script */
+extern ZEND_API int (*zend_preload_autoload)(zend_string *filename);
 
 ZEND_API ZEND_COLD void zend_error(int type, const char *format, ...) ZEND_ATTRIBUTE_FORMAT(printf, 2, 3);
 ZEND_API ZEND_COLD ZEND_NORETURN void zend_error_noreturn(int type, const char *format, ...) ZEND_ATTRIBUTE_FORMAT(printf, 2, 3);

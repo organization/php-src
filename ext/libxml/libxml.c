@@ -355,6 +355,10 @@ static void *php_libxml_streams_IO_open_wrapper(const char *filename, const char
 	context = php_stream_context_from_zval(Z_ISUNDEF(LIBXML(stream_context))? NULL : &LIBXML(stream_context), 0);
 
 	ret_val = php_stream_open_wrapper_ex(path_to_open, (char *)mode, REPORT_ERRORS, NULL, context);
+	if (ret_val) {
+		/* Prevent from closing this by fclose() */
+		((php_stream*)ret_val)->flags |= PHP_STREAM_FLAG_NO_FCLOSE;
+	}
 	if (isescaped) {
 		xmlFree(resolved_path);
 	}
@@ -378,9 +382,6 @@ static int php_libxml_streams_IO_read(void *context, char *buffer, int len)
 
 static int php_libxml_streams_IO_write(void *context, const char *buffer, int len)
 {
-	if (CG(unclean_shutdown)) {
-		return -1;
-	}
 	return php_stream_write((php_stream*)context, buffer, len);
 }
 
@@ -662,8 +663,9 @@ is_string:
 			}
 		} else if (Z_TYPE(retval) != IS_NULL) {
 			/* retval not string nor resource nor null; convert to string */
-			convert_to_string(&retval);
-			goto is_string;
+			if (try_convert_to_string(&retval)) {
+				goto is_string;
+			}
 		} /* else is null; don't try anything */
 	}
 
@@ -747,7 +749,9 @@ PHP_LIBXML_API void php_libxml_initialize(void)
 {
 	if (!_php_libxml_initialized) {
 		/* we should be the only one's to ever init!! */
+		ZEND_IGNORE_LEAKS_BEGIN();
 		xmlInitParser();
+		ZEND_IGNORE_LEAKS_END();
 
 		_php_libxml_default_entity_loader = xmlGetExternalEntityLoader();
 		xmlSetExternalEntityLoader(_php_libxml_pre_ext_ent_loader);
@@ -870,13 +874,14 @@ static PHP_RINIT_FUNCTION(libxml)
 		xmlSetGenericErrorFunc(NULL, php_libxml_error_handler);
 		xmlParserInputBufferCreateFilenameDefault(php_libxml_input_buffer_create_filename);
 		xmlOutputBufferCreateFilenameDefault(php_libxml_output_buffer_create_filename);
-
-		/* Enable the entity loader by default. This ensures that
-		 * other threads/requests that might have disabled the loader
-		 * do not affect the current request.
-		 */
-		LIBXML(entity_loader_disabled) = 0;
 	}
+
+	/* Enable the entity loader by default. This ensures that
+	 * other threads/requests that might have disabled the loader
+	 * do not affect the current request.
+	 */
+	LIBXML(entity_loader_disabled) = 0;
+
 	return SUCCESS;
 }
 
@@ -1060,7 +1065,7 @@ static PHP_FUNCTION(libxml_get_errors)
 			error = zend_llist_get_next(LIBXML(error_list));
 		}
 	} else {
-		ZVAL_EMPTY_ARRAY(return_value);
+		RETURN_EMPTY_ARRAY();
 	}
 }
 /* }}} */

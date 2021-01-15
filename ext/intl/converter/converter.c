@@ -63,9 +63,6 @@ static inline void php_converter_throw_failure(php_converter_object *objval, UEr
 
 /* {{{ php_converter_default_callback */
 static void php_converter_default_callback(zval *return_value, zval *zobj, zend_long reason, zval *error) {
-	ZVAL_DEREF(error);
-	zval_ptr_dtor(error);
-	ZVAL_LONG(error, U_ZERO_ERROR);
 	/* Basic functionality so children can call parent::toUCallback() */
 	switch (reason) {
 		case UCNV_UNASSIGNED:
@@ -81,7 +78,7 @@ static void php_converter_default_callback(zval *return_value, zval *zobj, zend_
 				chars[0] = 0x1A;
 				chars[1] = 0;
 				chars_len = 1;
-                ZVAL_LONG(error, U_INVALID_STATE_ERROR);
+				ZEND_TRY_ASSIGN_REF_LONG(error, U_INVALID_STATE_ERROR);
                 RETVAL_STRINGL(chars, chars_len);
                 return;
             }
@@ -99,8 +96,8 @@ static void php_converter_default_callback(zval *return_value, zval *zobj, zend_
 				chars[0] = 0x1A;
 				chars[1] = 0;
 				chars_len = 1;
-            	ZVAL_LONG(error, uerror);
 			}
+			ZEND_TRY_ASSIGN_REF_LONG(error, uerror);
 			RETVAL_STRINGL(chars, chars_len);
 		}
 	}
@@ -231,8 +228,16 @@ static void php_converter_to_u_callback(const void *context,
 	zval zargs[4];
 
 	ZVAL_LONG(&zargs[0], reason);
-	ZVAL_STRINGL(&zargs[1], args->source, args->sourceLimit - args->source);
-	ZVAL_STRINGL(&zargs[2], codeUnits, length);
+	if (args->source) {
+		ZVAL_STRINGL(&zargs[1], args->source, args->sourceLimit - args->source);
+	} else {
+		ZVAL_EMPTY_STRING(&zargs[1]);
+	}
+	if (codeUnits) {
+		ZVAL_STRINGL(&zargs[2], codeUnits, length);
+	} else {
+		ZVAL_EMPTY_STRING(&zargs[2]);
+	}
 	ZVAL_LONG(&zargs[3], *pErrorCode);
 
 	objval->to_cb.param_count    = 4;
@@ -820,7 +825,7 @@ static PHP_METHOD(UConverter, transcode) {
 
 		if (U_SUCCESS(error) &&
 			(ret = php_converter_do_convert(dest_cnv, src_cnv, str, str_len, NULL)) != NULL) {
-			RETURN_NEW_STR(ret);
+			RETVAL_NEW_STR(ret);
 		}
 
 		if (U_FAILURE(error)) {

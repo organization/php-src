@@ -103,8 +103,7 @@ int _pdo_mysql_error(pdo_dbh_t *dbh, pdo_stmt_t *stmt, const char *file, int lin
 
 	if (!dbh->methods) {
 		PDO_DBG_INF("Throwing exception");
-		zend_throw_exception_ex(php_pdo_get_exception(), einfo->errcode, "SQLSTATE[%s] [%d] %s",
-				*pdo_err, einfo->errcode, einfo->errmsg);
+		pdo_throw_exception(einfo->errcode, einfo->errmsg, pdo_err);
 	}
 
 	PDO_DBG_RETURN(einfo->errcode);
@@ -204,18 +203,17 @@ static int mysql_handle_preparer(pdo_dbh_t *dbh, const char *sql, size_t sql_len
 	}
 
 	if (mysql_stmt_prepare(S->stmt, sql, sql_len)) {
-		/* TODO: might need to pull statement specific info here? */
-		/* if the query isn't supported by the protocol, fallback to emulation */
-		if (mysql_errno(H->server) == 1295) {
-			if (nsql) {
-				efree(nsql);
-			}
-			goto fallback;
-		}
-		pdo_mysql_error(dbh);
 		if (nsql) {
 			efree(nsql);
 		}
+		/* TODO: might need to pull statement specific info here? */
+		/* if the query isn't supported by the protocol, fallback to emulation */
+		if (mysql_errno(H->server) == 1295) {
+			mysql_stmt_close(S->stmt);
+			S->stmt = NULL;
+			goto fallback;
+		}
+		pdo_mysql_error(dbh);
 		PDO_DBG_RETURN(0);
 	}
 	if (nsql) {
@@ -270,7 +268,8 @@ static zend_long mysql_handle_doer(pdo_dbh_t *dbh, const char *sql, size_t sql_l
 			MYSQL_RES* result;
 			while (mysql_more_results(H->server)) {
 				if (mysql_next_result(H->server)) {
-					PDO_DBG_RETURN(1);
+					pdo_mysql_error(dbh);
+					PDO_DBG_RETURN(-1);
 				}
 				result = mysql_store_result(H->server);
 				if (result) {
@@ -294,6 +293,11 @@ static char *pdo_mysql_last_insert_id(pdo_dbh_t *dbh, const char *name, size_t *
 }
 /* }}} */
 
+#if defined(PDO_USE_MYSQLND) || MYSQL_VERSION_ID < 50707 || defined(MARIADB_BASE_VERSION)
+# define mysql_real_escape_string_quote(mysql, to, from, length, quote) \
+	mysql_real_escape_string(mysql, to, from, length)
+#endif
+
 /* {{{ mysql_handle_quoter */
 static int mysql_handle_quoter(pdo_dbh_t *dbh, const char *unquoted, size_t unquotedlen, char **quoted, size_t *quotedlen, enum pdo_param_type paramtype )
 {
@@ -316,13 +320,13 @@ static int mysql_handle_quoter(pdo_dbh_t *dbh, const char *unquoted, size_t unqu
 	*quoted = safe_emalloc(2, unquotedlen, 3 + (use_national_character_set ? 1 : 0));
 
 	if (use_national_character_set) {
-		*quotedlen = mysql_real_escape_string(H->server, *quoted + 2, unquoted, unquotedlen);
+		*quotedlen = mysql_real_escape_string_quote(H->server, *quoted + 2, unquoted, unquotedlen, '\'');
 		(*quoted)[0] = 'N';
 		(*quoted)[1] = '\'';
 
 		++*quotedlen; /* N prefix */
 	} else {
-		*quotedlen = mysql_real_escape_string(H->server, *quoted + 1, unquoted, unquotedlen);
+		*quotedlen = mysql_real_escape_string_quote(H->server, *quoted + 1, unquoted, unquotedlen, '\'');
 		(*quoted)[0] = '\'';
 	}
 
@@ -347,7 +351,11 @@ static int mysql_handle_commit(pdo_dbh_t *dbh)
 {
 	PDO_DBG_ENTER("mysql_handle_commit");
 	PDO_DBG_INF_FMT("dbh=%p", dbh);
-	PDO_DBG_RETURN(0 == mysql_commit(((pdo_mysql_db_handle *)dbh->driver_data)->server));
+	if (mysql_commit(((pdo_mysql_db_handle *)dbh->driver_data)->server)) {
+		pdo_mysql_error(dbh);
+		PDO_DBG_RETURN(0);
+	}
+	PDO_DBG_RETURN(1);
 }
 /* }}} */
 
@@ -356,7 +364,11 @@ static int mysql_handle_rollback(pdo_dbh_t *dbh)
 {
 	PDO_DBG_ENTER("mysql_handle_rollback");
 	PDO_DBG_INF_FMT("dbh=%p", dbh);
-	PDO_DBG_RETURN(0 <= mysql_rollback(((pdo_mysql_db_handle *)dbh->driver_data)->server));
+	if (mysql_rollback(((pdo_mysql_db_handle *)dbh->driver_data)->server)) {
+		pdo_mysql_error(dbh);
+		PDO_DBG_RETURN(0);
+	}
+	PDO_DBG_RETURN(1);
 }
 /* }}} */
 
@@ -366,7 +378,11 @@ static inline int mysql_handle_autocommit(pdo_dbh_t *dbh)
 	PDO_DBG_ENTER("mysql_handle_autocommit");
 	PDO_DBG_INF_FMT("dbh=%p", dbh);
 	PDO_DBG_INF_FMT("dbh->autocommit=%d", dbh->auto_commit);
-	PDO_DBG_RETURN(0 <= mysql_autocommit(((pdo_mysql_db_handle *)dbh->driver_data)->server, dbh->auto_commit));
+	if (mysql_autocommit(((pdo_mysql_db_handle *)dbh->driver_data)->server, dbh->auto_commit)) {
+		pdo_mysql_error(dbh);
+		PDO_DBG_RETURN(0);
+	}
+	PDO_DBG_RETURN(1);
 }
 /* }}} */
 
@@ -383,7 +399,9 @@ static int pdo_mysql_set_attribute(pdo_dbh_t *dbh, zend_long attr, zval *val)
 			/* ignore if the new value equals the old one */
 			if (dbh->auto_commit ^ bval) {
 				dbh->auto_commit = bval;
-				mysql_handle_autocommit(dbh);
+				if (!mysql_handle_autocommit(dbh)) {
+					PDO_DBG_RETURN(0);
+				}
 			}
 			PDO_DBG_RETURN(1);
 
@@ -568,9 +586,11 @@ static int pdo_mysql_handle_factory(pdo_dbh_t *dbh, zval *driver_options)
 	struct pdo_data_src_parser vars[] = {
 		{ "charset",  NULL,	0 },
 		{ "dbname",   "",	0 },
-		{ "host",   "localhost",	0 },
-		{ "port",   "3306",	0 },
+		{ "host",     "localhost",	0 },
+		{ "port",     "3306",	0 },
 		{ "unix_socket",  PDO_DEFAULT_MYSQL_UNIX_ADDR,	0 },
+		{ "user",     NULL,	0 },
+		{ "password", NULL,	0 },
 	};
 	int connect_opts = 0
 #ifdef CLIENT_MULTI_RESULTS
@@ -596,7 +616,7 @@ static int pdo_mysql_handle_factory(pdo_dbh_t *dbh, zval *driver_options)
 	PDO_DBG_INF("multi results");
 #endif
 
-	php_pdo_parse_data_source(dbh->data_source, dbh->data_source_len, vars, 5);
+	php_pdo_parse_data_source(dbh->data_source, dbh->data_source_len, vars, 7);
 
 	H = pecalloc(1, sizeof(pdo_mysql_db_handle), dbh->is_persistent);
 
@@ -618,6 +638,13 @@ static int pdo_mysql_handle_factory(pdo_dbh_t *dbh, zval *driver_options)
 
 	dbh->driver_data = H;
 
+	dbh->skip_param_evt =
+		1 << PDO_PARAM_EVT_FREE |
+		1 << PDO_PARAM_EVT_EXEC_POST |
+		1 << PDO_PARAM_EVT_FETCH_PRE |
+		1 << PDO_PARAM_EVT_FETCH_POST |
+		1 << PDO_PARAM_EVT_NORMALIZE;
+
 #ifndef PDO_USE_MYSQLND
 	H->max_buffer_size = 1024*1024;
 #endif
@@ -628,7 +655,7 @@ static int pdo_mysql_handle_factory(pdo_dbh_t *dbh, zval *driver_options)
 	/* handle MySQL options */
 	if (driver_options) {
 		zend_long connect_timeout = pdo_attr_lval(driver_options, PDO_ATTR_TIMEOUT, 30);
-		zend_long local_infile = pdo_attr_lval(driver_options, PDO_MYSQL_ATTR_LOCAL_INFILE, 0);
+		unsigned int local_infile = (unsigned int) pdo_attr_lval(driver_options, PDO_MYSQL_ATTR_LOCAL_INFILE, 0);
 		zend_string *init_cmd = NULL;
 #ifndef PDO_USE_MYSQLND
 		zend_string *default_file = NULL, *default_group = NULL;
@@ -779,7 +806,7 @@ static int pdo_mysql_handle_factory(pdo_dbh_t *dbh, zval *driver_options)
 	} else {
 #if defined(MYSQL_OPT_LOCAL_INFILE) || defined(PDO_USE_MYSQLND)
 		// in case there are no driver options disable 'local infile' explicitly
-		zend_long local_infile = 0;
+		unsigned int local_infile = 0;
 		if (mysql_options(H->server, MYSQL_OPT_LOCAL_INFILE, (const char *)&local_infile)) {
 			pdo_mysql_error(dbh);
 			goto cleanup;
@@ -806,6 +833,14 @@ static int pdo_mysql_handle_factory(pdo_dbh_t *dbh, zval *driver_options)
 	if (vars[2].optval && !strcmp("localhost", vars[2].optval)) {
 #endif
 		unix_socket = vars[4].optval;
+	}
+
+	if (!dbh->username && vars[5].optval) {
+		dbh->username = pestrdup(vars[5].optval, dbh->is_persistent);
+	}
+
+	if (!dbh->password && vars[6].optval) {
+		dbh->password = pestrdup(vars[6].optval, dbh->is_persistent);
 	}
 
 	/* TODO: - Check zval cache + ZTS */

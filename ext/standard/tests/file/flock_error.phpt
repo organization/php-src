@@ -1,5 +1,7 @@
 --TEST--
 Test flock() function: Error conditions
+--CONFLICTS--
+obscure_filename
 --FILE--
 <?php
 /*
@@ -10,7 +12,7 @@ Description: PHP supports a portable way of locking complete files
 
 echo "*** Testing error conditions ***\n";
 
-$file = __DIR__."/flock.tmp";
+$file = preg_replace("~\.phpt?$~", '.tmp', __FILE__);
 $fp = fopen($file, "w");
 
 /* array of operatons */
@@ -47,12 +49,10 @@ var_dump(flock($fp));
 
 /* No.of args greater than expected */
 var_dump(flock($fp, "", $var, ""));
-
-echo "\n*** Done ***\n";
 ?>
 --CLEAN--
 <?php
-$file = __DIR__."/flock.tmp";
+$file = __DIR__."/flock_error.tmp";
 unlink($file);
 ?>
 --EXPECTF--
@@ -108,5 +108,3 @@ NULL
 
 Warning: flock() expects at most 3 parameters, 4 given in %s on line %d
 NULL
-
-*** Done ***

@@ -159,17 +159,20 @@ static zend_function *zend_test_class_method_get(zend_object **object, zend_stri
 /* }}} */
 
 static zend_function *zend_test_class_static_method_get(zend_class_entry *ce, zend_string *name) /* {{{ */ {
-	zend_internal_function *fptr = emalloc(sizeof(zend_internal_function));
-	fptr->type = ZEND_OVERLOADED_FUNCTION;
-	fptr->num_args = 1;
-	fptr->arg_info = NULL;
-	fptr->scope = ce;
-	fptr->fn_flags = ZEND_ACC_CALL_VIA_HANDLER|ZEND_ACC_STATIC;
-	fptr->function_name = name;
-	fptr->handler = ZEND_FN(zend_test_func);
-	zend_set_function_arg_flags((zend_function*)fptr);
+	if (zend_string_equals_literal_ci(name, "test")) {
+		zend_internal_function *fptr = emalloc(sizeof(zend_internal_function));
+		fptr->type = ZEND_OVERLOADED_FUNCTION;
+		fptr->num_args = 1;
+		fptr->arg_info = NULL;
+		fptr->scope = ce;
+		fptr->fn_flags = ZEND_ACC_CALL_VIA_HANDLER|ZEND_ACC_STATIC;
+		fptr->function_name = name;
+		fptr->handler = ZEND_FN(zend_test_func);
+		zend_set_function_arg_flags((zend_function*)fptr);
 
-	return (zend_function*)fptr;
+		return (zend_function*)fptr;
+	}
+	return zend_std_get_static_method(ce, name, NULL);
 }
 /* }}} */
 
@@ -179,10 +182,21 @@ static int zend_test_class_call_method(zend_string *method, zend_object *object,
 }
 /* }}} */
 
+/* Internal function returns bool, we return int. */
+static ZEND_METHOD(_ZendTestClass, is_object) /* {{{ */ {
+	RETURN_LONG(42);
+}
+/* }}} */
+
 static ZEND_METHOD(_ZendTestTrait, testMethod) /* {{{ */ {
 	RETURN_TRUE;
 }
 /* }}} */
+
+static const zend_function_entry zend_test_class_methods[] = {
+	ZEND_ME(_ZendTestClass, is_object, NULL, ZEND_ACC_PUBLIC|ZEND_ACC_STATIC)
+	ZEND_FE_END
+};
 
 static const zend_function_entry zend_test_trait_methods[] = {
     ZEND_ME(_ZendTestTrait, testMethod, NULL, ZEND_ACC_PUBLIC)
@@ -196,7 +210,7 @@ PHP_MINIT_FUNCTION(zend_test)
 	INIT_CLASS_ENTRY(class_entry, "_ZendTestInterface", NULL);
 	zend_test_interface = zend_register_internal_interface(&class_entry);
 	zend_declare_class_constant_long(zend_test_interface, ZEND_STRL("DUMMY"), 0);
-	INIT_CLASS_ENTRY(class_entry, "_ZendTestClass", NULL);
+	INIT_CLASS_ENTRY(class_entry, "_ZendTestClass", zend_test_class_methods);
 	zend_test_class = zend_register_internal_class_ex(&class_entry, NULL);
 	zend_class_implements(zend_test_class, 1, zend_test_interface);
 	zend_test_class->create_object = zend_test_class_new;
@@ -305,3 +319,26 @@ ZEND_TSRMLS_CACHE_DEFINE()
 #endif
 ZEND_GET_MODULE(zend_test)
 #endif
+
+struct bug79096 bug79096(void)
+{
+  struct bug79096 b;
+
+  b.a = 1;
+  b.b = 1;
+  return b;
+}
+
+void bug79532(off_t *array, size_t elems)
+{
+	int i;
+	for (i = 0; i < elems; i++) {
+		array[i] = i;
+	}
+}
+
+PHP_ZEND_TEST_API int *(*bug79177_cb)(void);
+void bug79177(void)
+{
+	bug79177_cb();
+}

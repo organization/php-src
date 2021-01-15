@@ -258,7 +258,11 @@ long_dim:
 			name = NULL;
 		} else {
 			if (Z_TYPE_P(member) != IS_STRING) {
-				ZVAL_STR(&tmp_zv, zval_get_string_func(member));
+				zend_string *str = zval_try_get_string_func(member);
+				if (UNEXPECTED(!str)) {
+					return &EG(uninitialized_zval);
+				}
+				ZVAL_STR(&tmp_zv, str);
 				member = &tmp_zv;
 			}
 			name = Z_STRVAL_P(member);
@@ -356,7 +360,7 @@ long_dim:
 	}
 
 	if (Z_ISUNDEF_P(rv)) {
-		ZVAL_COPY_VALUE(rv, &EG(uninitialized_zval));
+		ZVAL_NULL(rv);
 	}
 
 	return rv;
@@ -454,7 +458,11 @@ long_dim:
 			}
 		} else {
 			if (Z_TYPE_P(member) != IS_STRING) {
-				trim_str = zval_get_string_func(member);
+				trim_str = zval_try_get_string_func(member);
+				if (UNEXPECTED(!trim_str)) {
+					return &EG(error_zval);
+				}
+
 				ZVAL_STR(&tmp_zv, php_trim(trim_str, NULL, 0, 3));
 				zend_string_release_ex(trim_str, 0);
 				member = &tmp_zv;
@@ -672,10 +680,12 @@ static zval *sxe_property_get_adr(zval *object, zval *member, int fetch_type, vo
 	char           *name;
 	SXE_ITER        type;
 
-	sxe = Z_SXEOBJ_P(object);
+	if (!try_convert_to_string(member)) {
+		return NULL;
+	}
 
+	sxe = Z_SXEOBJ_P(object);
 	GET_NODE(sxe, node);
-	convert_to_string(member);
 	name = Z_STRVAL_P(member);
 	node = sxe_get_element_by_name(sxe, node, &name, &type);
 	if (node) {
@@ -711,7 +721,11 @@ static int sxe_prop_dim_exists(zval *object, zval *member, int check_empty, zend
 	zval            tmp_zv;
 
 	if (Z_TYPE_P(member) != IS_STRING && Z_TYPE_P(member) != IS_LONG) {
-		ZVAL_STR(&tmp_zv, zval_get_string_func(member));
+		zend_string *str = zval_try_get_string_func(member);
+		if (UNEXPECTED(!str)) {
+			return 0;
+		}
+		ZVAL_STR(&tmp_zv, str);
 		member = &tmp_zv;
 	}
 
@@ -830,7 +844,11 @@ static void sxe_prop_dim_delete(zval *object, zval *member, zend_bool elements, 
 	int             test = 0;
 
 	if (Z_TYPE_P(member) != IS_STRING && Z_TYPE_P(member) != IS_LONG) {
-		ZVAL_STR(&tmp_zv, zval_get_string_func(member));
+		zend_string *str = zval_try_get_string_func(member);
+		if (UNEXPECTED(!str)) {
+			return;
+		}
+		ZVAL_STR(&tmp_zv, str);
 		member = &tmp_zv;
 	}
 
@@ -1016,6 +1034,7 @@ static int sxe_prop_is_empty(zval *object) /* {{{ */
 	zval             iter_data;
 	int              test;
 	int              is_empty;
+	int              use_iter = 0;
 
 	sxe = Z_SXEOBJ_P(object);
 
@@ -1052,6 +1071,7 @@ static int sxe_prop_is_empty(zval *object) /* {{{ */
 				ZVAL_COPY_VALUE(&iter_data, &sxe->iter.data);
 				ZVAL_UNDEF(&sxe->iter.data);
 				node = php_sxe_reset_iterator(sxe, 0);
+				use_iter = 1;
 			}
 		}
 
@@ -1080,7 +1100,7 @@ static int sxe_prop_is_empty(zval *object) /* {{{ */
 			is_empty = 0;
 			break;
 next_iter:
-			if (!Z_ISUNDEF(iter_data)) {
+			if (use_iter) {
 				node = php_sxe_iterator_fetch(sxe, node->next, 0);
 			} else {
 				node = node->next;
@@ -1088,7 +1108,7 @@ next_iter:
 		}
 	}
 
-	if (!Z_ISUNDEF(iter_data)) {
+	if (use_iter) {
 		if (!Z_ISUNDEF(sxe->iter.data)) {
 			zval_ptr_dtor(&sxe->iter.data);
 		}
@@ -1177,7 +1197,7 @@ static HashTable *sxe_get_prop_hash(zval *object, int is_debug) /* {{{ */
 		}
 
 		while (node) {
-			if (node->children != NULL || node->prev != NULL || node->next != NULL) {
+			if (node->children != NULL || node->prev != NULL || node->next != NULL || xmlIsBlankNode(node)) {
 				SKIP_TEXT(node);
 			} else {
 				if (node->type == XML_TEXT_NODE) {
@@ -1358,7 +1378,7 @@ SXE_METHOD(xpath)
 			}
 		}
 	} else {
-		ZVAL_EMPTY_ARRAY(return_value);
+		RETVAL_EMPTY_ARRAY();
 	}
 
 	xmlXPathFreeObject(retval);
@@ -2395,7 +2415,8 @@ zend_object_iterator *php_sxe_get_iterator(zend_class_entry *ce, zval *object, i
 	iterator = emalloc(sizeof(php_sxe_iterator));
 	zend_iterator_init(&iterator->intern);
 
-	ZVAL_COPY(&iterator->intern.data, object);
+	Z_ADDREF_P(object);
+	ZVAL_OBJ(&iterator->intern.data, Z_OBJ_P(object));
 	iterator->intern.funcs = &php_sxe_iterator_funcs;
 	iterator->sxe = Z_SXEOBJ_P(object);
 
@@ -2683,7 +2704,7 @@ PHP_MINIT_FUNCTION(simplexml)
 	sxe.create_object = sxe_object_new;
 	sxe_class_entry = zend_register_internal_class(&sxe);
 	sxe_class_entry->get_iterator = php_sxe_get_iterator;
-	zend_class_implements(sxe_class_entry, 1, zend_ce_traversable);
+	zend_class_implements(sxe_class_entry, 2, zend_ce_traversable, zend_ce_countable);
 
 	memcpy(&sxe_object_handlers, &std_object_handlers, sizeof(zend_object_handlers));
 	sxe_object_handlers.offset = XtOffsetOf(php_sxe_object, zo);

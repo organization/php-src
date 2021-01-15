@@ -45,13 +45,9 @@
 # include <unistd.h>
 #endif
 
-#if HAVE_SIGNAL_H
-# include <signal.h>
-#endif
+#include <signal.h>
 
-#if HAVE_SETLOCALE
-# include <locale.h>
-#endif
+#include <locale.h>
 
 #if HAVE_SYS_TYPES_H
 # include <sys/types.h>
@@ -785,7 +781,7 @@ static void sapi_cgi_log_message(char *message, int syslog_type_int)
 
 /* {{{ php_cgi_ini_activate_user_config
  */
-static void php_cgi_ini_activate_user_config(char *path, size_t path_len, const char *doc_root, size_t doc_root_len, int start)
+static void php_cgi_ini_activate_user_config(char *path, size_t path_len, const char *doc_root, size_t doc_root_len)
 {
 	user_config_cache_entry *new_entry, *entry;
 	time_t request_time = (time_t)sapi_get_request_time();
@@ -838,8 +834,12 @@ static void php_cgi_ini_activate_user_config(char *path, size_t path_len, const 
 #else
 		if (strncmp(s1, s2, s_len) == 0) {
 #endif
-			char *ptr = s2 + start;  /* start is the point where doc_root ends! */
+			char *ptr = s2 + doc_root_len;
+#ifdef PHP_WIN32
+			while ((ptr = strpbrk(ptr, "\\/")) != NULL) {
+#else
 			while ((ptr = strchr(ptr, DEFAULT_SLASH)) != NULL) {
+#endif
 				*ptr = 0;
 				php_parse_user_ini_file(path, PG(user_ini_filename), entry->user_config);
 				*ptr = '/';
@@ -934,7 +934,7 @@ static int sapi_cgi_activate(void)
 				doc_root = estrndup(doc_root, doc_root_len);
 				zend_str_tolower(doc_root, doc_root_len);
 #endif
-				php_cgi_ini_activate_user_config(path, path_len, doc_root, doc_root_len, (doc_root_len > 0 && (doc_root_len - 1)));
+				php_cgi_ini_activate_user_config(path, path_len, doc_root, doc_root_len);
 
 #ifdef PHP_WIN32
 				efree(doc_root);
@@ -1734,7 +1734,7 @@ static zend_module_entry cgi_module_entry = {
 	NULL,
 	NULL,
 	PHP_MINFO(cgi),
-	NO_VERSION_YET,
+	PHP_VERSION,
 	STANDARD_MODULE_PROPERTIES
 };
 
@@ -1779,7 +1779,6 @@ int main(int argc, char *argv[])
 	char *decoded_query_string;
 	int skip_getopt = 0;
 
-#ifdef HAVE_SIGNAL_H
 #if defined(SIGPIPE) && defined(SIG_IGN)
 	signal(SIGPIPE, SIG_IGN); /* ignore SIGPIPE in standalone mode so
 								that sockets created via fsockopen()
@@ -1787,7 +1786,6 @@ int main(int argc, char *argv[])
 								closes it.  in apache|apxs mode apache
 								does that for us!  thies@thieso.net
 								20000419 */
-#endif
 #endif
 
 #ifdef ZTS
@@ -1923,6 +1921,7 @@ int main(int argc, char *argv[])
 #ifdef ZTS
 		tsrm_shutdown();
 #endif
+		free(bindpath);
 		return FAILURE;
 	}
 
@@ -1962,6 +1961,7 @@ consult the installation file that came with this distribution, or visit \n\
 			 */
 			tsrm_shutdown();
 #endif
+			free(bindpath);
 			return FAILURE;
 		}
 	}
@@ -2286,6 +2286,7 @@ parent_loop_end:
 					break;
 				case 'h':
 				case '?':
+				case PHP_GETOPT_INVALID_ARG:
 					if (request) {
 						fcgi_destroy_request(request);
 					}
@@ -2295,6 +2296,9 @@ parent_loop_end:
 					php_cgi_usage(argv[0]);
 					php_output_end_all();
 					exit_status = 0;
+					if (c == PHP_GETOPT_INVALID_ARG) {
+						exit_status = 1;
+					}
 					goto out;
 			}
 		}
@@ -2345,6 +2349,7 @@ parent_loop_end:
 							if (php_request_startup() == FAILURE) {
 								SG(server_context) = NULL;
 								php_module_shutdown();
+								free(bindpath);
 								return FAILURE;
 							}
 							if (no_headers) {
@@ -2389,6 +2394,7 @@ parent_loop_end:
 							if (php_request_startup() == FAILURE) {
 								SG(server_context) = NULL;
 								php_module_shutdown();
+								free(bindpath);
 								return FAILURE;
 							}
 							SG(headers_sent) = 1;
@@ -2479,17 +2485,10 @@ parent_loop_end:
 				we need in the environment.
 			*/
 			if (SG(request_info).path_translated || cgi || fastcgi) {
-				file_handle.type = ZEND_HANDLE_FILENAME;
-				file_handle.filename = SG(request_info).path_translated;
-				file_handle.handle.fp = NULL;
+				zend_stream_init_filename(&file_handle, SG(request_info).path_translated);
 			} else {
-				file_handle.filename = "Standard input code";
-				file_handle.type = ZEND_HANDLE_FP;
-				file_handle.handle.fp = stdin;
+				zend_stream_init_fp(&file_handle, stdin, "Standard input code");
 			}
-
-			file_handle.opened_path = NULL;
-			file_handle.free_filename = 0;
 
 			/* request startup only after we've done all we can to
 			 * get path_translated */
@@ -2547,83 +2546,13 @@ parent_loop_end:
 #ifdef ZTS
 					tsrm_shutdown();
 #endif
+					free(bindpath);
 					return FAILURE;
 				}
 			}
 
 			if (CGIG(check_shebang_line)) {
-				/* #!php support */
-				switch (file_handle.type) {
-					case ZEND_HANDLE_FD:
-						if (file_handle.handle.fd < 0) {
-							break;
-						}
-						file_handle.type = ZEND_HANDLE_FP;
-						file_handle.handle.fp = fdopen(file_handle.handle.fd, "rb");
-						/* break missing intentionally */
-					case ZEND_HANDLE_FP:
-						if (!file_handle.handle.fp ||
-						    (file_handle.handle.fp == stdin)) {
-							break;
-						}
-						c = fgetc(file_handle.handle.fp);
-						if (c == '#') {
-							while (c != '\n' && c != '\r' && c != EOF) {
-								c = fgetc(file_handle.handle.fp);	/* skip to end of line */
-							}
-							/* handle situations where line is terminated by \r\n */
-							if (c == '\r') {
-								if (fgetc(file_handle.handle.fp) != '\n') {
-									zend_long pos = zend_ftell(file_handle.handle.fp);
-									zend_fseek(file_handle.handle.fp, pos - 1, SEEK_SET);
-								}
-							}
-							CG(start_lineno) = 2;
-						} else {
-							rewind(file_handle.handle.fp);
-						}
-						break;
-					case ZEND_HANDLE_STREAM:
-						c = php_stream_getc((php_stream*)file_handle.handle.stream.handle);
-						if (c == '#') {
-							while (c != '\n' && c != '\r' && c != EOF) {
-								c = php_stream_getc((php_stream*)file_handle.handle.stream.handle);	/* skip to end of line */
-							}
-							/* handle situations where line is terminated by \r\n */
-							if (c == '\r') {
-								if (php_stream_getc((php_stream*)file_handle.handle.stream.handle) != '\n') {
-									zend_off_t pos = php_stream_tell((php_stream*)file_handle.handle.stream.handle);
-									php_stream_seek((php_stream*)file_handle.handle.stream.handle, pos - 1, SEEK_SET);
-								}
-							}
-							CG(start_lineno) = 2;
-						} else {
-							php_stream_rewind((php_stream*)file_handle.handle.stream.handle);
-						}
-						break;
-					case ZEND_HANDLE_MAPPED:
-						if (file_handle.handle.stream.mmap.buf[0] == '#') {
-						    size_t i = 1;
-
-						    c = file_handle.handle.stream.mmap.buf[i++];
-							while (c != '\n' && c != '\r' && i < file_handle.handle.stream.mmap.len) {
-								c = file_handle.handle.stream.mmap.buf[i++];
-							}
-							if (c == '\r') {
-								if (i < file_handle.handle.stream.mmap.len && file_handle.handle.stream.mmap.buf[i] == '\n') {
-									i++;
-								}
-							}
-							if(i > file_handle.handle.stream.mmap.len) {
-								i = file_handle.handle.stream.mmap.len;
-							}
-							file_handle.handle.stream.mmap.buf += i;
-							file_handle.handle.stream.mmap.len -= i;
-						}
-						break;
-					default:
-						break;
-				}
+				CG(skip_shebang) = 1;
 			}
 
 			switch (behavior) {
@@ -2716,9 +2645,7 @@ fastcgi_request_done:
 			requests++;
 			if (max_requests && (requests == max_requests)) {
 				fcgi_finish_request(request, 1);
-				if (bindpath) {
-					free(bindpath);
-				}
+				free(bindpath);
 				if (max_requests != 1) {
 					/* no need to return exit_status of the last request */
 					exit_status = 0;

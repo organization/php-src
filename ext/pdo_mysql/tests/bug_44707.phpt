@@ -15,10 +15,10 @@ $matches = array();
 if (!preg_match('/^(\d+)\.(\d+)\.(\d+)/ismU', $row['_version'], $matches))
 	die(sprintf("skip Cannot determine MySQL Server version\n"));
 
-$version = $matches[0] * 10000 + $matches[1] * 100 + $matches[2];
+$version = $matches[1] * 10000 + $matches[2] * 100 + $matches[3];
 if ($version < 41000)
 	die(sprintf("skip Will work different with MySQL Server < 4.1.0, found %d.%02d.%02d (%d)\n",
-		$matches[0], $matches[1], $matches[2], $version));
+		$matches[1], $matches[2], $matches[3], $version));
 ?>
 --FILE--
 <?php
@@ -37,8 +37,6 @@ function bug_44707($db) {
 
 	$stmt = $db->prepare('INSERT INTO test(id, mybool) VALUES (?, ?)');
 	$stmt->bindParam(1, $id);
-	// From MySQL 4.1 on boolean and TINYINT don't match! INSERT will fail.
-	// Versions prior to 4.1 have a weak test and will accept this.
 	$stmt->bindParam(2, $mybool, PDO::PARAM_BOOL);
 	var_dump($mybool);
 
@@ -78,10 +76,24 @@ Native Prepared Statements
 bool(false)
 bool(false)
 bool(false)
-array(0) {
-}
 array(1) {
   [0]=>
+  array(2) {
+    ["id"]=>
+    string(1) "1"
+    ["mybool"]=>
+    string(1) "0"
+  }
+}
+array(2) {
+  [0]=>
+  array(2) {
+    ["id"]=>
+    string(1) "1"
+    ["mybool"]=>
+    string(1) "0"
+  }
+  [1]=>
   array(2) {
     ["id"]=>
     string(1) "1"

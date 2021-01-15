@@ -154,7 +154,7 @@ PHPDBG_API char *phpdbg_resolve_path(const char *path) /* {{{ */
 		return NULL;
 	}
 
-	return estrdup(resolved_name);
+	return strdup(resolved_name);
 } /* }}} */
 
 PHPDBG_API const char *phpdbg_current_file(void) /* {{{ */
@@ -357,8 +357,11 @@ PHPDBG_API int phpdbg_get_terminal_height(void) /* {{{ */
 #ifdef _WIN32
 	CONSOLE_SCREEN_BUFFER_INFO csbi;
 
-	GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi);
-	lines = csbi.srWindow.Bottom - csbi.srWindow.Top + 1;
+	if (GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi)) {
+		lines = csbi.srWindow.Bottom - csbi.srWindow.Top + 1;
+	} else {
+		lines = 40;
+	}
 #elif defined(HAVE_SYS_IOCTL_H) && defined(TIOCGWINSZ)
 	struct winsize w;
 
@@ -430,7 +433,7 @@ PHPDBG_API int phpdbg_parse_variable(char *input, size_t len, HashTable *parent,
 PHPDBG_API int phpdbg_parse_variable_with_arg(char *input, size_t len, HashTable *parent, size_t i, phpdbg_parse_var_with_arg_func callback, phpdbg_parse_var_with_arg_func step_cb, zend_bool silent, void *arg) {
 	int ret = FAILURE;
 	zend_bool new_index = 1;
-	char *last_index;
+	char *last_index = NULL;
 	size_t index_len = 0;
 	zval *zv;
 
@@ -470,11 +473,7 @@ PHPDBG_API int phpdbg_parse_variable_with_arg(char *input, size_t len, HashTable
 		if (new_index && index_len == 0) {
 			zend_ulong numkey;
 			zend_string *strkey;
-			ZEND_HASH_FOREACH_KEY_PTR(parent, numkey, strkey, zv) {
-				while (Z_TYPE_P(zv) == IS_INDIRECT) {
-					zv = Z_INDIRECT_P(zv);
-				}
-
+			ZEND_HASH_FOREACH_KEY_VAL_IND(parent, numkey, strkey, zv) {
 				if (i == len || (i == len - 1 && input[len - 1] == ']')) {
 					char *key, *propkey;
 					size_t namelen, keylen;

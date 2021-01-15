@@ -522,7 +522,9 @@ static XMLRPC_VALUE PHP_to_XMLRPC_worker (const char* key, zval* in_val, int dep
 					}
 					break;
 				case xmlrpc_datetime:
-					convert_to_string(&val);
+					if (!try_convert_to_string(&val)) {
+						return NULL;
+					}
 					xReturn = XMLRPC_CreateValueDateTime_ISO8601(key, Z_STRVAL(val));
 					break;
 				case xmlrpc_boolean:
@@ -538,7 +540,9 @@ static XMLRPC_VALUE PHP_to_XMLRPC_worker (const char* key, zval* in_val, int dep
 					xReturn = XMLRPC_CreateValueDouble(key, Z_DVAL(val));
 					break;
 				case xmlrpc_string:
-					convert_to_string(&val);
+					if (!try_convert_to_string(&val)) {
+						return NULL;
+					}
 					xReturn = XMLRPC_CreateValueString(key, Z_STRVAL(val), Z_STRLEN(val));
 					break;
 				case xmlrpc_vector:
@@ -764,9 +768,9 @@ void decode_request_worker(char *xml_in, int xml_in_len, char *encoding_in, zval
 			if (method_name_out) {
 				method_name = XMLRPC_RequestGetMethodName(response);
 				if (method_name) {
-					ZEND_TRY_ASSIGN_STRING(method_name_out, method_name);
+					ZEND_TRY_ASSIGN_REF_STRING(method_name_out, method_name);
 				} else {
-					ZEND_TRY_ASSIGN_NULL(retval);
+					ZVAL_NULL(retval);
 				}
 			}
 		}
@@ -925,7 +929,10 @@ static void php_xmlrpc_introspection_callback(XMLRPC_SERVER server, void* data) 
 				STRUCT_XMLRPC_ERROR err = {0};
 
 				/* return value should be a string */
-				convert_to_string(&retval);
+				if (!try_convert_to_string(&retval)) {
+					zend_string_release_ex(php_function_name, 0);
+					break;
+				}
 
 				xData = XMLRPC_IntrospectionCreateDescription(Z_STRVAL(retval), &err);
 
@@ -1260,7 +1267,7 @@ XMLRPC_VECTOR_TYPE xmlrpc_str_as_vector_type(const char* str) /* {{{ */
 			}
 		}
 	}
-	return xmlrpc_none;
+	return xmlrpc_vector_none;
 }
 /* }}} */
 
@@ -1396,7 +1403,7 @@ PHP_FUNCTION(xmlrpc_set_type)
 		zval tmp;
 		ZVAL_COPY(&tmp, Z_REFVAL_P(arg));
 		if (set_zval_xmlrpc_type(&tmp, vtype) == SUCCESS) {
-			ZEND_TRY_ASSIGN_VALUE(arg, &tmp);
+			ZEND_TRY_ASSIGN_REF_TMP(arg, &tmp);
 			RETURN_TRUE;
 		}
 		Z_TRY_DELREF(tmp);

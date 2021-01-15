@@ -456,12 +456,14 @@ MYSQLND_METHOD(mysqlnd_conn_data, execute_init_commands)(MYSQLND_CONN_DATA * con
 					ret = FAIL;
 					break;
 				}
-				if (conn->last_query_type == QUERY_SELECT) {
-					MYSQLND_RES * result = conn->m->use_result(conn, 0);
-					if (result) {
-						result->m.free_result(result, TRUE);
+				do {
+					if (conn->last_query_type == QUERY_SELECT) {
+						MYSQLND_RES * result = conn->m->use_result(conn, 0);
+						if (result) {
+							result->m.free_result(result, TRUE);
+						}
 					}
-				}
+				} while (conn->m->next_result(conn) != FAIL);
 			}
 		}
 	}
@@ -509,6 +511,10 @@ MYSQLND_METHOD(mysqlnd_conn_data, get_updated_connect_flags)(MYSQLND_CONN_DATA *
 		mysql_flags |= CLIENT_SSL;
 	}
 #endif
+
+    if (conn->options->connect_attr && zend_hash_num_elements(conn->options->connect_attr)) {
+		mysql_flags |= CLIENT_CONNECT_ATTRS;
+	}
 
 	DBG_RETURN(mysql_flags);
 }
@@ -653,7 +659,7 @@ MYSQLND_METHOD(mysqlnd_conn_data, connect)(MYSQLND_CONN_DATA * conn,
 		password.s = "";
 		password.l = 0;
 	}
-	if (!database.s) {
+	if (!database.s || !database.s[0]) {
 		DBG_INF_FMT("no db given, using empty string");
 		database.s = "";
 		database.l = 0;
@@ -667,13 +673,9 @@ MYSQLND_METHOD(mysqlnd_conn_data, connect)(MYSQLND_CONN_DATA * conn,
 
 	{
 		const MYSQLND_CSTRING scheme = { transport.s, transport.l };
-		/* This will be overwritten below with a copy, but we can use it during authentication */
-		conn->unix_socket.s = (char *)socket_or_pipe.s;
 		if (FAIL == conn->m->connect_handshake(conn, &scheme, &username, &password, &database, mysql_flags)) {
-			conn->unix_socket.s = NULL;
 			goto err;
 		}
-		conn->unix_socket.s = NULL;
 	}
 
 	{
@@ -791,7 +793,7 @@ err:
 
 	DBG_ERR_FMT("[%u] %.128s (trying to connect via %s)", conn->error_info->error_no, conn->error_info->error, conn->scheme.s);
 	if (!conn->error_info->error_no) {
-		SET_CLIENT_ERROR(conn->error_info, CR_CONNECTION_ERROR, UNKNOWN_SQLSTATE, conn->error_info->error? conn->error_info->error:"Unknown error");
+		SET_CLIENT_ERROR(conn->error_info, CR_CONNECTION_ERROR, UNKNOWN_SQLSTATE, conn->error_info->error);
 		php_error_docref(NULL, E_WARNING, "[%u] %.128s (trying to connect via %s)", conn->error_info->error_no, conn->error_info->error, conn->scheme.s);
 	}
 
@@ -825,6 +827,9 @@ MYSQLND_METHOD(mysqlnd_conn, connect)(MYSQLND * conn_handle,
 
 	if (PASS == conn->m->local_tx_start(conn, this_func)) {
 		mysqlnd_options4(conn_handle, MYSQL_OPT_CONNECT_ATTR_ADD, "_client_name", "mysqlnd");
+        if (hostname.l > 0) {
+            mysqlnd_options4(conn_handle, MYSQL_OPT_CONNECT_ATTR_ADD, "_server_host", hostname.s);
+        }
 		ret = conn->m->connect(conn, hostname, username, password, database, port, socket_or_pipe, mysql_flags);
 
 		conn->m->local_tx_end(conn, this_func, FAIL);
@@ -1434,6 +1439,14 @@ MYSQLND_METHOD(mysqlnd_conn_data, get_server_version)(const MYSQLND_CONN_DATA * 
 
 	if (!(p = conn->server_version)) {
 		return 0;
+	}
+
+#define MARIA_DB_VERSION_HACK_PREFIX "5.5.5-"
+
+	if (conn->server_capabilities & CLIENT_PLUGIN_AUTH
+		&& !strncmp(p, MARIA_DB_VERSION_HACK_PREFIX, sizeof(MARIA_DB_VERSION_HACK_PREFIX)-1))
+	{
+		p += sizeof(MARIA_DB_VERSION_HACK_PREFIX)-1;
 	}
 
 	major = ZEND_STRTOL(p, &p, 10);
@@ -2123,23 +2136,16 @@ MYSQLND_METHOD(mysqlnd_conn_data, tx_begin)(MYSQLND_CONN_DATA * conn, const unsi
 				}
 				smart_str_appendl(&tmp_str, "WITH CONSISTENT SNAPSHOT", sizeof("WITH CONSISTENT SNAPSHOT") - 1);
 			}
-			if (mode & (TRANS_START_READ_WRITE | TRANS_START_READ_ONLY)) {
-				zend_ulong server_version = conn->m->get_server_version(conn);
-				if (server_version < 50605L) {
-					php_error_docref(NULL, E_WARNING, "This server version doesn't support 'READ WRITE' and 'READ ONLY'. Minimum 5.6.5 is required");
-					smart_str_free(&tmp_str);
-					break;
-				} else if (mode & TRANS_START_READ_WRITE) {
-					if (tmp_str.s && ZSTR_LEN(tmp_str.s)) {
-						smart_str_appendl(&tmp_str, ", ", sizeof(", ") - 1);
-					}
-					smart_str_appendl(&tmp_str, "READ WRITE", sizeof("READ WRITE") - 1);
-				} else if (mode & TRANS_START_READ_ONLY) {
-					if (tmp_str.s && ZSTR_LEN(tmp_str.s)) {
-						smart_str_appendl(&tmp_str, ", ", sizeof(", ") - 1);
-					}
-					smart_str_appendl(&tmp_str, "READ ONLY", sizeof("READ ONLY") - 1);
+			if (mode & TRANS_START_READ_WRITE) {
+				if (tmp_str.s && ZSTR_LEN(tmp_str.s)) {
+					smart_str_appendl(&tmp_str, ", ", sizeof(", ") - 1);
 				}
+				smart_str_appendl(&tmp_str, "READ WRITE", sizeof("READ WRITE") - 1);
+			} else if (mode & TRANS_START_READ_ONLY) {
+				if (tmp_str.s && ZSTR_LEN(tmp_str.s)) {
+					smart_str_appendl(&tmp_str, ", ", sizeof(", ") - 1);
+				}
+				smart_str_appendl(&tmp_str, "READ ONLY", sizeof("READ ONLY") - 1);
 			}
 			smart_str_0(&tmp_str);
 
@@ -2158,6 +2164,11 @@ MYSQLND_METHOD(mysqlnd_conn_data, tx_begin)(MYSQLND_CONN_DATA * conn, const unsi
 				}
 				ret = conn->m->query(conn, query, query_len);
 				mnd_sprintf_free(query);
+				if (ret && mode & (TRANS_START_READ_WRITE | TRANS_START_READ_ONLY) &&
+					mysqlnd_stmt_errno(conn) == 1064) {
+					php_error_docref(NULL, E_WARNING, "This server version doesn't support 'READ WRITE' and 'READ ONLY'. Minimum 5.6.5 is required");
+					break;
+				}
 			}
 		} while (0);
 		conn->m->local_tx_end(conn, this_func, ret);

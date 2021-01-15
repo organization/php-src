@@ -31,9 +31,8 @@
 #if HAVE_SYS_WAIT_H
 #include <sys/wait.h>
 #endif
-#if HAVE_SIGNAL_H
+
 #include <signal.h>
-#endif
 
 #if HAVE_SYS_TYPES_H
 #include <sys/types.h>
@@ -49,9 +48,7 @@
 #include <unistd.h>
 #endif
 
-#if HAVE_LIMITS_H
 #include <limits.h>
-#endif
 
 #ifdef PHP_WIN32
 # include "win32/nice.h"
@@ -162,6 +159,13 @@ PHPAPI int php_exec(int type, char *cmd, zval *array, zval *return_value)
 			b = buf;
 		}
 		if (bufl) {
+			/* output remaining data in buffer */
+			if (type == 1 && buf != b) {
+				PHPWRITE(buf, bufl);
+				if (php_output_get_level() < 1) {
+					sapi_flush();
+				}
+			}
 			/* strip trailing whitespaces if we have not done so already */
 			if ((type == 2 && buf != b) || type != 2) {
 				l = bufl;
@@ -181,8 +185,9 @@ PHPAPI int php_exec(int type, char *cmd, zval *array, zval *return_value)
 			RETVAL_EMPTY_STRING();
 		}
 	} else {
-		while((bufl = php_stream_read(stream, buf, EXEC_INPUT_BUF)) > 0) {
-			PHPWRITE(buf, bufl);
+		ssize_t read;
+		while ((read = php_stream_read(stream, buf, EXEC_INPUT_BUF)) > 0) {
+			PHPWRITE(buf, read);
 		}
 	}
 
@@ -246,7 +251,7 @@ static void php_exec_ex(INTERNAL_FUNCTION_PARAMETERS, int mode) /* {{{ */
 		ret = php_exec(2, cmd, ret_array, return_value);
 	}
 	if (ret_code) {
-		ZEND_TRY_ASSIGN_LONG(ret_code, ret);
+		ZEND_TRY_ASSIGN_REF_LONG(ret_code, ret);
 	}
 }
 /* }}} */
@@ -531,6 +536,15 @@ PHP_FUNCTION(shell_exec)
 	ZEND_PARSE_PARAMETERS_START(1, 1)
 		Z_PARAM_STRING(command, command_len)
 	ZEND_PARSE_PARAMETERS_END();
+
+	if (!command_len) {
+		php_error_docref(NULL, E_WARNING, "Cannot execute a blank command");
+		RETURN_FALSE;
+	}
+	if (strlen(command) != command_len) {
+		php_error_docref(NULL, E_WARNING, "NULL byte detected. Possible attack");
+		RETURN_FALSE;
+	}
 
 #ifdef PHP_WIN32
 	if ((in=VCWD_POPEN(command, "rt"))==NULL) {

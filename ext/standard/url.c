@@ -26,14 +26,10 @@
 #include "url.h"
 #include "file.h"
 #ifdef _OSD_POSIX
-#ifndef APACHE
-#error On this EBCDIC platform, PHP is only supported as an Apache module.
-#else /*APACHE*/
-#ifndef CHARSET_EBCDIC
-#define CHARSET_EBCDIC /* this machine uses EBCDIC, not ASCII! */
-#endif
-#include "ebcdic.h"
-#endif /*APACHE*/
+# ifndef CHARSET_EBCDIC
+#  define CHARSET_EBCDIC /* this machine uses EBCDIC, not ASCII! */
+# endif
+# include "ebcdic.h"
 #endif /*_OSD_POSIX*/
 
 /* {{{ free_url
@@ -91,14 +87,50 @@ PHPAPI php_url *php_url_parse(char const *str)
 	return php_url_parse_ex(str, strlen(str));
 }
 
+static const char *binary_strcspn(const char *s, const char *e, const char *chars) {
+	while (*chars) {
+		const char *p = memchr(s, *chars, e - s);
+		if (p) {
+			e = p;
+		}
+		chars++;
+	}
+	return e;
+}
+
+static int is_userinfo_valid(const char *str, size_t len)
+{
+	const char *valid = "-._~!$&'()*+,;=:";
+	const char *p = str;
+	while (p - str < len) {
+		if (isalpha(*p) || isdigit(*p) || strchr(valid, *p)) {
+			p++;
+		} else if (*p == '%' && p - str <= len - 3 && isdigit(*(p+1)) && isxdigit(*(p+2))) {
+			p += 3;
+		} else {
+			return 0;
+		}
+	}
+	return 1;
+}
+
 /* {{{ php_url_parse
  */
 PHPAPI php_url *php_url_parse_ex(char const *str, size_t length)
+{
+	zend_bool has_port;
+	return php_url_parse_ex2(str, length, &has_port);
+}
+
+/* {{{ php_url_parse_ex2
+ */
+PHPAPI php_url *php_url_parse_ex2(char const *str, size_t length, zend_bool *has_port)
 {
 	char port_buf[6];
 	php_url *ret = ecalloc(1, sizeof(php_url));
 	char const *s, *e, *p, *pp, *ue;
 
+	*has_port = 0;
 	s = str;
 	ue = s + length;
 
@@ -109,7 +141,7 @@ PHPAPI php_url *php_url_parse_ex(char const *str, size_t length)
 		while (p < e) {
 			/* scheme = 1*[ lowalpha | digit | "+" | "-" | "." ] */
 			if (!isalpha(*p) && !isdigit(*p) && *p != '+' && *p != '.' && *p != '-') {
-				if (e + 1 < ue && e < s + strcspn(s, "?#")) {
+				if (e + 1 < ue && e < binary_strcspn(s, ue, "?#")) {
 					goto parse_port;
 				} else if (s + 1 < ue && *s == '/' && *(s + 1) == '/') { /* relative-scheme URL */
 					s += 2;
@@ -183,10 +215,12 @@ PHPAPI php_url *php_url_parse_ex(char const *str, size_t length)
 
 		if (pp - p > 0 && pp - p < 6 && (pp == ue || *pp == '/')) {
 			zend_long port;
+			char *end;
 			memcpy(port_buf, p, (pp - p));
 			port_buf[pp - p] = '\0';
-			port = ZEND_STRTOL(port_buf, NULL, 10);
-			if (port > 0 && port <= 65535) {
+			port = ZEND_STRTOL(port_buf, &end, 10);
+			if (port >= 0 && port <= 65535 && end != port_buf) {
+				*has_port = 1;
 				ret->port = (unsigned short) port;
 				if (s + 1 < ue && *s == '/' && *(s + 1) == '/') { /* relative-scheme URL */
 				    s += 2;
@@ -209,18 +243,8 @@ PHPAPI php_url *php_url_parse_ex(char const *str, size_t length)
 		goto just_path;
 	}
 
-	parse_host:
-	/* Binary-safe strcspn(s, "/?#") */
-	e = ue;
-	if ((p = memchr(s, '/', e - s))) {
-		e = p;
-	}
-	if ((p = memchr(s, '?', e - s))) {
-		e = p;
-	}
-	if ((p = memchr(s, '#', e - s))) {
-		e = p;
-	}
+parse_host:
+	e = binary_strcspn(s, ue, "/?#");
 
 	/* check for login and password */
 	if ((p = zend_memrchr(s, '@', (e-s)))) {
@@ -232,13 +256,17 @@ PHPAPI php_url *php_url_parse_ex(char const *str, size_t length)
 			ret->pass = zend_string_init(pp, (p-pp), 0);
 			php_replace_controlchars_ex(ZSTR_VAL(ret->pass), ZSTR_LEN(ret->pass));
 		} else {
-			ret->user = zend_string_init(s, (p-s), 0);
+            if (!is_userinfo_valid(s, p-s)) {
+                goto check_port;
+            }
+            ret->user = zend_string_init(s, (p-s), 0);
 			php_replace_controlchars_ex(ZSTR_VAL(ret->user), ZSTR_LEN(ret->user));
 		}
 
 		s = p + 1;
 	}
 
+check_port:
 	/* check for port */
 	if (s < ue && *s == '[' && *(e-1) == ']') {
 		/* Short circuit portscan,
@@ -257,10 +285,12 @@ PHPAPI php_url *php_url_parse_ex(char const *str, size_t length)
 				return NULL;
 			} else if (e - p > 0) {
 				zend_long port;
+				char *end;
 				memcpy(port_buf, p, (e - p));
 				port_buf[e - p] = '\0';
-				port = ZEND_STRTOL(port_buf, NULL, 10);
-				if (port > 0 && port <= 65535) {
+				port = ZEND_STRTOL(port_buf, &end, 10);
+				if (port >= 0 && port <= 65535 && end != port_buf) {
+					*has_port = 1;
 					ret->port = (unsigned short)port;
 				} else {
 					php_url_free(ret);
@@ -329,6 +359,7 @@ PHP_FUNCTION(parse_url)
 	php_url *resource;
 	zend_long key = -1;
 	zval tmp;
+	zend_bool has_port;
 
 	ZEND_PARSE_PARAMETERS_START(1, 2)
 		Z_PARAM_STRING(str, str_len)
@@ -336,7 +367,7 @@ PHP_FUNCTION(parse_url)
 		Z_PARAM_LONG(key)
 	ZEND_PARSE_PARAMETERS_END();
 
-	resource = php_url_parse_ex(str, str_len);
+	resource = php_url_parse_ex2(str, str_len, &has_port);
 	if (resource == NULL) {
 		/* @todo Find a method to determine why php_url_parse_ex() failed */
 		RETURN_FALSE;
@@ -351,7 +382,7 @@ PHP_FUNCTION(parse_url)
 				if (resource->host != NULL) RETVAL_STR_COPY(resource->host);
 				break;
 			case PHP_URL_PORT:
-				if (resource->port != 0) RETVAL_LONG(resource->port);
+				if (has_port) RETVAL_LONG(resource->port);
 				break;
 			case PHP_URL_USER:
 				if (resource->user != NULL) RETVAL_STR_COPY(resource->user);
@@ -387,7 +418,7 @@ PHP_FUNCTION(parse_url)
 		ZVAL_STR_COPY(&tmp, resource->host);
 		zend_hash_add_new(Z_ARRVAL_P(return_value), ZSTR_KNOWN(ZEND_STR_HOST), &tmp);
 	}
-	if (resource->port != 0) {
+	if (has_port) {
 		ZVAL_LONG(&tmp, resource->port);
 		zend_hash_add_new(Z_ARRVAL_P(return_value), ZSTR_KNOWN(ZEND_STR_PORT), &tmp);
 	}
@@ -547,7 +578,7 @@ PHPAPI size_t php_url_decode(char *str, size_t len)
 #ifndef CHARSET_EBCDIC
 			*dest = (char) php_htoi(data + 1);
 #else
-			*dest = os_toebcdic[(char) php_htoi(data + 1)];
+			*dest = os_toebcdic[(unsigned char) php_htoi(data + 1)];
 #endif
 			data += 2;
 			len -= 2;
@@ -643,7 +674,7 @@ PHPAPI size_t php_raw_url_decode(char *str, size_t len)
 #ifndef CHARSET_EBCDIC
 			*dest = (char) php_htoi(data + 1);
 #else
-			*dest = os_toebcdic[(char) php_htoi(data + 1)];
+			*dest = os_toebcdic[(unsigned char) php_htoi(data + 1)];
 #endif
 			data += 2;
 			len -= 2;
@@ -671,7 +702,7 @@ PHP_FUNCTION(get_headers)
 	php_stream_context *context;
 
 	ZEND_PARSE_PARAMETERS_START(1, 3)
-		Z_PARAM_STRING(url, url_len)
+		Z_PARAM_PATH(url, url_len)
 		Z_PARAM_OPTIONAL
 		Z_PARAM_LONG(format)
 		Z_PARAM_RESOURCE_EX(zcontext, 1, 0)

@@ -68,7 +68,7 @@ echo "Done";
 --> http://secret:@www.php.net/index.php?test=1&test2=char&test3=mixesCI#some_page_ref123   : string(6) "secret"
 --> http://:hideout@www.php.net:80/index.php?test=1&test2=char&test3=mixesCI#some_page_ref123   : string(0) ""
 --> http://secret:hideout@www.php.net/index.php?test=1&test2=char&test3=mixesCI#some_page_ref123   : string(6) "secret"
---> http://secret@hideout@www.php.net:80/index.php?test=1&test2=char&test3=mixesCI#some_page_ref123   : string(14) "secret@hideout"
+--> http://secret@hideout@www.php.net:80/index.php?test=1&test2=char&test3=mixesCI#some_page_ref123   : NULL
 --> http://secret:hid:out@www.php.net:80/index.php?test=1&test2=char&test3=mixesCI#some_page_ref123   : string(6) "secret"
 --> nntp://news.php.net   : NULL
 --> ftp://ftp.gnu.org/gnu/glic/glibc.tar.gz   : NULL
@@ -111,6 +111,8 @@ echo "Done";
 -->    : NULL
 --> /   : NULL
 --> /rest/Users?filter={"id":"123"}   : NULL
+--> %:x   : NULL
+--> https://example.com:0/   : NULL
 --> http:///blah.com   : bool(false)
 --> http://:80   : bool(false)
 --> http://user@:80   : bool(false)

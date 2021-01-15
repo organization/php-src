@@ -54,8 +54,6 @@
 #define WE_HAD_MBSTATE_T
 #endif
 
-#include <my_global.h>
-
 #if !defined(HAVE_MBRLEN) && defined(WE_HAD_MBRLEN)
 #define HAVE_MBRLEN 1
 #endif
@@ -64,20 +62,12 @@
 #define HAVE_MBSTATE_T 1
 #endif
 
-/*
-  We need more than mysql.h because we need CHARSET_INFO in one place.
-  This order has been borrowed from the ODBC driver. Nothing can be removed
-  from the list of headers :(
-*/
-
-#include <my_sys.h>
 #include <mysql.h>
+#if MYSQL_VERSION_ID >= 80000 &&  MYSQL_VERSION_ID < 100000
+typedef _Bool		my_bool;
+#endif
 #include <errmsg.h>
-#include <my_list.h>
-#include <m_string.h>
 #include <mysqld_error.h>
-#include <my_list.h>
-#include <m_ctype.h>
 #include "mysqli_libmysql.h"
 #endif /* MYSQLI_USE_MYSQLND */
 
@@ -158,7 +148,7 @@ struct st_mysqli_warning {
 typedef struct _mysqli_property_entry {
 	const char *pname;
 	size_t pname_length;
-	zval *(*r_func)(mysqli_object *obj, zval *retval);
+	int (*r_func)(mysqli_object *obj, zval *retval, zend_bool quiet);
 	int (*w_func)(mysqli_object *obj, zval *value);
 } mysqli_property_entry;
 

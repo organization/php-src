@@ -76,9 +76,15 @@ void zend_exception_set_previous(zend_object *exception, zend_object *add_previo
 	zval  pv, zv, rv;
 	zend_class_entry *base_ce;
 
-	if (exception == add_previous || !add_previous || !exception) {
+	if (!exception || !add_previous) {
 		return;
 	}
+
+	if (exception == add_previous) {
+		OBJ_RELEASE(add_previous);
+		return;
+	}
+
 	ZVAL_OBJ(&pv, add_previous);
 	if (!instanceof_function(Z_OBJCE(pv), zend_ce_throwable)) {
 		zend_error_noreturn(E_CORE_ERROR, "Previous exception must implement Throwable");
@@ -179,16 +185,18 @@ ZEND_API ZEND_COLD void zend_throw_exception_internal(zval *exception) /* {{{ */
 
 ZEND_API void zend_clear_exception(void) /* {{{ */
 {
+	zend_object *exception;
 	if (EG(prev_exception)) {
-
 		OBJ_RELEASE(EG(prev_exception));
 		EG(prev_exception) = NULL;
 	}
 	if (!EG(exception)) {
 		return;
 	}
-	OBJ_RELEASE(EG(exception));
+	/* exception may have destructor */
+	exception = EG(exception);
 	EG(exception) = NULL;
+	OBJ_RELEASE(exception);
 	if (EG(current_execute_data)) {
 		EG(current_execute_data)->opline = EG(opline_before_exception);
 	}
@@ -212,7 +220,9 @@ static zend_object *zend_default_exception_new_ex(zend_class_entry *class_type, 
 	object_properties_init(object, class_type);
 
 	if (EG(current_execute_data)) {
-		zend_fetch_debug_backtrace(&trace, skip_top_traces, 0, 0);
+		zend_fetch_debug_backtrace(&trace,
+			skip_top_traces,
+			EG(exception_ignore_args) ? DEBUG_BACKTRACE_IGNORE_ARGS : 0, 0);
 	} else {
 		array_init(&trace);
 	}
@@ -977,7 +987,7 @@ ZEND_API ZEND_COLD void zend_exception_error(zend_object *ex, int severity) /* {
 	zend_class_entry *ce_exception;
 
 	ZVAL_OBJ(&exception, ex);
-	ce_exception = Z_OBJCE(exception);
+	ce_exception = ex->ce;
 	EG(exception) = NULL;
 	if (ce_exception == zend_ce_parse_error || ce_exception == zend_ce_compile_error) {
 		zend_string *message = zval_get_string(GET_PROPERTY(&exception, ZEND_STR_MESSAGE));
@@ -990,7 +1000,7 @@ ZEND_API ZEND_COLD void zend_exception_error(zend_object *ex, int severity) /* {
 		zend_string_release_ex(file, 0);
 		zend_string_release_ex(message, 0);
 	} else if (instanceof_function(ce_exception, zend_ce_throwable)) {
-		zval tmp, rv;
+		zval tmp;
 		zend_string *str, *file = NULL;
 		zend_long line = 0;
 

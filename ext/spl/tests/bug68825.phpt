@@ -1,5 +1,12 @@
 --TEST--
 Bug #68825 (Exception in DirectoryIterator::getLinkTarget())
+--SKIPIF--
+<?php
+if (PHP_OS_FAMILY === 'Windows') {
+    include_once __DIR__ . '/../../standard/tests/file/windows_links/common.inc';
+    skipIfSeCreateSymbolicLinkPrivilegeIsDisabled(__FILE__);
+}
+?>
 --FILE--
 <?php
 $dir = __DIR__ . '/bug68825';

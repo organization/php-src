@@ -221,15 +221,6 @@ static int find_adjusted_tmp_var(const zend_op_array *op_array, uint32_t build_f
 }
 /* }}} */
 
-static inline zend_bool add_will_overflow(zend_long a, zend_long b) {
-	return (b > 0 && a > ZEND_LONG_MAX - b)
-		|| (b < 0 && a < ZEND_LONG_MIN - b);
-}
-static inline zend_bool sub_will_overflow(zend_long a, zend_long b) {
-	return (b > 0 && a < ZEND_LONG_MIN + b)
-		|| (b < 0 && a > ZEND_LONG_MAX + b);
-}
-
 /* e-SSA construction: Pi placement (Pi is actually a Phi with single
  * source and constraint).
  * Order of Phis is importent, Pis must be placed before Phis
@@ -291,7 +282,7 @@ static void place_essa_pis(
 			}
 
 			if (var1 >= 0 && var2 >= 0) {
-				if (!sub_will_overflow(val1, val2) && !sub_will_overflow(val2, val1)) {
+				if (!zend_sub_will_overflow(val1, val2) && !zend_sub_will_overflow(val2, val1)) {
 					zend_long tmp = val1;
 					val1 -= val2;
 					val2 -= tmp;
@@ -316,7 +307,7 @@ static void place_essa_pis(
 				} else {
 					var1 = -1;
 				}
-				if (!add_will_overflow(val2, add_val2)) {
+				if (!zend_add_will_overflow(val2, add_val2)) {
 					val2 += add_val2;
 				} else {
 					var1 = -1;
@@ -337,7 +328,7 @@ static void place_essa_pis(
 				} else {
 					var2 = -1;
 				}
-				if (!add_will_overflow(val1, add_val1)) {
+				if (!zend_add_will_overflow(val1, add_val1)) {
 					val1 += add_val1;
 				} else {
 					var2 = -1;
@@ -457,7 +448,7 @@ static void place_essa_pis(
 			if ((pi = add_pi(arena, op_array, dfg, ssa, j, bt, var))) {
 				pi_type_mask(pi, mask_for_type_check(type));
 			}
-			if (type != IS_RESOURCE) {
+			if (type != MAY_BE_RESOURCE) {
 				/* is_resource() may return false for closed resources */
 				if ((pi = add_pi(arena, op_array, dfg, ssa, j, bf, var))) {
 					pi_not_type_mask(pi, mask_for_type_check(type));
@@ -533,7 +524,7 @@ static int zend_ssa_rename(const zend_op_array *op_array, uint32_t build_flags, 
 	int i, j;
 	zend_op *opline, *end;
 	int *tmp = NULL;
-	ALLOCA_FLAG(use_heap);
+	ALLOCA_FLAG(use_heap = 0);
 
 	// FIXME: Can we optimize this copying out in some cases?
 	if (blocks[n].next_child >= 0) {
@@ -687,6 +678,9 @@ static int zend_ssa_rename(const zend_op_array *op_array, uint32_t build_flags, 
 						//NEW_SSA_VAR(opline+->op1.var)
 					}
 					break;
+				case ZEND_ADD_ARRAY_UNPACK:
+					ssa_ops[k].result_use = var[EX_VAR_TO_NUM(opline->result.var)];
+					break;
 				case ZEND_SEND_VAR:
 				case ZEND_CAST:
 				case ZEND_QM_ASSIGN:
@@ -722,18 +716,10 @@ static int zend_ssa_rename(const zend_op_array *op_array, uint32_t build_flags, 
 						//NEW_SSA_VAR(opline->op1.var)
 					}
 					break;
-				case ZEND_ASSIGN_ADD:
-				case ZEND_ASSIGN_SUB:
-				case ZEND_ASSIGN_MUL:
-				case ZEND_ASSIGN_DIV:
-				case ZEND_ASSIGN_MOD:
-				case ZEND_ASSIGN_SL:
-				case ZEND_ASSIGN_SR:
-				case ZEND_ASSIGN_CONCAT:
-				case ZEND_ASSIGN_BW_OR:
-				case ZEND_ASSIGN_BW_AND:
-				case ZEND_ASSIGN_BW_XOR:
-				case ZEND_ASSIGN_POW:
+				case ZEND_ASSIGN_OP:
+				case ZEND_ASSIGN_DIM_OP:
+				case ZEND_ASSIGN_OBJ_OP:
+				case ZEND_ASSIGN_STATIC_PROP_OP:
 				case ZEND_PRE_INC:
 				case ZEND_PRE_DEC:
 				case ZEND_POST_INC:
@@ -1312,11 +1298,7 @@ static inline void zend_ssa_remove_phi_source(zend_ssa *ssa, zend_ssa_phi *phi, 
 	for (j = 0; j < predecessors_count; j++) {
 		if (phi->sources[j] == var_num) {
 			if (j < pred_offset) {
-				if (next_phi == NULL) {
-					next_phi = phi->use_chains[pred_offset];
-				} else {
-					ZEND_ASSERT(phi->use_chains[pred_offset] == NULL);
-				}
+				ZEND_ASSERT(next_phi == NULL);
 			} else if (j >= pred_offset) {
 				phi->use_chains[j] = next_phi;
 			}
@@ -1402,7 +1384,7 @@ void zend_ssa_remove_predecessor(zend_ssa *ssa, int from, int to) /* {{{ */
 	for (phi = next_ssa_block->phis; phi; phi = phi->next) {
 		if (phi->pi >= 0) {
 			if (phi->pi == from) {
-				zend_ssa_remove_uses_of_var(ssa, phi->ssa_var);
+				zend_ssa_rename_var_uses(ssa, phi->ssa_var, phi->sources[0], /* update_types */ 0);
 				zend_ssa_remove_phi(ssa, phi);
 			}
 		} else {
@@ -1605,6 +1587,8 @@ void zend_ssa_rename_var_uses(zend_ssa *ssa, int old, int new, zend_bool update_
 						new_var->phi_use_chain = phi;
 					}
 					after_first_new_source = 1;
+				} else {
+					phi->use_chains[j] = NULL;
 				}
 			}
 		}

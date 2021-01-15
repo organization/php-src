@@ -71,7 +71,7 @@ inline ssize_t sendmsg(int sockfd, const struct msghdr *msg, int flags)
 #define LONG_CHECK_VALID_INT(l) \
 	do { \
 		if ((l) < INT_MIN && (l) > INT_MAX) { \
-			php_error_docref0(NULL, E_WARNING, "The value " ZEND_LONG_FMT " does not fit inside " \
+			php_error_docref(NULL, E_WARNING, "The value " ZEND_LONG_FMT " does not fit inside " \
 					"the boundaries of a native integer", (l)); \
 			return; \
 		} \
@@ -106,7 +106,7 @@ static void init_ancillary_registry(void)
 	entry.to_array		= to; \
 	key.cmsg_level		= level; \
 	key.cmsg_type		= type; \
-	zend_hash_str_update_mem(&ancillary_registry.ht, (char*)&key, sizeof(key) - 1, (void*)&entry, sizeof(entry))
+	zend_hash_str_update_mem(&ancillary_registry.ht, (char*)&key, sizeof(key), (void*)&entry, sizeof(entry))
 
 #if defined(IPV6_PKTINFO) && HAVE_IPV6
 	PUT_ENTRY(sizeof(struct in6_pktinfo), 0, 0, from_zval_write_in6_pktinfo,
@@ -156,7 +156,7 @@ ancillary_reg_entry *get_ancillary_reg_entry(int cmsg_level, int msg_type)
 	tsrm_mutex_unlock(ancillary_mutex);
 #endif
 
-	if ((entry = zend_hash_str_find_ptr(&ancillary_registry.ht, (char*)&key, sizeof(key) - 1)) != NULL) {
+	if ((entry = zend_hash_str_find_ptr(&ancillary_registry.ht, (char*)&key, sizeof(key))) != NULL) {
 		return entry;
 	} else {
 		return NULL;
@@ -197,14 +197,13 @@ PHP_FUNCTION(socket_sendmsg)
 	res = sendmsg(php_sock->bsd_socket, msghdr, (int)flags);
 
 	if (res != -1) {
-		zend_llist_destroy(allocations);
-		efree(allocations);
-
-		RETURN_LONG((zend_long)res);
+		RETVAL_LONG((zend_long)res);
 	} else {
 		PHP_SOCKET_ERROR(php_sock, "error in sendmsg", errno);
-		RETURN_FALSE;
+		RETVAL_FALSE;
 	}
+
+	allocations_dispose(&allocations);
 }
 
 PHP_FUNCTION(socket_recvmsg)
@@ -254,7 +253,6 @@ PHP_FUNCTION(socket_recvmsg)
 
 		/* we don;t need msghdr anymore; free it */
 		msghdr = NULL;
-		allocations_dispose(&allocations);
 
 		zval_ptr_dtor(zmsg);
 		if (!err.has_error) {
@@ -265,14 +263,15 @@ PHP_FUNCTION(socket_recvmsg)
 			/* no need to destroy/free zres -- it's NULL in this circumstance */
 			assert(zres == NULL);
 		}
+		RETVAL_LONG((zend_long)res);
 	} else {
 		SOCKETS_G(last_error) = errno;
 		php_error_docref(NULL, E_WARNING, "error in recvmsg [%d]: %s",
 				errno, sockets_strerror(errno));
-		RETURN_FALSE;
+		RETVAL_FALSE;
 	}
 
-	RETURN_LONG((zend_long)res);
+	allocations_dispose(&allocations);
 }
 
 PHP_FUNCTION(socket_cmsg_space)
@@ -292,14 +291,14 @@ PHP_FUNCTION(socket_cmsg_space)
 	LONG_CHECK_VALID_INT(n);
 
 	if (n < 0) {
-		php_error_docref0(NULL, E_WARNING, "The third argument "
+		php_error_docref(NULL, E_WARNING, "The third argument "
 				"cannot be negative");
 		return;
 	}
 
 	entry = get_ancillary_reg_entry(level, type);
 	if (entry == NULL) {
-		php_error_docref0(NULL, E_WARNING, "The pair level " ZEND_LONG_FMT "/type " ZEND_LONG_FMT " is "
+		php_error_docref(NULL, E_WARNING, "The pair level " ZEND_LONG_FMT "/type " ZEND_LONG_FMT " is "
 				"not supported by PHP", level, type);
 		return;
 	}
@@ -307,7 +306,7 @@ PHP_FUNCTION(socket_cmsg_space)
 	if (entry->var_el_size > 0 && n > (zend_long)((ZEND_LONG_MAX - entry->size -
 			CMSG_SPACE(0) - 15L) / entry->var_el_size)) {
 		/* the -15 is to account for any padding CMSG_SPACE may add after the data */
-		php_error_docref0(NULL, E_WARNING, "The value for the "
+		php_error_docref(NULL, E_WARNING, "The value for the "
 				"third argument (" ZEND_LONG_FMT ") is too large", n);
 		return;
 	}
@@ -331,7 +330,7 @@ int php_do_setsockopt_ipv6_rfc3542(php_socket *php_sock, int level, int optname,
 	case IPV6_PKTINFO:
 #ifdef PHP_WIN32
 		if (Z_TYPE_P(arg4) == IS_ARRAY) {
-			php_error_docref0(NULL, E_WARNING, "Windows does not "
+			php_error_docref(NULL, E_WARNING, "Windows does not "
 					"support sticky IPV6_PKTINFO");
 			return FAILURE;
 		} else {

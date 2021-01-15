@@ -7,22 +7,20 @@ require_once('skipifemb.inc');
 require_once('connect.inc');
 
 /*
-Let's not deal with cross-version issues in the EXPECTF/UEXPECTF.
+Let's not deal with cross-version issues in the EXPECTF section.
 Most of the things which we test are covered by mysqli_class_*_interface.phpt.
 Those tests go into the details and are aimed to be a development tool, no more.
 */
 if (!$IS_MYSQLND)
-	die("skip Test has been written for the latest version of mysqlnd only");
-if ($MYSQLND_VERSION < 50004)
-	die("skip Test requires mysqlnd Revision 5.0.4 or newer");
+    die("skip Test has been written for mysqlnd only");
 
 ?>
 --FILE--
 <?php
-	require_once('reflection_tools.inc');
-	$class = new ReflectionClass('mysqli');
-	inspectClass($class);
-	print "done!\n";
+    require_once('reflection_tools.inc');
+    $class = new ReflectionClass('mysqli');
+    inspectClass($class);
+    print "done!\n";
 ?>
 --EXPECT--
 Inspecting class 'mysqli'
@@ -1317,14 +1315,6 @@ isStatic: no
 isDefault: yes
 Modifiers: 1
 
-Inspecting property 'stat'
-isPublic: yes
-isPrivate: no
-isProtected: no
-isStatic: no
-isDefault: yes
-Modifiers: 1
-
 Inspecting property 'thread_id'
 isPublic: yes
 isPrivate: no
@@ -1356,7 +1346,6 @@ Default property 'protocol_version'
 Default property 'server_info'
 Default property 'server_version'
 Default property 'sqlstate'
-Default property 'stat'
 Default property 'thread_id'
 Default property 'warning_count'
 done!

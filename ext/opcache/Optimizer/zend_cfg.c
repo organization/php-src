@@ -74,8 +74,8 @@ static void zend_mark_reachable(zend_op *opcodes, zend_cfg *cfg, zend_basic_bloc
 					}
 				} else {
 					ZEND_ASSERT(opcode == ZEND_SWITCH_LONG || opcode == ZEND_SWITCH_STRING);
-					if (i == b->successors_count) {
-						succ->flags |= ZEND_BB_FOLLOW;
+					if (i == b->successors_count - 1) {
+						succ->flags |= ZEND_BB_FOLLOW | ZEND_BB_TARGET;
 					} else {
 						succ->flags |= ZEND_BB_TARGET;
 					}
@@ -208,9 +208,7 @@ static void zend_mark_reachable_blocks(const zend_op_array *op_array, zend_cfg *
 
 			for (j = b->start; j < b->start + b->len; j++) {
 				zend_op *opline = &op_array->opcodes[j];
-				if (opline->opcode == ZEND_FE_FREE ||
-					(opline->opcode == ZEND_FREE && opline->extended_value == ZEND_FREE_SWITCH)
-				) {
+				if (zend_optimizer_is_loop_var_free(opline)) {
 					zend_op *def_opline = zend_optimizer_get_loop_var_def(op_array, opline);
 					if (def_opline) {
 						uint32_t def_block = block_map[def_opline - op_array->opcodes];
@@ -375,8 +373,6 @@ int zend_build_cfg(zend_arena **arena, const zend_op_array *op_array, uint32_t b
 				}
 				BB_START(i + 1);
 				break;
-			case ZEND_DECLARE_ANON_CLASS:
-			case ZEND_DECLARE_ANON_INHERITED_CLASS:
 			case ZEND_FE_FETCH_R:
 			case ZEND_FE_FETCH_RW:
 				BB_START(ZEND_OFFSET_TO_OPLINE_NUM(op_array, opline, opline->extended_value));
@@ -536,8 +532,6 @@ int zend_build_cfg(zend_arena **arena, const zend_op_array *op_array, uint32_t b
 					block->successors[0] = j + 1;
 				}
 				break;
-			case ZEND_DECLARE_ANON_CLASS:
-			case ZEND_DECLARE_ANON_INHERITED_CLASS:
 			case ZEND_FE_FETCH_R:
 			case ZEND_FE_FETCH_RW:
 				block->successors_count = 2;
@@ -581,9 +575,8 @@ int zend_build_cfg(zend_arena **arena, const zend_op_array *op_array, uint32_t b
 	}
 
 	/* Build CFG, Step 4, Mark Reachable Basic Blocks */
-	zend_mark_reachable_blocks(op_array, cfg, 0);
-
 	cfg->flags |= flags;
+	zend_mark_reachable_blocks(op_array, cfg, 0);
 
 	return SUCCESS;
 }

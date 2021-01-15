@@ -37,6 +37,33 @@
 
 static int pdo_dbh_attribute_set(pdo_dbh_t *dbh, zend_long attr, zval *value);
 
+void pdo_throw_exception(unsigned int driver_errcode, char *driver_errmsg, pdo_error_type *pdo_error)
+{
+		zval error_info,pdo_exception;
+		char *pdo_exception_message;
+
+		object_init_ex(&pdo_exception, php_pdo_get_exception());
+		array_init(&error_info);
+
+		add_next_index_string(&error_info, *pdo_error);
+		add_next_index_long(&error_info, driver_errcode);
+		add_next_index_string(&error_info, driver_errmsg);
+
+		spprintf(&pdo_exception_message, 0,"SQLSTATE[%s] [%d] %s",*pdo_error, driver_errcode, driver_errmsg);
+		zend_update_property(php_pdo_get_exception(), &pdo_exception, "errorInfo", sizeof("errorInfo")-1, &error_info);
+		zend_update_property_long(php_pdo_get_exception(), &pdo_exception, "code", sizeof("code")-1, driver_errcode);
+		zend_update_property_string(
+			php_pdo_get_exception(),
+			&pdo_exception,
+			"message",
+			sizeof("message")-1,
+			pdo_exception_message
+		);
+		efree(pdo_exception_message);
+		zval_ptr_dtor(&error_info);
+		zend_throw_exception_object(&pdo_exception);
+}
+
 void pdo_raise_impl_error(pdo_dbh_t *dbh, pdo_stmt_t *stmt, const char *sqlstate, const char *supp) /* {{{ */
 {
 	pdo_error_type *pdo_err = &dbh->error_code;
@@ -802,9 +829,7 @@ static int pdo_dbh_attribute_set(pdo_dbh_t *dbh, zend_long attr, zval *value) /*
 	}
 
 fail:
-	if (attr == PDO_ATTR_AUTOCOMMIT) {
-		zend_throw_exception_ex(php_pdo_get_exception(), 0, "The auto-commit mode cannot be changed for this driver");
-	} else if (!dbh->methods->set_attribute) {
+	if (!dbh->methods->set_attribute) {
 		pdo_raise_impl_error(dbh, NULL, "IM001", "driver does not support setting attributes");
 	} else {
 		PDO_HANDLE_DBH_ERR();
@@ -1108,7 +1133,7 @@ static PHP_METHOD(PDO, query)
 		}
 		/* something broke */
 		dbh->query_stmt = stmt;
-		ZVAL_COPY_VALUE(&dbh->query_stmt_zval, return_value);
+		ZVAL_OBJ(&dbh->query_stmt_zval, Z_OBJ_P(return_value));
 		Z_DELREF(stmt->database_object_handle);
 		ZVAL_UNDEF(&stmt->database_object_handle);
 		PDO_HANDLE_STMT_ERR();
@@ -1375,6 +1400,7 @@ void pdo_dbh_init(void)
 	pdo_dbh_object_handlers.offset = XtOffsetOf(pdo_dbh_object_t, std);
 	pdo_dbh_object_handlers.dtor_obj = zend_objects_destroy_object;
 	pdo_dbh_object_handlers.free_obj = pdo_dbh_free_storage;
+	pdo_dbh_object_handlers.clone_obj = NULL;
 	pdo_dbh_object_handlers.get_method = dbh_method_get;
 	pdo_dbh_object_handlers.compare_objects = dbh_compare;
 	pdo_dbh_object_handlers.get_gc = dbh_get_gc;

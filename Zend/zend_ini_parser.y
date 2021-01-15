@@ -1,3 +1,4 @@
+%require "3.0"
 %{
 /*
    +----------------------------------------------------------------------+
@@ -31,7 +32,6 @@
 #include "win32/syslog.h"
 #endif
 
-#define YYERROR_VERBOSE
 #define YYSTYPE zval
 
 int ini_parse(void);
@@ -46,6 +46,22 @@ int ini_parse(void);
 
 #define ZEND_SYSTEM_INI CG(ini_parser_unbuffered_errors)
 
+static int get_int_val(zval *op) {
+	switch (Z_TYPE_P(op)) {
+		case IS_LONG:
+			return Z_LVAL_P(op);
+		case IS_DOUBLE:
+			return (int)Z_DVAL_P(op);
+		case IS_STRING:
+		{
+			int val = atoi(Z_STRVAL_P(op));
+			zend_string_free(Z_STR_P(op));
+			return val;
+		}
+		EMPTY_SWITCH_DEFAULT_CASE()
+	}
+}
+
 /* {{{ zend_ini_do_op()
 */
 static void zend_ini_do_op(char type, zval *result, zval *op1, zval *op2)
@@ -55,22 +71,8 @@ static void zend_ini_do_op(char type, zval *result, zval *op1, zval *op2)
 	int str_len;
 	char str_result[MAX_LENGTH_OF_LONG+1];
 
-	if (IS_LONG == Z_TYPE_P(op1)) {
-		i_op1 = Z_LVAL_P(op1);
-	} else {
-		i_op1 = atoi(Z_STRVAL_P(op1));
-		zend_string_free(Z_STR_P(op1));
-	}
-	if (op2) {
-		if (IS_LONG == Z_TYPE_P(op2)) {
-			i_op2 = Z_LVAL_P(op2);
-		} else {
-			i_op2 = atoi(Z_STRVAL_P(op2));
-			zend_string_free(Z_STR_P(op2));
-		}
-	} else {
-		i_op2 = 0;
-	}
+	i_op1 = get_int_val(op1);
+	i_op2 = op2 ? get_int_val(op2) : 0;
 
 	switch (type) {
 		case '|':
@@ -287,8 +289,10 @@ static void zval_ini_dtor(zval *zv)
 %}
 
 %expect 0
-%pure-parser
+%define api.pure full
+%define parse.error verbose
 
+%token END 0 "end of file"
 %token TC_SECTION
 %token TC_RAW
 %token TC_CONSTANT
@@ -308,7 +312,7 @@ static void zval_ini_dtor(zval *zv)
 %left '|' '&' '^'
 %right '~' '!'
 
-%destructor { zval_ini_dtor(&$$); } TC_RAW TC_CONSTANT TC_NUMBER TC_STRING TC_WHITESPACE TC_LABEL TC_OFFSET TC_VARNAME BOOL_TRUE BOOL_FALSE NULL_NULL
+%destructor { zval_ini_dtor(&$$); } TC_RAW TC_CONSTANT TC_NUMBER TC_STRING TC_WHITESPACE TC_LABEL TC_OFFSET TC_VARNAME BOOL_TRUE BOOL_FALSE NULL_NULL cfg_var_ref constant_literal constant_string encapsed_list expr option_offset section_string_or_value string_or_value var_string_list var_string_list_section
 
 %%
 

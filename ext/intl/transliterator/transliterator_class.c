@@ -189,12 +189,14 @@ err:
 }
 /* }}} */
 
-#define TRANSLITERATOR_PROPERTY_HANDLER_PROLOG  \
+#define TRANSLITERATOR_PROPERTY_HANDLER_PROLOG(return_fail) \
 	zval tmp_member;							\
 	if( Z_TYPE_P( member ) != IS_STRING )		\
 	{											\
-		ZVAL_STR(&tmp_member,					\
-			zval_get_string_func(member));		\
+		zend_string *_str =						\
+			zval_try_get_string_func(member);	\
+		if (UNEXPECTED(!_str)) { return_fail; }	\
+		ZVAL_STR(&tmp_member, _str);			\
 		member = &tmp_member;					\
 		cache_slot = NULL;						\
     }
@@ -210,7 +212,7 @@ static zval *Transliterator_get_property_ptr_ptr( zval *object, zval *member, in
 {
 	zval *retval;
 
-	TRANSLITERATOR_PROPERTY_HANDLER_PROLOG;
+	TRANSLITERATOR_PROPERTY_HANDLER_PROLOG(return NULL);
 
 	if(zend_binary_strcmp( "id", sizeof( "id" ) - 1,
 		Z_STRVAL_P( member ), Z_STRLEN_P( member ) ) == 0 )
@@ -233,13 +235,13 @@ static zval *Transliterator_read_property( zval *object, zval *member, int type,
 {
 	zval *retval;
 
-	TRANSLITERATOR_PROPERTY_HANDLER_PROLOG;
+	TRANSLITERATOR_PROPERTY_HANDLER_PROLOG(return &EG(uninitialized_zval));
 
 	if( ( type != BP_VAR_R && type != BP_VAR_IS ) &&
 		( zend_binary_strcmp( "id", sizeof( "id" ) - 1,
 		Z_STRVAL_P( member ), Z_STRLEN_P( member ) ) == 0 ) )
 	{
-		php_error_docref0( NULL, E_WARNING, "The property \"id\" is read-only" );
+		php_error_docref(NULL, E_WARNING, "The property \"id\" is read-only" );
 		retval = &EG( uninitialized_zval );
 	}
 	else
@@ -258,7 +260,7 @@ static zval *Transliterator_read_property( zval *object, zval *member, int type,
 static zval *Transliterator_write_property( zval *object, zval *member, zval *value, void **cache_slot )
 {
 	zend_class_entry *scope;
-	TRANSLITERATOR_PROPERTY_HANDLER_PROLOG;
+	TRANSLITERATOR_PROPERTY_HANDLER_PROLOG(return value);
 
 	if (EG(fake_scope)) {
 		scope = EG(fake_scope);
@@ -269,7 +271,7 @@ static zval *Transliterator_write_property( zval *object, zval *member, zval *va
 		( zend_binary_strcmp( "id", sizeof( "id" ) - 1,
 		Z_STRVAL_P( member ), Z_STRLEN_P( member ) ) == 0 ) )
 	{
-		php_error_docref0( NULL, E_WARNING, "The property \"id\" is read-only" );
+		php_error_docref(NULL, E_WARNING, "The property \"id\" is read-only" );
 	}
 	else
 	{

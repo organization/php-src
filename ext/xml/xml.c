@@ -1157,7 +1157,7 @@ static void php_xml_parser_create_impl(INTERNAL_FUNCTION_PARAMETERS, int ns_supp
 	XML_SetUserData(parser->parser, parser);
 
 	RETVAL_RES(zend_register_resource(parser, le_xml_parser));
-	ZVAL_COPY(&parser->index, return_value);
+	ZVAL_COPY_VALUE(&parser->index, return_value);
 }
 /* }}} */
 
@@ -1200,7 +1200,8 @@ PHP_FUNCTION(xml_set_object)
 	/* please leave this commented - or ask thies@thieso.net before doing it (again) */
 	/* zval_add_ref(&parser->object); */
 
-	ZVAL_COPY(&parser->object, mythis);
+	Z_ADDREF_P(mythis);
+	ZVAL_OBJ(&parser->object, Z_OBJ_P(mythis));
 
 	RETVAL_TRUE;
 }
@@ -1588,7 +1589,7 @@ PHP_FUNCTION(xml_parser_free)
 		RETURN_FALSE;
 	}
 
-	if (zend_list_delete(Z_RES(parser->index)) == FAILURE) {
+	if (zend_list_close(Z_RES(parser->index)) == FAILURE) {
 		RETURN_FALSE;
 	}
 
@@ -1628,7 +1629,10 @@ PHP_FUNCTION(xml_parser_set_option)
 			break;
 		case PHP_XML_OPTION_TARGET_ENCODING: {
 			const xml_encoding *enc;
-			convert_to_string_ex(val);
+			if (!try_convert_to_string(val)) {
+				return;
+			}
+
 			enc = xml_get_encoding((XML_Char*)Z_STRVAL_P(val));
 			if (enc == NULL) {
 				php_error_docref(NULL, E_WARNING, "Unsupported target encoding \"%s\"", Z_STRVAL_P(val));

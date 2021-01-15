@@ -16,6 +16,11 @@
    +----------------------------------------------------------------------+
 */
 
+/*
+To generate ffi_parser.c use llk <https://github.com/dstogov/llk>:
+php llk.php ffi.g
+*/
+
 %start          declarations
 %sub-start      type_name
 %case-sensetive true
@@ -69,6 +74,7 @@ static void yy_error_sym(const char *msg, int sym);
 declarations:
 	(
 		{zend_ffi_dcl common_dcl = ZEND_FFI_ATTR_INIT;}
+		"__extension__"?
 		declaration_specifiers(&common_dcl)
 		(
 			{const char *name;}
@@ -76,6 +82,14 @@ declarations:
 			{zend_ffi_dcl dcl;}
 			{dcl = common_dcl;}
 			declarator(&dcl, &name, &name_len)
+			(
+				{zend_ffi_val asm_str;}
+				"__asm__"
+				"("
+				STRING(&asm_str)+
+				/*TODO*/
+				")"
+			)?
 			attributes(&dcl)?
 			initializer?
 			{zend_ffi_declare(name, name_len, &dcl);}
@@ -113,14 +127,6 @@ declaration_specifiers(zend_ffi_dcl *dcl):
 			{dcl->flags |= ZEND_FFI_DCL_INLINE;}
 		|	"_Noreturn"
 			{dcl->flags |= ZEND_FFI_DCL_NO_RETURN;}
-		|	"__cdecl"
-			{zend_ffi_set_abi(dcl, ZEND_FFI_ABI_CDECL);}
-		|	"__stdcall"
-			{zend_ffi_set_abi(dcl, ZEND_FFI_ABI_STDCALL);}
-		|	"__fastcall"
-			{zend_ffi_set_abi(dcl, ZEND_FFI_ABI_FASTCALL);}
-		|	"__thiscall"
-			{zend_ffi_set_abi(dcl, ZEND_FFI_ABI_THISCALL);}
 		|	"_Alignas"
 			"("
 			(	&type_name_start
@@ -140,6 +146,7 @@ declaration_specifiers(zend_ffi_dcl *dcl):
 ;
 
 specifier_qualifier_list(zend_ffi_dcl *dcl):
+	"__extension__"?
 	(	?{sym != YY_ID || zend_ffi_is_typedef_name((const char*)yy_text, yy_pos - yy_text)}
 		(	type_specifier(dcl)
 		|	type_qualifier(dcl)
@@ -206,7 +213,7 @@ type_specifier(zend_ffi_dcl *dcl):
 	|	{if (dcl->flags & ZEND_FFI_DCL_TYPE_SPECIFIERS) yy_error_sym("unexpected", sym);}
 		"_Bool"
 		{dcl->flags |= ZEND_FFI_DCL_BOOL;}
-	|	{if (dcl->flags & (ZEND_FFI_DCL_TYPE_SPECIFIERS-(ZEND_FFI_DCL_FLOAT|ZEND_FFI_DCL_DOUBLE|ZEND_FFI_DCL_LONG))) yy_error_sym("Unexpected '%s'", sym);}
+	|	{if (dcl->flags & (ZEND_FFI_DCL_TYPE_SPECIFIERS-(ZEND_FFI_DCL_FLOAT|ZEND_FFI_DCL_DOUBLE|ZEND_FFI_DCL_LONG))) yy_error_sym("unexpected", sym);}
 		("_Complex"|"complex"|"__complex"|"__complex__")
 		{dcl->flags |= ZEND_FFI_DCL_COMPLEX;}
 //	|	"_Atomic" "(" type_name ")" // TODO: not-implemented ???
@@ -341,7 +348,7 @@ declarator(zend_ffi_dcl *dcl, const char **name, size_t *name_len):
 		")"
 		{nested = 1;}
 	)
-	array_or_function_declarators(dcl)?
+	array_or_function_declarators(dcl, &nested_dcl)?
 	{if (nested) zend_ffi_nested_declaration(dcl, &nested_dcl);}
 ;
 
@@ -356,7 +363,7 @@ abstract_declarator(zend_ffi_dcl *dcl):
 		")"
 		{nested = 1;}
 	)?
-	array_or_function_declarators(dcl)?
+	array_or_function_declarators(dcl, &nested_dcl)?
 	{if (nested) zend_ffi_nested_declaration(dcl, &nested_dcl);}
 ;
 
@@ -373,7 +380,7 @@ parameter_declarator(zend_ffi_dcl *dcl, const char **name, size_t *name_len):
 	|	ID(name, name_len)
 	|	/* empty */
 	)
-	array_or_function_declarators(dcl)?
+	array_or_function_declarators(dcl, &nested_dcl)?
 	{if (nested) zend_ffi_nested_declaration(dcl, &nested_dcl);}
 ;
 
@@ -384,7 +391,7 @@ pointer(zend_ffi_dcl *dcl):
 	)+
 ;
 
-array_or_function_declarators(zend_ffi_dcl *dcl):
+array_or_function_declarators(zend_ffi_dcl *dcl, zend_ffi_dcl *nested_dcl):
 	{zend_ffi_dcl dummy = ZEND_FFI_ATTR_INIT;}
 	{zend_ffi_val len = {.kind = ZEND_FFI_VAL_EMPTY};}
 	{HashTable *args = NULL;}
@@ -409,7 +416,7 @@ array_or_function_declarators(zend_ffi_dcl *dcl):
 			)
 		)
 		"]"
-		array_or_function_declarators(dcl)?
+		array_or_function_declarators(dcl, nested_dcl)?
 		{dcl->attr |= attr;}
 		{zend_ffi_make_array_type(dcl, &len);}
 	|	"("
@@ -427,9 +434,9 @@ array_or_function_declarators(zend_ffi_dcl *dcl):
 			{attr |= ZEND_FFI_ATTR_VARIADIC;}
 		)?
 		")"
-		array_or_function_declarators(dcl)?
+		array_or_function_declarators(dcl, nested_dcl)?
 		{dcl->attr |= attr;}
-		{zend_ffi_make_func_type(dcl, args);}
+		{zend_ffi_make_func_type(dcl, args, nested_dcl);}
 //	|	"(" (ID ("," ID)*)? ")" // TODO: ANSI function not-implemented ???
 	)
 ;
@@ -477,6 +484,16 @@ attributes(zend_ffi_dcl *dcl):
 				)?
 			)+
 		")"
+	|	"__cdecl"
+		{zend_ffi_set_abi(dcl, ZEND_FFI_ABI_CDECL);}
+	|	"__stdcall"
+		{zend_ffi_set_abi(dcl, ZEND_FFI_ABI_STDCALL);}
+	|	"__fastcall"
+		{zend_ffi_set_abi(dcl, ZEND_FFI_ABI_FASTCALL);}
+	|	"__thiscall"
+		{zend_ffi_set_abi(dcl, ZEND_FFI_ABI_THISCALL);}
+	|	"__vectorcall"
+		{zend_ffi_set_abi(dcl, ZEND_FFI_ABI_VECTORCALL);}
 	)++
 ;
 
@@ -485,10 +502,13 @@ attrib(zend_ffi_dcl *dcl):
 	{size_t name_len;}
 	{int n;}
 	{zend_ffi_val val;}
+	{zend_bool orig_attribute_parsing;}
 	(   ID(&name, &name_len)
 		(	/* empty */
 			{zend_ffi_add_attribute(dcl, name, name_len);}
 		|	"("
+			{orig_attribute_parsing = FFI_G(attribute_parsing);}
+			{FFI_G(attribute_parsing) = 1;}
 			assignment_expression(&val)
 			{zend_ffi_add_attribute_value(dcl, name, name_len, 0, &val);}
 			{n = 0;}
@@ -496,8 +516,12 @@ attrib(zend_ffi_dcl *dcl):
 				assignment_expression(&val)
 				{zend_ffi_add_attribute_value(dcl, name, name_len, ++n, &val);}
 			)*
+			{FFI_G(attribute_parsing) = orig_attribute_parsing;}
 			")"
 		)
+	|	"const"
+	|	"__const"
+	|	"__const__"
 	)?
 ;
 
@@ -861,6 +885,7 @@ SKIP: ( EOL | WS | ONE_LINE_COMMENT | COMMENT )*;
 int zend_ffi_parse_decl(const char *str, size_t len) {
 	if (SETJMP(FFI_G(bailout))==0) {
 		FFI_G(allow_vla) = 0;
+		FFI_G(attribute_parsing) = 0;
 		yy_buf = (unsigned char*)str;
 		yy_end = yy_buf + len;
 		parse();
@@ -875,6 +900,7 @@ int zend_ffi_parse_type(const char *str, size_t len, zend_ffi_dcl *dcl) {
 
 	if (SETJMP(FFI_G(bailout))==0) {
 		FFI_G(allow_vla) = 0;
+		FFI_G(attribute_parsing) = 0;
 		yy_pos = yy_text = yy_buf = (unsigned char*)str;
 		yy_end = yy_buf + len;
 		yy_line = 1;

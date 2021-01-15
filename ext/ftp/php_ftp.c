@@ -318,12 +318,14 @@ static void ftp_destructor_ftpbuf(zend_resource *rsrc)
 PHP_MINIT_FUNCTION(ftp)
 {
 #ifdef HAVE_FTP_SSL
+#if OPENSSL_VERSION_NUMBER < 0x10101000 && !defined(LIBRESSL_VERSION_NUMBER)
 	SSL_library_init();
 	OpenSSL_add_all_ciphers();
 	OpenSSL_add_all_digests();
 	OpenSSL_add_all_algorithms();
 
 	SSL_load_error_strings();
+#endif
 #endif
 
 	le_ftpbuf = zend_register_list_destructors_ex(ftp_destructor_ftpbuf, NULL, le_ftpbuf_name, module_number);
@@ -688,7 +690,7 @@ PHP_FUNCTION(ftp_alloc)
 	ret = ftp_alloc(ftp, size, zresponse ? &response : NULL);
 
 	if (response) {
-		ZEND_TRY_ASSIGN_STR(zresponse, response);
+		ZEND_TRY_ASSIGN_REF_STR(zresponse, response);
 	}
 
 	if (!ret) {

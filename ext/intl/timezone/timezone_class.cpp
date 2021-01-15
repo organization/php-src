@@ -179,7 +179,10 @@ U_CFUNC TimeZone *timezone_process_timezone_argument(zval *zv_timezone,
 		UnicodeString	id,
 						gottenId;
 		UErrorCode		status = U_ZERO_ERROR; /* outside_error may be NULL */
-		convert_to_string_ex(zv_timezone);
+		if (!try_convert_to_string(zv_timezone)) {
+			zval_ptr_dtor_str(&local_zv_tz);
+			return NULL;
+		}
 		if (intl_stringFromChar(id, Z_STRVAL_P(zv_timezone), Z_STRLEN_P(zv_timezone),
 				&status) == FAILURE) {
 			spprintf(&message, 0, "%s: Time zone identifier given is not a "
@@ -502,7 +505,7 @@ U_CFUNC void timezone_register_IntlTimeZone_class(void)
 	TimeZone_ce_ptr = zend_register_internal_class(&ce);
 	if (!TimeZone_ce_ptr) {
 		//can't happen now without bigger problems before
-		php_error_docref0(NULL, E_ERROR,
+		php_error_docref(NULL, E_ERROR,
 			"IntlTimeZone: class registration has failed.");
 		return;
 	}

@@ -201,7 +201,6 @@ struct _zval_struct {
 				zend_uchar    type,			/* active type */
 				zend_uchar    type_flags,
 				union {
-					uint16_t  call_info;    /* call info for EX(This) */
 					uint16_t  extra;        /* not further specified */
 				} u)
 		} v;
@@ -383,16 +382,14 @@ struct _zend_resource {
 	void             *ptr;
 };
 
-typedef struct _zend_property_info zend_property_info;
-
 typedef struct {
 	size_t num;
 	size_t num_allocated;
-	zend_property_info *ptr[1];
+	struct _zend_property_info *ptr[1];
 } zend_property_info_list;
 
 typedef union {
-	zend_property_info *ptr;
+	struct _zend_property_info *ptr;
 	uintptr_t list;
 } zend_property_info_source_list;
 
@@ -430,6 +427,7 @@ struct _zend_ast_ref {
 /* internal types */
 #define IS_INDIRECT             	13
 #define IS_PTR						14
+#define IS_ALIAS_PTR				15
 #define _IS_ERROR					15
 
 /* fake types used only for type hinting (Z_TYPE(zv) can not use them) */
@@ -556,9 +554,11 @@ static zend_always_inline uint32_t zval_gc_info(uint32_t gc_type_info) {
 
 /* zval.u1.v.type_flags */
 #define IS_TYPE_REFCOUNTED			(1<<0)
+#define IS_TYPE_COLLECTABLE			(1<<1)
 
 #if 1
 /* This optimized version assumes that we have a single "type_flag" */
+/* IS_TYPE_COLLECTABLE may be used only with IS_TYPE_REFCOUNTED */
 # define Z_TYPE_INFO_REFCOUNTED(t)	(((t) & Z_TYPE_FLAGS_MASK) != 0)
 #else
 # define Z_TYPE_INFO_REFCOUNTED(t)	(((t) & (IS_TYPE_REFCOUNTED << Z_TYPE_FLAGS_SHIFT)) != 0)
@@ -568,8 +568,8 @@ static zend_always_inline uint32_t zval_gc_info(uint32_t gc_type_info) {
 #define IS_INTERNED_STRING_EX		IS_STRING
 
 #define IS_STRING_EX				(IS_STRING         | (IS_TYPE_REFCOUNTED << Z_TYPE_FLAGS_SHIFT))
-#define IS_ARRAY_EX					(IS_ARRAY          | (IS_TYPE_REFCOUNTED << Z_TYPE_FLAGS_SHIFT))
-#define IS_OBJECT_EX				(IS_OBJECT         | (IS_TYPE_REFCOUNTED << Z_TYPE_FLAGS_SHIFT))
+#define IS_ARRAY_EX					(IS_ARRAY          | (IS_TYPE_REFCOUNTED << Z_TYPE_FLAGS_SHIFT) | (IS_TYPE_COLLECTABLE << Z_TYPE_FLAGS_SHIFT))
+#define IS_OBJECT_EX				(IS_OBJECT         | (IS_TYPE_REFCOUNTED << Z_TYPE_FLAGS_SHIFT) | (IS_TYPE_COLLECTABLE << Z_TYPE_FLAGS_SHIFT))
 #define IS_RESOURCE_EX				(IS_RESOURCE       | (IS_TYPE_REFCOUNTED << Z_TYPE_FLAGS_SHIFT))
 #define IS_REFERENCE_EX				(IS_REFERENCE      | (IS_TYPE_REFCOUNTED << Z_TYPE_FLAGS_SHIFT))
 
@@ -625,11 +625,15 @@ static zend_always_inline uint32_t zval_gc_info(uint32_t gc_type_info) {
 
 #if 1
 /* This optimized version assumes that we have a single "type_flag" */
+/* IS_TYPE_COLLECTABLE may be used only with IS_TYPE_REFCOUNTED */
 #define Z_REFCOUNTED(zval)			(Z_TYPE_FLAGS(zval) != 0)
 #else
 #define Z_REFCOUNTED(zval)			((Z_TYPE_FLAGS(zval) & IS_TYPE_REFCOUNTED) != 0)
 #endif
 #define Z_REFCOUNTED_P(zval_p)		Z_REFCOUNTED(*(zval_p))
+
+#define Z_COLLECTABLE(zval)			((Z_TYPE_FLAGS(zval) & IS_TYPE_COLLECTABLE) != 0)
+#define Z_COLLECTABLE_P(zval_p)		Z_COLLECTABLE(*(zval_p))
 
 /* deprecated: (COPYABLE is the same as IS_ARRAY) */
 #define Z_COPYABLE(zval)			(Z_TYPE(zval) == IS_ARRAY)
@@ -961,6 +965,11 @@ static zend_always_inline uint32_t zval_gc_info(uint32_t gc_type_info) {
 		Z_TYPE_INFO_P(z) = IS_PTR;								\
 	} while (0)
 
+#define ZVAL_ALIAS_PTR(z, p) do {								\
+		Z_PTR_P(z) = (p);										\
+		Z_TYPE_INFO_P(z) = IS_ALIAS_PTR;						\
+	} while (0)
+
 #define ZVAL_ERROR(z) do {				\
 		Z_TYPE_INFO_P(z) = _IS_ERROR;	\
 	} while (0)
@@ -1027,6 +1036,7 @@ static zend_always_inline uint32_t zend_gc_addref(zend_refcounted_h *p) {
 }
 
 static zend_always_inline uint32_t zend_gc_delref(zend_refcounted_h *p) {
+	ZEND_ASSERT(p->refcount > 0);
 	ZEND_RC_MOD_CHECK(p);
 	return --(p->refcount);
 }
@@ -1255,5 +1265,19 @@ static zend_always_inline uint32_t zval_delref_p(zval* pz) {
 			Z_ADDREF_P(varptr); 						\
 		}												\
 	} while (0)
+
+/* Properties store a flag distinguishing unset and unintialized properties
+ * (both use IS_UNDEF type) in the Z_EXTRA space. As such we also need to copy
+ * the Z_EXTRA space when copying property default values etc. We define separate
+ * macros for this purpose, so this workaround is easier to remove in the future. */
+#define IS_PROP_UNINIT 1
+#define Z_PROP_FLAG_P(z) Z_EXTRA_P(z)
+#define ZVAL_COPY_VALUE_PROP(z, v) \
+	do { *(z) = *(v); } while (0)
+#define ZVAL_COPY_PROP(z, v) \
+	do { ZVAL_COPY(z, v); Z_PROP_FLAG_P(z) = Z_PROP_FLAG_P(v); } while (0)
+#define ZVAL_COPY_OR_DUP_PROP(z, v) \
+	do { ZVAL_COPY_OR_DUP(z, v); Z_PROP_FLAG_P(z) = Z_PROP_FLAG_P(v); } while (0)
+
 
 #endif /* ZEND_TYPES_H */

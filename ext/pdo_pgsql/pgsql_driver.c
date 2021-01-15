@@ -31,12 +31,7 @@
 #include "pdo/php_pdo_driver.h"
 #include "pdo/php_pdo_error.h"
 #include "ext/standard/file.h"
-
-#undef PACKAGE_BUGREPORT
-#undef PACKAGE_NAME
-#undef PACKAGE_STRING
-#undef PACKAGE_TARNAME
-#undef PACKAGE_VERSION
+#undef SIZEOF_OFF_T
 #include "pg_config.h" /* needed for PG_VERSION */
 #include "php_pdo_pgsql.h"
 #include "php_pdo_pgsql_int.h"
@@ -101,8 +96,7 @@ int _pdo_pgsql_error(pdo_dbh_t *dbh, pdo_stmt_t *stmt, int errcode, const char *
 	}
 
 	if (!dbh->methods) {
-		zend_throw_exception_ex(php_pdo_get_exception(), einfo->errcode, "SQLSTATE[%s] [%d] %s",
-				*pdo_err, einfo->errcode, einfo->errmsg);
+		pdo_throw_exception(einfo->errcode, einfo->errmsg, pdo_err);
 	}
 
 	return errcode;
@@ -130,13 +124,13 @@ static int pdo_pgsql_fetch_error_func(pdo_dbh_t *dbh, pdo_stmt_t *stmt, zval *in
 /* }}} */
 
 /* {{{ pdo_pgsql_create_lob_stream */
-static size_t pgsql_lob_write(php_stream *stream, const char *buf, size_t count)
+static ssize_t pgsql_lob_write(php_stream *stream, const char *buf, size_t count)
 {
 	struct pdo_pgsql_lob_self *self = (struct pdo_pgsql_lob_self*)stream->abstract;
 	return lo_write(self->conn, self->lfd, (char*)buf, count);
 }
 
-static size_t pgsql_lob_read(php_stream *stream, char *buf, size_t count)
+static ssize_t pgsql_lob_read(php_stream *stream, char *buf, size_t count)
 {
 	struct pdo_pgsql_lob_self *self = (struct pdo_pgsql_lob_self*)stream->abstract;
 	return lo_read(self->conn, self->lfd, buf, count);
@@ -262,36 +256,36 @@ static int pgsql_handle_preparer(pdo_dbh_t *dbh, const char *sql, size_t sql_len
 		execute_only = H->disable_prepares;
 	}
 
-	if (!emulate && PQprotocolVersion(H->server) > 2) {
-		stmt->supports_placeholders = PDO_PLACEHOLDER_NAMED;
-		stmt->named_rewrite_template = "$%d";
-		ret = pdo_parse_params(stmt, (char*)sql, sql_len, &nsql, &nsql_len);
-
-		if (ret == 1) {
-			/* query was re-written */
-			sql = nsql;
-		} else if (ret == -1) {
-			/* couldn't grok it */
-			strcpy(dbh->error_code, stmt->error_code);
-			return 0;
-		}
-
-		if (!execute_only) {
-			/* prepared query: set the query name and defer the
-			   actual prepare until the first execute call */
-			spprintf(&S->stmt_name, 0, "pdo_stmt_%08x", ++H->stmt_counter);
-		}
-
-		if (nsql) {
-			S->query = nsql;
-		} else {
-			S->query = estrdup(sql);
-		}
-
-		return 1;
+	if (!emulate && PQprotocolVersion(H->server) <= 2) {
+		emulate = 1;
 	}
 
-	stmt->supports_placeholders = PDO_PLACEHOLDER_NONE;
+	if (emulate) {
+		stmt->supports_placeholders = PDO_PLACEHOLDER_NONE;
+	} else {
+		stmt->supports_placeholders = PDO_PLACEHOLDER_NAMED;
+		stmt->named_rewrite_template = "$%d";
+	}
+
+	ret = pdo_parse_params(stmt, (char*)sql, sql_len, &nsql, &nsql_len);
+
+	if (ret == -1) {
+		/* couldn't grok it */
+		strcpy(dbh->error_code, stmt->error_code);
+		return 0;
+	} else if (ret == 1) {
+		/* query was re-written */
+		S->query = nsql;
+	} else {
+		S->query = estrdup(sql);
+	}
+
+	if (!emulate && !execute_only) {
+		/* prepared query: set the query name and defer the
+		   actual prepare until the first execute call */
+		spprintf(&S->stmt_name, 0, "pdo_stmt_%08x", ++H->stmt_counter);
+	}
+
 	return 1;
 }
 
@@ -479,7 +473,7 @@ static int pdo_pgsql_get_attribute(pdo_dbh_t *dbh, zend_long attr, zval *return_
 static int pdo_pgsql_check_liveness(pdo_dbh_t *dbh)
 {
 	pdo_pgsql_db_handle *H = (pdo_pgsql_db_handle *)dbh->driver_data;
-	if (PQstatus(H->server) == CONNECTION_BAD) {
+	if (!PQconsumeInput(H->server) || PQstatus(H->server) == CONNECTION_BAD) {
 		PQreset(H->server);
 	}
 	return (PQstatus(H->server) == CONNECTION_OK) ? SUCCESS : FAILURE;
@@ -598,7 +592,10 @@ static PHP_METHOD(PDO, pgsqlCopyFromArray)
 		PQclear(pgsql_result);
 		ZEND_HASH_FOREACH_VAL(Z_ARRVAL_P(pg_rows), tmp) {
 			size_t query_len;
-			convert_to_string_ex(tmp);
+			if (!try_convert_to_string(tmp)) {
+				efree(query);
+				return;
+			}
 
 			if (buffer_len < Z_STRLEN_P(tmp)) {
 				buffer_len = Z_STRLEN_P(tmp);
@@ -1071,13 +1068,21 @@ static PHP_METHOD(PDO, pgsqlGetNotify)
 
 	H = (pdo_pgsql_db_handle *)dbh->driver_data;
 
-	PQconsumeInput(H->server);
+	if (!PQconsumeInput(H->server)) {
+		pdo_pgsql_error(dbh, PGRES_FATAL_ERROR, NULL);
+		PDO_HANDLE_DBH_ERR();
+		RETURN_FALSE;
+	}
 	pgsql_notify = PQnotifies(H->server);
 
 	if (ms_timeout && !pgsql_notify) {
 		php_pollfd_for_ms(PQsocket(H->server), PHP_POLLREADABLE, (int)ms_timeout);
 
-		PQconsumeInput(H->server);
+		if (!PQconsumeInput(H->server)) {
+			pdo_pgsql_error(dbh, PGRES_FATAL_ERROR, NULL);
+			PDO_HANDLE_DBH_ERR();
+			RETURN_FALSE;
+		}
 		pgsql_notify = PQnotifies(H->server);
 	}
 
@@ -1190,6 +1195,11 @@ static int pdo_pgsql_handle_factory(pdo_dbh_t *dbh, zval *driver_options) /* {{{
 
 	H = pecalloc(1, sizeof(pdo_pgsql_db_handle), dbh->is_persistent);
 	dbh->driver_data = H;
+
+	dbh->skip_param_evt =
+		1 << PDO_PARAM_EVT_EXEC_POST |
+		1 << PDO_PARAM_EVT_FETCH_PRE |
+		1 << PDO_PARAM_EVT_FETCH_POST;
 
 	H->einfo.errcode = 0;
 	H->einfo.errmsg = NULL;

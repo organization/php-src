@@ -508,15 +508,13 @@ echo "Done";
   string(16) "some_page_ref123"
 }
 
---> http://secret@hideout@www.php.net:80/index.php?test=1&test2=char&test3=mixesCI#some_page_ref123: array(7) {
+--> http://secret@hideout@www.php.net:80/index.php?test=1&test2=char&test3=mixesCI#some_page_ref123: array(6) {
   ["scheme"]=>
   string(4) "http"
   ["host"]=>
-  string(11) "www.php.net"
+  string(26) "secret@hideout@www.php.net"
   ["port"]=>
   int(80)
-  ["user"]=>
-  string(14) "secret@hideout"
   ["path"]=>
   string(10) "/index.php"
   ["query"]=>
@@ -854,6 +852,22 @@ echo "Done";
   string(11) "/rest/Users"
   ["query"]=>
   string(19) "filter={"id":"123"}"
+}
+
+--> %:x: array(1) {
+  ["path"]=>
+  string(3) "%:x"
+}
+
+--> https://example.com:0/: array(4) {
+  ["scheme"]=>
+  string(5) "https"
+  ["host"]=>
+  string(11) "example.com"
+  ["port"]=>
+  int(0)
+  ["path"]=>
+  string(1) "/"
 }
 
 --> http:///blah.com: bool(false)

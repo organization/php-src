@@ -250,8 +250,6 @@ static php_stream_filter *strfilter_strip_tags_create(const char *filtername, zv
 
 	php_error_docref(NULL, E_DEPRECATED, "The string.strip_tags filter is deprecated");
 
-	inst = pemalloc(sizeof(php_strip_tags_filter), persistent);
-
 	if (filterparams != NULL) {
 		if (Z_TYPE_P(filterparams) == IS_ARRAY) {
 			smart_str tags_ss = {0};
@@ -268,8 +266,17 @@ static php_stream_filter *strfilter_strip_tags_create(const char *filtername, zv
 		} else {
 			allowed_tags = zval_get_string(filterparams);
 		}
+
+		/* Exception during string conversion. */
+		if (EG(exception)) {
+			if (allowed_tags) {
+				zend_string_release(allowed_tags);
+			}
+			return NULL;
+		}
 	}
 
+	inst = pemalloc(sizeof(php_strip_tags_filter), persistent);
 	if (php_strip_tags_filter_ctor(inst, allowed_tags, persistent) == SUCCESS) {
 		filter = php_stream_filter_alloc(&strfilter_strip_tags_ops, inst, persistent);
 	} else {
@@ -788,7 +795,7 @@ static php_conv_err_t php_conv_qprint_encode_convert(php_conv_qprint_encode *ins
 	lb_ptr = inst->lb_ptr;
 	lb_cnt = inst->lb_cnt;
 
-	if ((in_pp == NULL || in_left_p == NULL) && (lb_ptr >=lb_cnt)) {
+	if (in_pp == NULL || in_left_p == NULL) {
 		return PHP_CONV_ERR_SUCCESS;
 	}
 
@@ -1016,7 +1023,7 @@ static php_conv_err_t php_conv_qprint_decode_convert(php_conv_qprint_decode *ins
 	lb_ptr = inst->lb_ptr;
 	lb_cnt = inst->lb_cnt;
 
-	if ((in_pp == NULL || in_left_p == NULL) && lb_cnt == lb_ptr) {
+	if (in_pp == NULL || in_left_p == NULL) {
 		if (inst->scan_stat != 0) {
 			return PHP_CONV_ERR_UNEXPECTED_EOS;
 		}
@@ -1113,8 +1120,7 @@ static php_conv_err_t php_conv_qprint_decode_convert(php_conv_qprint_decode *ins
 					*ps == (unsigned char)inst->lbchars[lb_cnt]) {
 					lb_cnt++;
 					scan_stat = 5;
-				}
-				if (*ps != '\t' && *ps != ' ') {
+				} else if (*ps != '\t' && *ps != ' ') {
 					err = PHP_CONV_ERR_INVALID_SEQ;
 					goto out;
 				}

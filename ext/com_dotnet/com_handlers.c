@@ -38,9 +38,11 @@ static zval *com_property_read(zval *object, zval *member, int type, void **cahc
 	obj = CDNO_FETCH(object);
 
 	if (V_VT(&obj->v) == VT_DISPATCH) {
-		VariantInit(&v);
+		if (!try_convert_to_string(member)) {
+			return rv;
+		}
 
-		convert_to_string_ex(member);
+		VariantInit(&v);
 
 		res = php_com_do_invoke(obj, Z_STRVAL_P(member), Z_STRLEN_P(member),
 				DISPATCH_METHOD|DISPATCH_PROPERTYGET, &v, 0, NULL, 1);
@@ -66,9 +68,12 @@ static zval *com_property_write(zval *object, zval *member, zval *value, void **
 	obj = CDNO_FETCH(object);
 
 	if (V_VT(&obj->v) == VT_DISPATCH) {
+		if (!try_convert_to_string(member)) {
+			return value;
+		}
+
 		VariantInit(&v);
 
-		convert_to_string_ex(member);
 		if (SUCCESS == php_com_do_invoke(obj, Z_STRVAL_P(member), Z_STRLEN_P(member),
 				DISPATCH_PROPERTYPUT|DISPATCH_PROPERTYPUTREF, &v, 1, value, 0)) {
 			VariantClear(&v);
@@ -124,6 +129,11 @@ static void com_write_dimension(zval *object, zval *offset, zval *value)
 
 	obj = CDNO_FETCH(object);
 
+	if (offset == NULL) {
+		php_com_throw_exception(DISP_E_BADINDEX, "appending to variants is not supported");
+		return;
+	}
+
 	if (V_VT(&obj->v) == VT_DISPATCH) {
 		ZVAL_COPY_VALUE(&args[0], offset);
 		ZVAL_COPY_VALUE(&args[1], value);
@@ -174,6 +184,11 @@ static void com_write_dimension(zval *object, zval *offset, zval *value)
 	}
 }
 
+static zval *com_get_property_ptr_ptr(zval *object, zval *member, int type, void **cache_slot)
+{
+	return NULL;
+}
+
 #if 0
 static void com_object_set(zval **property, zval *value)
 {
@@ -195,7 +210,9 @@ static int com_property_exists(zval *object, zval *member, int check_empty, void
 	obj = CDNO_FETCH(object);
 
 	if (V_VT(&obj->v) == VT_DISPATCH) {
-		convert_to_string_ex(member);
+		if (!try_convert_to_string(member)) {
+			return 0;
+		}
 		if (SUCCEEDED(php_com_get_id_of_name(obj, Z_STRVAL_P(member), Z_STRLEN_P(member), &dispid))) {
 			/* TODO: distinguish between property and method! */
 			return 1;
@@ -231,6 +248,13 @@ static HashTable *com_properties_get(zval *object)
 	 * Perhaps it is best to leave it un-implemented.
 	 */
 	return &zend_empty_array;
+}
+
+static HashTable *com_get_gc(zval *object, zval **table, int *n)
+{
+	*table = NULL;
+	*n = 0;
+	return NULL;
 }
 
 static void function_dtor(zval *zv)
@@ -546,7 +570,7 @@ zend_object_handlers php_com_object_handlers = {
 	com_property_write,
 	com_read_dimension,
 	com_write_dimension,
-	NULL,
+	com_get_property_ptr_ptr,
 	NULL, /* com_object_get, */
 	NULL, /* com_object_set, */
 	com_property_exists,
@@ -563,7 +587,7 @@ zend_object_handlers php_com_object_handlers = {
 	com_object_count,
 	NULL,									/* get_debug_info */
 	NULL,									/* get_closure */
-	zend_std_get_gc,						/* get_gc */
+	com_get_gc,								/* get_gc */
 };
 
 void php_com_object_enable_event_sink(php_com_dotnet_object *obj, int enable)

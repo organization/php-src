@@ -69,7 +69,7 @@ zend_class_entry *mysqli_warning_class_entry;
 zend_class_entry *mysqli_exception_class_entry;
 
 
-typedef zval *(*mysqli_read_t)(mysqli_object *obj, zval *rv);
+typedef int (*mysqli_read_t)(mysqli_object *obj, zval *rv, zend_bool quiet);
 typedef int (*mysqli_write_t)(mysqli_object *obj, zval *newval);
 
 typedef struct _mysqli_prop_handler {
@@ -281,10 +281,13 @@ static void mysqli_warning_free_storage(zend_object *object)
 /* }}} */
 
 /* {{{ mysqli_read_na */
-static zval *mysqli_read_na(mysqli_object *obj, zval *retval)
+static int mysqli_read_na(mysqli_object *obj, zval *retval, zend_bool quiet)
 {
-	zend_throw_error(NULL, "Cannot read property");
-	return NULL;
+	if (!quiet) {
+		zend_throw_error(NULL, "Cannot read property");
+	}
+
+	return FAILURE;
 }
 /* }}} */
 
@@ -292,6 +295,7 @@ static zval *mysqli_read_na(mysqli_object *obj, zval *retval)
 static int mysqli_write_na(mysqli_object *obj, zval *newval)
 {
 	zend_throw_error(NULL, "Cannot write property");
+
 	return FAILURE;
 }
 /* }}} */
@@ -307,7 +311,11 @@ zval *mysqli_read_property(zval *object, zval *member, int type, void **cache_sl
 	obj = Z_MYSQLI_P(object);
 
 	if (Z_TYPE_P(member) != IS_STRING) {
-		ZVAL_STR(&tmp_member, zval_get_string_func(member));
+		zend_string *str = zval_try_get_string_func(member);
+		if (UNEXPECTED(!str)) {
+			return &EG(uninitialized_zval);
+		}
+		ZVAL_STR(&tmp_member, str);
 		member = &tmp_member;
 	}
 
@@ -316,8 +324,9 @@ zval *mysqli_read_property(zval *object, zval *member, int type, void **cache_sl
 	}
 
 	if (hnd) {
-		retval = hnd->read_func(obj, rv);
-		if (retval == NULL) {
+		if (hnd->read_func(obj, rv, type == BP_VAR_IS) == SUCCESS || type != BP_VAR_IS) {
+			retval = rv;
+		} else {
 			retval = &EG(uninitialized_zval);
 		}
 	} else {
@@ -340,7 +349,11 @@ zval *mysqli_write_property(zval *object, zval *member, zval *value, void **cach
 	mysqli_prop_handler *hnd = NULL;
 
 	if (Z_TYPE_P(member) != IS_STRING) {
-		ZVAL_STR(&tmp_member, zval_get_string_func(member));
+		zend_string *str = zval_try_get_string_func(member);
+		if (UNEXPECTED(!str)) {
+			return value;
+		}
+		ZVAL_STR(&tmp_member, str);
 		member = &tmp_member;
 	}
 
@@ -427,6 +440,7 @@ HashTable *mysqli_object_get_debug_info(zval *object, int *is_temp)
 		zval rv, member;
 		zval *value;
 		ZVAL_STR(&member, entry->name);
+
 		value = mysqli_read_property(object, &member, BP_VAR_IS, 0, &rv);
 		if (value != &EG(uninitialized_zval)) {
 			zend_hash_add(retval, Z_STR(member), value);
@@ -626,7 +640,6 @@ PHP_MINIT_FUNCTION(mysqli)
 	zend_declare_property_null(ce, "insert_id",			sizeof("insert_id") - 1, ZEND_ACC_PUBLIC);
 	zend_declare_property_null(ce, "server_info", 		sizeof("server_info") - 1, ZEND_ACC_PUBLIC);
 	zend_declare_property_null(ce, "server_version", 	sizeof("server_version") - 1, ZEND_ACC_PUBLIC);
-	zend_declare_property_null(ce, "stat", 				sizeof("stat") - 1, ZEND_ACC_PUBLIC);
 	zend_declare_property_null(ce, "sqlstate", 			sizeof("sqlstate") - 1, ZEND_ACC_PUBLIC);
 	zend_declare_property_null(ce, "protocol_version", 	sizeof("protocol_version") - 1,  ZEND_ACC_PUBLIC);
 	zend_declare_property_null(ce, "thread_id",			sizeof("thread_id") - 1, ZEND_ACC_PUBLIC);
@@ -686,7 +699,7 @@ PHP_MINIT_FUNCTION(mysqli)
 #ifdef MYSQLND_STRING_TO_INT_CONVERSION
 	REGISTER_LONG_CONSTANT("MYSQLI_OPT_INT_AND_FLOAT_NATIVE", MYSQLND_OPT_INT_AND_FLOAT_NATIVE, CONST_CS | CONST_PERSISTENT);
 #endif
-#if MYSQL_VERSION_ID > 50110 || defined(MYSQLI_USE_MYSQLND)
+#if (MYSQL_VERSION_ID > 50110 && MYSQL_VERSION_ID < 80000) || (MYSQL_VERSION_ID >= 100000) || defined(MYSQLI_USE_MYSQLND)
 	REGISTER_LONG_CONSTANT("MYSQLI_OPT_SSL_VERIFY_SERVER_CERT", MYSQL_OPT_SSL_VERIFY_SERVER_CERT, CONST_CS | CONST_PERSISTENT);
 #endif
 
@@ -1028,51 +1041,38 @@ PHP_FUNCTION(mysqli_stmt_construct)
 	zval				*mysql_link;
 	MY_STMT				*stmt;
 	MYSQLI_RESOURCE		*mysqli_resource;
-	char				*statement;
+	char				*statement = NULL;
 	size_t					statement_len;
 
-	switch (ZEND_NUM_ARGS())
-	{
-		case 1:  /* mysql_stmt_init */
-			if (zend_parse_parameters(1, "O", &mysql_link, mysqli_link_class_entry)==FAILURE) {
-				return;
-			}
-			MYSQLI_FETCH_RESOURCE_CONN(mysql, mysql_link, MYSQLI_STATUS_VALID);
-
-			stmt = (MY_STMT *)ecalloc(1,sizeof(MY_STMT));
-
-			stmt->stmt = mysql_stmt_init(mysql->mysql);
-		break;
-		case 2:
-			if (zend_parse_parameters(2, "Os", &mysql_link, mysqli_link_class_entry, &statement, &statement_len)==FAILURE) {
-				return;
-			}
-			MYSQLI_FETCH_RESOURCE_CONN(mysql, mysql_link, MYSQLI_STATUS_VALID);
-
-			stmt = (MY_STMT *)ecalloc(1,sizeof(MY_STMT));
-
-			if ((stmt->stmt = mysql_stmt_init(mysql->mysql))) {
-				mysql_stmt_prepare(stmt->stmt, (char *)statement, statement_len);
-			}
-		break;
-		default:
-			WRONG_PARAM_COUNT;
-		break;
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "O|s!", &mysql_link, mysqli_link_class_entry, &statement, &statement_len) == FAILURE) {
+		return;
 	}
+	MYSQLI_FETCH_RESOURCE_CONN(mysql, mysql_link, MYSQLI_STATUS_VALID);
 
-	if (!stmt->stmt) {
+	stmt = (MY_STMT *) ecalloc(1, sizeof(MY_STMT));
+
+	if (!(stmt->stmt = mysql_stmt_init(mysql->mysql))) {
 		efree(stmt);
 		RETURN_FALSE;
 	}
+
 #ifndef MYSQLI_USE_MYSQLND
 	ZVAL_COPY(&stmt->link_handle, mysql_link);
 #endif
 
 	mysqli_resource = (MYSQLI_RESOURCE *)ecalloc (1, sizeof(MYSQLI_RESOURCE));
 	mysqli_resource->ptr = (void *)stmt;
-	mysqli_resource->status = (ZEND_NUM_ARGS() == 1) ? MYSQLI_STATUS_INITIALIZED : MYSQLI_STATUS_VALID;
+	mysqli_resource->status = MYSQLI_STATUS_INITIALIZED;
 
 	MYSQLI_REGISTER_RESOURCE_EX(mysqli_resource, getThis());
+
+	if (statement) {
+		if(mysql_stmt_prepare(stmt->stmt, statement, statement_len)) {
+			MYSQLI_REPORT_STMT_ERROR(stmt->stmt);
+			RETURN_FALSE;
+		}
+		mysqli_resource->status = MYSQLI_STATUS_VALID;
+	}
 }
 /* }}} */
 

@@ -58,6 +58,9 @@ extern zend_module_entry curl_module_entry;
 #define PHP_CURL_RETURN 4
 #define PHP_CURL_IGNORE 7
 
+#define SAVE_CURL_ERROR(__handle, __err) \
+    do { (__handle)->err.no = (int) __err; } while (0)
+
 extern int  le_curl;
 #define le_curl_name "cURL handle"
 extern int  le_curl_multi_handle;
@@ -167,6 +170,7 @@ struct _php_curl_send_headers {
 struct _php_curl_free {
 	zend_llist str;
 	zend_llist post;
+	zend_llist stream;
 	HashTable *slist;
 };
 
@@ -179,6 +183,9 @@ typedef struct {
 	struct _php_curl_error        err;
 	zend_bool                     in_callback;
 	uint32_t*                     clone;
+#if LIBCURL_VERSION_NUM >= 0x073800 /* 7.56.0 */
+	zval                          postfields;
+#endif
 } php_curl;
 
 #define CURLOPT_SAFE_UPLOAD -1

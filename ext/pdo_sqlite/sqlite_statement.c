@@ -41,6 +41,46 @@ static int pdo_sqlite_stmt_dtor(pdo_stmt_t *stmt)
 	return 1;
 }
 
+/**
+ * Change the column count on the statement.
+ *
+ * Since PHP 7.2 sqlite3_prepare_v2 is used which auto recompile prepared statement on schema change.
+ * Instead of raise an error on schema change, the result set will change, and the statement's columns must be updated.
+ *
+ * See bug #78192
+ */
+static void pdo_sqlite_stmt_set_column_count(pdo_stmt_t *stmt, int new_count)
+{
+	/* Columns not yet "described" */
+	if (!stmt->columns) {
+		stmt->column_count = new_count;
+
+		return;
+	}
+
+	/*
+	 * The column count has not changed : no need to reload columns description
+	 * Note: Do not handle attribute name change, without column count change
+	 */
+	if (new_count == stmt->column_count) {
+		return;
+	}
+
+	/* Free previous columns to force reload description */
+	int i;
+
+	for (i = 0; i < stmt->column_count; i++) {
+		if (stmt->columns[i].name) {
+			zend_string_release(stmt->columns[i].name);
+			stmt->columns[i].name = NULL;
+		}
+	}
+
+	efree(stmt->columns);
+	stmt->columns = NULL;
+	stmt->column_count = new_count;
+}
+
 static int pdo_sqlite_stmt_execute(pdo_stmt_t *stmt)
 {
 	pdo_sqlite_stmt *S = (pdo_sqlite_stmt*)stmt->driver_data;
@@ -53,11 +93,11 @@ static int pdo_sqlite_stmt_execute(pdo_stmt_t *stmt)
 	switch (sqlite3_step(S->stmt)) {
 		case SQLITE_ROW:
 			S->pre_fetched = 1;
-			stmt->column_count = sqlite3_data_count(S->stmt);
+			pdo_sqlite_stmt_set_column_count(stmt, sqlite3_data_count(S->stmt));
 			return 1;
 
 		case SQLITE_DONE:
-			stmt->column_count = sqlite3_column_count(S->stmt);
+			pdo_sqlite_stmt_set_column_count(stmt, sqlite3_column_count(S->stmt));
 			stmt->row_count = sqlite3_changes(S->H->db);
 			sqlite3_reset(S->stmt);
 			S->done = 1;
@@ -153,7 +193,9 @@ static int pdo_sqlite_stmt_param_hook(pdo_stmt_t *stmt, struct pdo_bound_param_d
 							pdo_sqlite_error_stmt(stmt);
 							return 0;
 						} else {
-							convert_to_string(parameter);
+							if (!try_convert_to_string(parameter)) {
+								return 0;
+							}
 						}
 
 						if (SQLITE_OK == sqlite3_bind_blob(S->stmt, param->paramno + 1,
@@ -176,7 +218,9 @@ static int pdo_sqlite_stmt_param_hook(pdo_stmt_t *stmt, struct pdo_bound_param_d
 								return 1;
 							}
 						} else {
-							convert_to_string(parameter);
+							if (!try_convert_to_string(parameter)) {
+								return 0;
+							}
 							if (SQLITE_OK == sqlite3_bind_text(S->stmt, param->paramno + 1,
 									Z_STRVAL_P(parameter),
 									Z_STRLEN_P(parameter),
@@ -242,7 +286,7 @@ static int pdo_sqlite_stmt_describe(pdo_stmt_t *stmt, int colno)
 
 	str = sqlite3_column_name(S->stmt, colno);
 	stmt->columns[colno].name = zend_string_init(str, strlen(str), 0);
-	stmt->columns[colno].maxlen = 0xffffffff;
+	stmt->columns[colno].maxlen = SIZE_MAX;
 	stmt->columns[colno].precision = 0;
 
 	switch (sqlite3_column_type(S->stmt, colno)) {
@@ -259,7 +303,7 @@ static int pdo_sqlite_stmt_describe(pdo_stmt_t *stmt, int colno)
 	return 1;
 }
 
-static int pdo_sqlite_stmt_get_col(pdo_stmt_t *stmt, int colno, char **ptr, zend_ulong *len, int *caller_frees)
+static int pdo_sqlite_stmt_get_col(pdo_stmt_t *stmt, int colno, char **ptr, size_t *len, int *caller_frees)
 {
 	pdo_sqlite_stmt *S = (pdo_sqlite_stmt*)stmt->driver_data;
 	if (!S->stmt) {
@@ -297,7 +341,7 @@ static int pdo_sqlite_stmt_col_meta(pdo_stmt_t *stmt, zend_long colno, zval *ret
 	if (!S->stmt) {
 		return FAILURE;
 	}
-	if(colno >= sqlite3_data_count(S->stmt)) {
+	if(colno >= sqlite3_column_count(S->stmt)) {
 		/* error invalid column */
 		pdo_sqlite_error_stmt(stmt);
 		return FAILURE;

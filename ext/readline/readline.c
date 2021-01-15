@@ -279,7 +279,9 @@ PHP_FUNCTION(readline_info)
 			oldstr = rl_line_buffer;
 			if (value) {
 				/* XXX if (rl_line_buffer) free(rl_line_buffer); */
-				convert_to_string_ex(value);
+				if (!try_convert_to_string(value)) {
+					return;
+				}
 				rl_line_buffer = strdup(Z_STRVAL_P(value));
 			}
 			RETVAL_STRING(SAFE_STRING(oldstr));
@@ -302,7 +304,9 @@ PHP_FUNCTION(readline_info)
 		} else if (!strcasecmp(what, "pending_input")) {
 			oldval = rl_pending_input;
 			if (value) {
-				convert_to_string_ex(value);
+				if (!try_convert_to_string(value)) {
+					return;
+				}
 				rl_pending_input = Z_STRVAL_P(value)[0];
 			}
 			RETVAL_LONG(oldval);
@@ -319,7 +323,9 @@ PHP_FUNCTION(readline_info)
 		} else if (!strcasecmp(what, "completion_append_character")) {
 			oldval = rl_completion_append_character;
 			if (value) {
-				convert_to_string_ex(value)
+				if (!try_convert_to_string(value)) {
+					return;
+				}
 				rl_completion_append_character = (int)Z_STRVAL_P(value)[0];
 			}
 			RETVAL_INTERNED_STR(
@@ -342,7 +348,9 @@ PHP_FUNCTION(readline_info)
 			oldstr = (char*)rl_readline_name;
 			if (value) {
 				/* XXX if (rl_readline_name) free(rl_readline_name); */
-				convert_to_string_ex(value);
+				if (!try_convert_to_string(value)) {
+					return;
+				}
 				rl_readline_name = strdup(Z_STRVAL_P(value));
 			}
 			RETVAL_STRING(SAFE_STRING(oldstr));
@@ -433,6 +441,7 @@ PHP_FUNCTION(readline_list_history)
 				}
 			}
 		}
+		free(hs);
     }
 
 #else /* readline */
@@ -546,6 +555,7 @@ static char **_readline_completion_cb(const char *text, int start, int end)
 
 	if (call_user_function(NULL, NULL, &_readline_completion, &_readline_array, 3, params) == SUCCESS) {
 		if (Z_TYPE(_readline_array) == IS_ARRAY) {
+			SEPARATE_ARRAY(&_readline_array);
 			if (zend_hash_num_elements(Z_ARRVAL(_readline_array))) {
 				matches = rl_completion_matches(text,_readline_command_generator);
 			} else {
@@ -645,6 +655,10 @@ PHP_FUNCTION(readline_callback_handler_install)
    Informs the readline callback interface that a character is ready for input */
 PHP_FUNCTION(readline_callback_read_char)
 {
+	if (zend_parse_parameters_none() == FAILURE) {
+		return;
+	}
+
 	if (Z_TYPE(_prepped_callback) != IS_UNDEF) {
 		rl_callback_read_char();
 	}
@@ -655,6 +669,10 @@ PHP_FUNCTION(readline_callback_read_char)
    Removes a previously installed callback handler and restores terminal settings */
 PHP_FUNCTION(readline_callback_handler_remove)
 {
+	if (zend_parse_parameters_none() == FAILURE) {
+		return;
+	}
+
 	if (Z_TYPE(_prepped_callback) != IS_UNDEF) {
 		rl_callback_handler_remove();
 		zval_ptr_dtor(&_prepped_callback);
@@ -669,6 +687,10 @@ PHP_FUNCTION(readline_callback_handler_remove)
    Ask readline to redraw the display */
 PHP_FUNCTION(readline_redisplay)
 {
+	if (zend_parse_parameters_none() == FAILURE) {
+		return;
+	}
+
 #if HAVE_LIBEDIT
 	/* seems libedit doesn't take care of rl_initialize in rl_redisplay
 	 * see bug #72538 */
@@ -685,6 +707,10 @@ PHP_FUNCTION(readline_redisplay)
    Inform readline that the cursor has moved to a new line */
 PHP_FUNCTION(readline_on_new_line)
 {
+	if (zend_parse_parameters_none() == FAILURE) {
+		return;
+	}
+
 	rl_on_new_line();
 }
 /* }}} */

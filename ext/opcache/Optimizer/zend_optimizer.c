@@ -53,25 +53,6 @@ void zend_optimizer_collect_constant(zend_optimizer_ctx *ctx, zval *name, zval* 
 	zend_hash_add(ctx->constants, Z_STR_P(name), &val);
 }
 
-zend_uchar zend_compound_assign_to_binary_op(zend_uchar opcode)
-{
-	switch (opcode) {
-		case ZEND_ASSIGN_ADD: return ZEND_ADD;
-		case ZEND_ASSIGN_SUB: return ZEND_SUB;
-		case ZEND_ASSIGN_MUL: return ZEND_MUL;
-		case ZEND_ASSIGN_DIV: return ZEND_DIV;
-		case ZEND_ASSIGN_MOD: return ZEND_MOD;
-		case ZEND_ASSIGN_SL: return ZEND_SL;
-		case ZEND_ASSIGN_SR: return ZEND_SR;
-		case ZEND_ASSIGN_CONCAT: return ZEND_CONCAT;
-		case ZEND_ASSIGN_BW_OR: return ZEND_BW_OR;
-		case ZEND_ASSIGN_BW_AND: return ZEND_BW_AND;
-		case ZEND_ASSIGN_BW_XOR: return ZEND_BW_XOR;
-		case ZEND_ASSIGN_POW: return ZEND_POW;
-		EMPTY_SWITCH_DEFAULT_CASE()
-	}
-}
-
 int zend_optimizer_eval_binary_op(zval *result, zend_uchar opcode, zval *op1, zval *op2) /* {{{ */
 {
 	binary_op_type binary_op = get_binary_op(opcode);
@@ -320,21 +301,11 @@ int zend_optimizer_update_op1_const(zend_op_array *op_array,
 			}
 			zend_optimizer_add_literal_string(op_array, zend_string_tolower(Z_STR_P(val)));
 			break;
-		case ZEND_ASSIGN_ADD:
-		case ZEND_ASSIGN_SUB:
-		case ZEND_ASSIGN_MUL:
-		case ZEND_ASSIGN_DIV:
-		case ZEND_ASSIGN_MOD:
-		case ZEND_ASSIGN_SL:
-		case ZEND_ASSIGN_SR:
-		case ZEND_ASSIGN_CONCAT:
-		case ZEND_ASSIGN_BW_OR:
-		case ZEND_ASSIGN_BW_AND:
-		case ZEND_ASSIGN_BW_XOR:
-		case ZEND_ASSIGN_POW:
-			if (opline->extended_value != ZEND_ASSIGN_STATIC_PROP) {
-				break;
-			}
+		case ZEND_ASSIGN_OP:
+		case ZEND_ASSIGN_DIM_OP:
+		case ZEND_ASSIGN_OBJ_OP:
+			break;
+		case ZEND_ASSIGN_STATIC_PROP_OP:
 		case ZEND_ASSIGN_STATIC_PROP:
 		case ZEND_ASSIGN_STATIC_PROP_REF:
 		case ZEND_FETCH_STATIC_PROP_R:
@@ -413,6 +384,7 @@ int zend_optimizer_update_op2_const(zend_op_array *op_array,
 				(opline + 1)->op2.var == opline->result.var) {
 				return 0;
 			}
+			/* break missing intentionally */
 		case ZEND_INSTANCEOF:
 			REQUIRES_STRING(val);
 			drop_leading_backslash(val);
@@ -440,7 +412,7 @@ int zend_optimizer_update_op2_const(zend_op_array *op_array,
 		case ZEND_PRE_DEC_STATIC_PROP:
 		case ZEND_POST_INC_STATIC_PROP:
 		case ZEND_POST_DEC_STATIC_PROP:
-handle_static_prop:
+		case ZEND_ASSIGN_STATIC_PROP_OP:
 			REQUIRES_STRING(val);
 			drop_leading_backslash(val);
 			opline->op2.constant = zend_optimizer_add_literal(op_array, val);
@@ -509,6 +481,7 @@ handle_static_prop:
 		case ZEND_PRE_DEC_OBJ:
 		case ZEND_POST_INC_OBJ:
 		case ZEND_POST_DEC_OBJ:
+		case ZEND_ASSIGN_OBJ_OP:
 			TO_STRING_NOWARN(val);
 			opline->op2.constant = zend_optimizer_add_literal(op_array, val);
 			opline->extended_value = alloc_cache_slots(op_array, 3);
@@ -518,42 +491,7 @@ handle_static_prop:
 			opline->op2.constant = zend_optimizer_add_literal(op_array, val);
 			opline->extended_value = alloc_cache_slots(op_array, 3) | (opline->extended_value & ZEND_ISEMPTY);
 			break;
-		case ZEND_ASSIGN_ADD:
-		case ZEND_ASSIGN_SUB:
-		case ZEND_ASSIGN_MUL:
-		case ZEND_ASSIGN_DIV:
-		case ZEND_ASSIGN_POW:
-		case ZEND_ASSIGN_MOD:
-		case ZEND_ASSIGN_SL:
-		case ZEND_ASSIGN_SR:
-		case ZEND_ASSIGN_CONCAT:
-		case ZEND_ASSIGN_BW_OR:
-		case ZEND_ASSIGN_BW_AND:
-		case ZEND_ASSIGN_BW_XOR:
-			if (opline->extended_value == ZEND_ASSIGN_OBJ) {
-				TO_STRING_NOWARN(val);
-				opline->op2.constant = zend_optimizer_add_literal(op_array, val);
-				(opline+1)->extended_value = alloc_cache_slots(op_array, 3);
-			} else if (opline->extended_value == ZEND_ASSIGN_STATIC_PROP) {
-				goto handle_static_prop;
-			} else if (opline->extended_value == ZEND_ASSIGN_DIM) {
-				if (Z_TYPE_P(val) == IS_STRING) {
-					zend_ulong index;
-
-					if (ZEND_HANDLE_NUMERIC(Z_STR_P(val), index)) {
-						ZVAL_LONG(&tmp, index);
-						opline->op2.constant = zend_optimizer_add_literal(op_array, &tmp);
-						zend_string_hash_val(Z_STR_P(val));
-						zend_optimizer_add_literal(op_array, val);
-						Z_EXTRA(op_array->literals[opline->op2.constant]) = ZEND_EXTRA_VALUE;
-						break;
-					}
-				}
-				opline->op2.constant = zend_optimizer_add_literal(op_array, val);
-			} else {
-				opline->op2.constant = zend_optimizer_add_literal(op_array, val);
-			}
-			break;
+		case ZEND_ASSIGN_DIM_OP:
 		case ZEND_ISSET_ISEMPTY_DIM_OBJ:
 		case ZEND_ASSIGN_DIM:
 		case ZEND_UNSET_DIM:
@@ -772,8 +710,6 @@ void zend_optimizer_migrate_jump(zend_op_array *op_array, zend_op *new_opline, z
 		case ZEND_ASSERT_CHECK:
 			ZEND_SET_OP_JMP_ADDR(new_opline, new_opline->op2, ZEND_OP2_JMP_ADDR(opline));
 			break;
-		case ZEND_DECLARE_ANON_CLASS:
-		case ZEND_DECLARE_ANON_INHERITED_CLASS:
 		case ZEND_FE_FETCH_R:
 		case ZEND_FE_FETCH_RW:
 			new_opline->extended_value = ZEND_OPLINE_NUM_TO_OFFSET(op_array, new_opline, ZEND_OFFSET_TO_OPLINE_NUM(op_array, opline, opline->extended_value));
@@ -823,8 +759,6 @@ void zend_optimizer_shift_jump(zend_op_array *op_array, zend_op *opline, uint32_
 				ZEND_SET_OP_JMP_ADDR(opline, opline->op2, ZEND_OP2_JMP_ADDR(opline) - shiftlist[ZEND_OP2_JMP_ADDR(opline) - op_array->opcodes]);
 			}
 			break;
-		case ZEND_DECLARE_ANON_CLASS:
-		case ZEND_DECLARE_ANON_INHERITED_CLASS:
 		case ZEND_FE_FETCH_R:
 		case ZEND_FE_FETCH_RW:
 			opline->extended_value = ZEND_OPLINE_NUM_TO_OFFSET(op_array, opline, ZEND_OFFSET_TO_OPLINE_NUM(op_array, opline, opline->extended_value) - shiftlist[ZEND_OFFSET_TO_OPLINE_NUM(op_array, opline, opline->extended_value)]);
@@ -972,6 +906,8 @@ uint32_t zend_optimizer_classify_function(zend_string *name, uint32_t num_args) 
 		return ZEND_FUNC_INDIRECT_VAR_ACCESS;
 	} else if (zend_string_equals_literal(name, "assert")) {
 		return ZEND_FUNC_INDIRECT_VAR_ACCESS;
+	} else if (zend_string_equals_literal(name, "db2_execute")) {
+		return ZEND_FUNC_INDIRECT_VAR_ACCESS;
 	} else if (zend_string_equals_literal(name, "func_num_args")) {
 		return ZEND_FUNC_VARARG;
 	} else if (zend_string_equals_literal(name, "func_get_arg")) {
@@ -985,8 +921,7 @@ uint32_t zend_optimizer_classify_function(zend_string *name, uint32_t num_args) 
 
 zend_op *zend_optimizer_get_loop_var_def(const zend_op_array *op_array, zend_op *free_opline) {
 	uint32_t var = free_opline->op1.var;
-	ZEND_ASSERT(free_opline->opcode == ZEND_FE_FREE ||
-		(free_opline->opcode == ZEND_FREE && free_opline->extended_value == ZEND_FREE_SWITCH));
+	ZEND_ASSERT(zend_optimizer_is_loop_var_free(free_opline));
 
 	while (--free_opline >= op_array->opcodes) {
 		if ((free_opline->result_type & (IS_TMP_VAR|IS_VAR)) && free_opline->result.var == var) {
@@ -1211,8 +1146,6 @@ static void zend_redo_pass_two(zend_op_array *op_array)
 						opline->op2.jmp_addr = &op_array->opcodes[opline->op2.jmp_addr - old_opcodes];
 					}
 					break;
-				case ZEND_DECLARE_ANON_CLASS:
-				case ZEND_DECLARE_ANON_INHERITED_CLASS:
 				case ZEND_FE_FETCH_R:
 				case ZEND_FE_FETCH_RW:
 				case ZEND_SWITCH_LONG:
@@ -1300,8 +1233,6 @@ static void zend_redo_pass_two_ex(zend_op_array *op_array, zend_ssa *ssa)
 						opline->op2.jmp_addr = &op_array->opcodes[opline->op2.jmp_addr - old_opcodes];
 					}
 					break;
-				case ZEND_DECLARE_ANON_CLASS:
-				case ZEND_DECLARE_ANON_INHERITED_CLASS:
 				case ZEND_FE_FETCH_R:
 				case ZEND_FE_FETCH_RW:
 				case ZEND_SWITCH_LONG:
@@ -1381,11 +1312,21 @@ static void zend_adjust_fcall_stack_size_graph(zend_op_array *op_array)
 static zend_bool needs_live_range(zend_op_array *op_array, zend_op *def_opline) {
 	zend_func_info *func_info = ZEND_FUNC_INFO(op_array);
 	zend_ssa_op *ssa_op = &func_info->ssa.ops[def_opline - op_array->opcodes];
-	if (ssa_op->result_def >= 0) {
-		uint32_t type = func_info->ssa.var_info[ssa_op->result_def].type;
-		return (type & (MAY_BE_STRING|MAY_BE_ARRAY|MAY_BE_OBJECT|MAY_BE_RESOURCE|MAY_BE_REF)) != 0;
+	int ssa_var = ssa_op->result_def;
+	if (ssa_var < 0) {
+		/* Be conservative. */
+		return 1;
 	}
-	return 1;
+
+	/* If the variable is used by a PHI, this may be the assignment of the final branch of a
+	 * ternary/etc structure. While this is where the live range starts, the value from the other
+	 * branch may also be used. As such, use the type of the PHI node for the following check. */
+	if (func_info->ssa.vars[ssa_var].phi_use_chain) {
+		ssa_var = func_info->ssa.vars[ssa_var].phi_use_chain->ssa_var;
+	}
+
+	uint32_t type = func_info->ssa.var_info[ssa_var].type;
+	return (type & (MAY_BE_STRING|MAY_BE_ARRAY|MAY_BE_OBJECT|MAY_BE_RESOURCE|MAY_BE_REF)) != 0;
 }
 #endif
 

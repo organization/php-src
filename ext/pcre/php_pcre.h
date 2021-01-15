@@ -25,9 +25,7 @@
 #include "pcre2.h"
 #endif
 
-#if HAVE_LOCALE_H
 #include <locale.h>
-#endif
 
 PHPAPI zend_string *php_pcre_replace(zend_string *regex, zend_string *subject_str, char *subject, size_t subject_len, zend_string *replace_str, size_t limit, size_t *replace_count);
 PHPAPI pcre2_code* pcre_get_compiled_regex(zend_string *regex, uint32_t *capture_count);
@@ -42,6 +40,7 @@ extern zend_module_entry pcre_module_entry;
 typedef struct _pcre_cache_entry pcre_cache_entry;
 
 PHPAPI pcre_cache_entry* pcre_get_compiled_regex_cache(zend_string *regex);
+PHPAPI pcre_cache_entry* pcre_get_compiled_regex_cache_ex(zend_string *regex, int locale_aware);
 
 PHPAPI void  php_pcre_match_impl(pcre_cache_entry *pce, zend_string *subject_str, zval *return_value,
 	zval *subpats, int global, int use_flags, zend_long flags, zend_off_t start_offset);

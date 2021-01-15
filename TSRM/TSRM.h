@@ -15,9 +15,9 @@
 
 #if !defined(__CYGWIN__) && defined(WIN32)
 # define TSRM_WIN32
-# include "tsrm_config.w32.h"
+# include "Zend/zend_config.w32.h"
 #else
-# include <tsrm_config.h>
+# include "main/php_config.h"
 #endif
 
 #include "main/php_stdint.h"
@@ -52,9 +52,6 @@ typedef uintptr_t tsrm_uintptr_t;
 # include <pthread.h>
 #elif defined(TSRM_ST)
 # include <st.h>
-#elif defined(BETHREADS)
-#include <kernel/OS.h>
-#include <TLS.h>
 #endif
 
 #if SIZEOF_SIZE_T == 4
@@ -82,9 +79,7 @@ typedef int ts_rsrc_id;
 # define MUTEX_T st_mutex_t
 #endif
 
-#ifdef HAVE_SIGNAL_H
 #include <signal.h>
-#endif
 
 typedef void (*ts_allocate_ctor)(void *);
 typedef void (*ts_allocate_dtor)(void *);
@@ -99,6 +94,10 @@ extern "C" {
 TSRM_API int tsrm_startup(int expected_threads, int expected_resources, int debug_level, char *debug_filename);
 TSRM_API void tsrm_shutdown(void);
 
+/* environ lock API */
+TSRM_API void tsrm_env_lock();
+TSRM_API void tsrm_env_unlock();
+
 /* allocates a new thread-safe-resource id */
 TSRM_API ts_rsrc_id ts_allocate_id(ts_rsrc_id *rsrc_id, size_t size, ts_allocate_ctor ctor, ts_allocate_dtor dtor);
 
@@ -112,9 +111,6 @@ TSRM_API void *ts_resource_ex(ts_rsrc_id id, THREAD_T *th_id);
 
 /* frees all resources allocated for the current thread */
 TSRM_API void ts_free_thread(void);
-
-/* frees all resources allocated for all threads except current */
-void ts_free_worker_threads(void);
 
 /* deallocates all occurrences of a given id */
 TSRM_API void ts_free_id(ts_rsrc_id id);
@@ -156,16 +152,13 @@ TSRM_API void tsrm_free_interpreter_context(void *context);
 TSRM_API void *tsrm_get_ls_cache(void);
 TSRM_API size_t tsrm_get_ls_cache_tcb_offset(void);
 TSRM_API uint8_t tsrm_is_main_thread(void);
+TSRM_API uint8_t tsrm_is_shutdown(void);
 TSRM_API const char *tsrm_api_name(void);
 
-#if defined(__cplusplus) && __cplusplus > 199711L
-# define TSRM_TLS thread_local
+#ifdef TSRM_WIN32
+# define TSRM_TLS __declspec(thread)
 #else
-# ifdef TSRM_WIN32
-#  define TSRM_TLS __declspec(thread)
-# else
-#  define TSRM_TLS __thread
-# endif
+# define TSRM_TLS __thread
 #endif
 
 #define TSRM_SHUFFLE_RSRC_ID(rsrc_id)		((rsrc_id)+1)
@@ -184,13 +177,7 @@ TSRM_API const char *tsrm_api_name(void);
 #define TSRMG_FAST_BULK_STATIC(offset, type)	((type) (((char*) TSRMLS_CACHE)+(offset)))
 #define TSRMLS_CACHE_EXTERN() extern TSRM_TLS void *TSRMLS_CACHE;
 #define TSRMLS_CACHE_DEFINE() TSRM_TLS void *TSRMLS_CACHE = NULL;
-#if ZEND_DEBUG
 #define TSRMLS_CACHE_UPDATE() TSRMLS_CACHE = tsrm_get_ls_cache()
-#define TSRMLS_CACHE_RESET()
-#else
-#define TSRMLS_CACHE_UPDATE() if (!TSRMLS_CACHE) TSRMLS_CACHE = tsrm_get_ls_cache()
-#define TSRMLS_CACHE_RESET()  TSRMLS_CACHE = NULL
-#endif
 #define TSRMLS_CACHE _tsrm_ls_cache
 
 /* BC only */
@@ -205,6 +192,9 @@ TSRM_API const char *tsrm_api_name(void);
 #endif
 
 #else /* non ZTS */
+
+#define tsrm_env_lock()
+#define tsrm_env_unlock()
 
 #define TSRMLS_FETCH()
 #define TSRMLS_FETCH_FROM_CTX(ctx)

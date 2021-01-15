@@ -292,8 +292,9 @@ static php_stream_filter *user_filter_factory_create(const char *filtername,
 			memcpy(wildcard, filtername, len + 1); /* copy \0 */
 			period = wildcard + (period - filtername);
 			while (period) {
-				*period = '\0';
-				strncat(wildcard, ".*", 2);
+				ZEND_ASSERT(period[0] == '.');
+				period[1] = '*';
+				period[2] = '\0';
 				if (NULL != (fdat = zend_hash_str_find_ptr(BG(user_filter_map), wildcard, strlen(wildcard)))) {
 					period = NULL;
 				} else {
@@ -320,13 +321,16 @@ static php_stream_filter *user_filter_factory_create(const char *filtername,
 		}
 	}
 
-	filter = php_stream_filter_alloc(&userfilter_ops, NULL, 0);
-	if (filter == NULL) {
+	/* create the object */
+	if (object_init_ex(&obj, fdat->ce) == FAILURE) {
 		return NULL;
 	}
 
-	/* create the object */
-	object_init_ex(&obj, fdat->ce);
+	filter = php_stream_filter_alloc(&userfilter_ops, NULL, 0);
+	if (filter == NULL) {
+		zval_ptr_dtor(&obj);
+		return NULL;
+	}
 
 	/* filtername */
 	add_property_string(&obj, "filtername", (char*)filtername);
@@ -368,7 +372,7 @@ static php_stream_filter *user_filter_factory_create(const char *filtername,
 
 	/* set the filter property, this will be used during cleanup */
 	ZVAL_RES(&zfilter, zend_register_resource(filter, le_userfilters));
-	ZVAL_COPY_VALUE(&filter->abstract, &obj);
+	ZVAL_OBJ(&filter->abstract, Z_OBJ(obj));
 	add_property_zval(&obj, "filter", &zfilter);
 	/* add_property_zval increments the refcount which is unwanted here */
 	zval_ptr_dtor(&zfilter);
@@ -431,7 +435,7 @@ static void php_stream_bucket_attach(int append, INTERNAL_FUNCTION_PARAMETERS)
 		Z_PARAM_OBJECT(zobject)
 	ZEND_PARSE_PARAMETERS_END_EX(RETURN_FALSE);
 
-	if (NULL == (pzbucket = zend_hash_str_find(Z_OBJPROP_P(zobject), "bucket", sizeof("bucket")-1))) {
+	if (NULL == (pzbucket = zend_hash_str_find_deref(Z_OBJPROP_P(zobject), "bucket", sizeof("bucket")-1))) {
 		php_error_docref(NULL, E_WARNING, "Object has no bucket property");
 		RETURN_FALSE;
 	}
@@ -445,7 +449,7 @@ static void php_stream_bucket_attach(int append, INTERNAL_FUNCTION_PARAMETERS)
 		RETURN_FALSE;
 	}
 
-	if (NULL != (pzdata = zend_hash_str_find(Z_OBJPROP_P(zobject), "data", sizeof("data")-1)) && Z_TYPE_P(pzdata) == IS_STRING) {
+	if (NULL != (pzdata = zend_hash_str_find_deref(Z_OBJPROP_P(zobject), "data", sizeof("data")-1)) && Z_TYPE_P(pzdata) == IS_STRING) {
 		if (!bucket->own_buf) {
 			bucket = php_stream_bucket_make_writeable(bucket);
 		}

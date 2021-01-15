@@ -5,6 +5,8 @@ AC_CACHE_CHECK([whether flush should be called explicitly after a buffered io], 
 AC_RUN_IFELSE([AC_LANG_SOURCE([[
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 
 int main(int argc, char **argv)
 {
@@ -59,6 +61,8 @@ fi
 
 AC_CACHE_CHECK(for standard DES crypt, ac_cv_crypt_des,[
   AC_RUN_IFELSE([AC_LANG_SOURCE([[
+#include <string.h>
+
 #if HAVE_UNISTD_H
 #include <unistd.h>
 #endif
@@ -70,9 +74,9 @@ AC_CACHE_CHECK(for standard DES crypt, ac_cv_crypt_des,[
 int main() {
 #if HAVE_CRYPT
 	char *encrypted = crypt("rasmuslerdorf","rl");
-	exit(!encrypted || strcmp(encrypted,"rl.3StKT.4T8M"));
+	return !encrypted || strcmp(encrypted,"rl.3StKT.4T8M");
 #else
-	exit(1);
+	return 1;
 #endif
 }]])],[
   ac_cv_crypt_des=yes
@@ -84,6 +88,8 @@ int main() {
 
 AC_CACHE_CHECK(for extended DES crypt, ac_cv_crypt_ext_des,[
   AC_RUN_IFELSE([AC_LANG_SOURCE([[
+#include <string.h>
+
 #if HAVE_UNISTD_H
 #include <unistd.h>
 #endif
@@ -95,9 +101,9 @@ AC_CACHE_CHECK(for extended DES crypt, ac_cv_crypt_ext_des,[
 int main() {
 #if HAVE_CRYPT
 	char *encrypted = crypt("rasmuslerdorf","_J9..rasm");
-	exit(!encrypted || strcmp(encrypted,"_J9..rasmBYk8r9AiWNc"));
+	return !encrypted || strcmp(encrypted,"_J9..rasmBYk8r9AiWNc");
 #else
-	exit(1);
+	return 1;
 #endif
 }]])],[
   ac_cv_crypt_ext_des=yes
@@ -109,6 +115,8 @@ int main() {
 
 AC_CACHE_CHECK(for MD5 crypt, ac_cv_crypt_md5,[
 AC_RUN_IFELSE([AC_LANG_SOURCE([[
+#include <string.h>
+
 #if HAVE_UNISTD_H
 #include <unistd.h>
 #endif
@@ -130,9 +138,9 @@ int main() {
 	strcpy(answer,salt);
 	strcat(answer,"rISCgZzpwk3UhDidwXvin0");
 	encrypted = crypt("rasmuslerdorf",salt);
-	exit(!encrypted || strcmp(encrypted,answer));
+	return !encrypted || strcmp(encrypted,answer);
 #else
-	exit(1);
+	return 1;
 #endif
 }]])],[
   ac_cv_crypt_md5=yes
@@ -144,6 +152,8 @@ int main() {
 
 AC_CACHE_CHECK(for Blowfish crypt, ac_cv_crypt_blowfish,[
 AC_RUN_IFELSE([AC_LANG_SOURCE([[
+#include <string.h>
+
 #if HAVE_UNISTD_H
 #include <unistd.h>
 #endif
@@ -162,9 +172,9 @@ int main() {
 	strcpy(answer,salt);
 	strcpy(&answer[29],"nIdrcHdxcUxWomQX9j6kvERCFjTg7Ra");
 	encrypted = crypt("rasmuslerdorf",salt);
-	exit(!encrypted || strcmp(encrypted,answer));
+	return !encrypted || strcmp(encrypted,answer);
 #else
-	exit(1);
+	return 1;
 #endif
 }]])],[
   ac_cv_crypt_blowfish=yes
@@ -176,6 +186,8 @@ int main() {
 
 AC_CACHE_CHECK(for SHA512 crypt, ac_cv_crypt_sha512,[
 AC_RUN_IFELSE([AC_LANG_SOURCE([[
+#include <string.h>
+
 #if HAVE_UNISTD_H
 #include <unistd.h>
 #endif
@@ -193,9 +205,9 @@ int main() {
 	strcpy(answer, salt);
 	strcat(answer, "EeHCRjm0bljalWuALHSTs1NB9ipEiLEXLhYeXdOpx22gmlmVejnVXFhd84cEKbYxCo.XuUTrW.RLraeEnsvWs/");
 	encrypted = crypt("rasmuslerdorf",salt);
-	exit(!encrypted || strcmp(encrypted,answer));
+	return !encrypted || strcmp(encrypted,answer);
 #else
-	exit(1);
+	return 1;
 #endif
 }]])],[
   ac_cv_crypt_sha512=yes
@@ -207,6 +219,8 @@ int main() {
 
 AC_CACHE_CHECK(for SHA256 crypt, ac_cv_crypt_sha256,[
 AC_RUN_IFELSE([AC_LANG_SOURCE([[
+#include <string.h>
+
 #if HAVE_UNISTD_H
 #include <unistd.h>
 #endif
@@ -224,9 +238,9 @@ int main() {
 	strcpy(answer, salt);
 	strcat(answer, "cFAm2puLCujQ9t.0CxiFIIvFi4JyQx5UncCt/xRIX23");
 	encrypted = crypt("rasmuslerdorf",salt);
-	exit(!encrypted || strcmp(encrypted,answer));
+	return !encrypted || strcmp(encrypted,answer);
 #else
-	exit(1);
+	return 1;
 #endif
 }]])],[
   ac_cv_crypt_sha256=yes
@@ -284,14 +298,14 @@ fi
 dnl
 dnl Check for available functions
 dnl
-dnl log2 could be used to improve the log function, however it requires C99. The check for log2 should be turned on,
-dnl as soon as we support C99.
-AC_CHECK_FUNCS(getcwd getwd asinh acosh atanh log1p hypot glob strfmon nice fpclass mempcpy strpncpy)
+dnl log2 could be used to improve the log function, however it requires C99. The
+dnl check for log2 should be turned on, as soon as we support C99.
+AC_CHECK_FUNCS(asinh acosh atanh log1p hypot)
 AC_FUNC_FNMATCH
 
 dnl
-dnl Check if there is a support means of creating a new process
-dnl and defining which handles it receives
+dnl Check if there is a support means of creating a new process and defining
+dnl which handles it receives
 dnl
 AC_CHECK_FUNCS(fork CreateProcess, [
   php_can_support_proc_open=yes
@@ -335,7 +349,8 @@ fi
 
 dnl
 dnl Detect library functions needed by php dns_xxx functions
-dnl ext/standard/php_dns.h will collect these in a single define: HAVE_FULL_DNS_FUNCS
+dnl ext/standard/php_dns.h will collect these in a single define
+dnl HAVE_FULL_DNS_FUNCS
 dnl
 PHP_CHECK_FUNC(res_nsearch, resolv, bind, socket)
 PHP_CHECK_FUNC(res_ndestroy, resolv, bind, socket)
@@ -375,7 +390,7 @@ dnl
 dnl Check for i18n capabilities
 dnl
 AC_CHECK_HEADERS([wchar.h])
-AC_CHECK_FUNCS([mblen mbrlen mbsinit])
+AC_CHECK_FUNCS([mblen])
 AC_CACHE_CHECK([for mbstate_t], [ac_cv_type_mbstate_t],[
 AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
 #ifdef HAVE_WCHAR_H
@@ -447,7 +462,6 @@ AC_CHECK_HEADERS([net/if.h],[], [],
   #endif
   #include <net/if.h>
 ])
-AC_CHECK_HEADERS([netdb.h])
 AC_MSG_CHECKING([for usable getifaddrs])
 AC_LINK_IFELSE([AC_LANG_PROGRAM([[
   #include <sys/types.h>

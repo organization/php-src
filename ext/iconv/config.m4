@@ -1,5 +1,3 @@
-dnl config.m4 for extension iconv
-
 PHP_ARG_WITH([iconv],
   [for iconv support],
   [AS_HELP_STRING([[--without-iconv[=DIR]]],
@@ -132,7 +130,7 @@ int main() {
 
 int main() {
   iconv_t cd;
-  cd = iconv_open( "*blahblah*", "*blahblah*" );
+  cd = iconv_open( "*blahblah*", "*blahblahblah*" );
   if (cd == (iconv_t)(-1)) {
     if (errno == EINVAL) {
       return 0;
@@ -164,6 +162,9 @@ int main() {
 
 int main() {
   iconv_t cd = iconv_open( "UTF-8//IGNORE", "UTF-8" );
+  if(cd == (iconv_t)-1) {
+    return 1;
+  }
   char *in_p = "\xC3\xC3\xC3\xB8";
   size_t in_left = 4, out_left = 4096;
   char *out = malloc(out_left);

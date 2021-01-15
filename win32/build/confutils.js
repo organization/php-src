@@ -35,7 +35,8 @@ var VCVERS = -1;
 var CLANGVERS = -1;
 var INTELVERS = -1;
 var COMPILER_NUMERIC_VERSION = -1;
-var COMPILER_NAME = "unknown";
+var COMPILER_NAME_LONG = "unknown";
+var COMPILER_NAME_SHORT = "unknown";
 var PHP_OBJECT_OUT_DIR = "";
 var PHP_CONFIG_PROFILE = "no";
 var PHP_SANITIZER = "no";
@@ -71,31 +72,6 @@ var headers_install = new Array();
 /* Store unknown configure options */
 var INVALID_CONFIG_ARGS = new Array();
 
-/* Mapping CL version > human readable name */
-var VC_VERSIONS = new Array();
-VC_VERSIONS[1700] = 'MSVC11 (Visual C++ 2012)';
-VC_VERSIONS[1800] = 'MSVC12 (Visual C++ 2013)';
-VC_VERSIONS[1900] = 'MSVC14 (Visual C++ 2015)';
-VC_VERSIONS[1910] = 'MSVC15 (Visual C++ 2017)';
-VC_VERSIONS[1911] = 'MSVC15 (Visual C++ 2017)';
-VC_VERSIONS[1912] = 'MSVC15 (Visual C++ 2017)';
-VC_VERSIONS[1913] = 'MSVC15 (Visual C++ 2017)';
-VC_VERSIONS[1914] = 'MSVC15 (Visual C++ 2017)';
-VC_VERSIONS[1915] = 'MSVC15 (Visual C++ 2017)';
-VC_VERSIONS[1916] = 'MSVC15 (Visual C++ 2017)';
-
-var VC_VERSIONS_SHORT = new Array();
-VC_VERSIONS_SHORT[1700] = 'VC11';
-VC_VERSIONS_SHORT[1800] = 'VC12';
-VC_VERSIONS_SHORT[1900] = 'VC14';
-VC_VERSIONS_SHORT[1910] = 'VC15';
-VC_VERSIONS_SHORT[1911] = 'VC15';
-VC_VERSIONS_SHORT[1912] = 'VC15';
-VC_VERSIONS_SHORT[1913] = 'VC15';
-VC_VERSIONS_SHORT[1914] = 'VC15';
-VC_VERSIONS_SHORT[1915] = 'VC15';
-VC_VERSIONS_SHORT[1916] = 'VC15';
-
 if (PROGRAM_FILES == null) {
 	PROGRAM_FILES = "C:\\Program Files";
 }
@@ -106,7 +82,7 @@ if (MODE_PHPIZE) {
 		WScript.Quit(10);
 	}
 } else {
-	if (!FSO.FileExists("README.GIT-RULES")) {
+	if (!FSO.FileExists("main\\php_version.h")) {
 		STDERR.WriteLine("Must be run from the root of the php source");
 		WScript.Quit(10);
 	}
@@ -115,38 +91,33 @@ if (MODE_PHPIZE) {
 var CWD = WshShell.CurrentDirectory;
 
 if (typeof(CWD) == "undefined") {
-	CWD = FSO.GetParentFolderName(FSO.GetAbsolutePathName("README.GIT-RULES"));
+	CWD = FSO.GetParentFolderName(FSO.GetParentFolderName(FSO.GetAbsolutePathName("main\\php_version.h")));
 }
 
-/* defaults; we pick up the precise versions from configure.ac */
-var PHP_VERSION = 7;
-var PHP_MINOR_VERSION = 3;
-var PHP_RELEASE_VERSION = 0;
-var PHP_EXTRA_VERSION = "";
-var PHP_VERSION_STRING = "7.3.0";
+if (!MODE_PHPIZE) {
+	/* defaults; we pick up the precise versions from configure.ac */
+	var PHP_VERSION = 7;
+	var PHP_MINOR_VERSION = 4;
+	var PHP_RELEASE_VERSION = 0;
+	var PHP_EXTRA_VERSION = "";
+	var PHP_VERSION_STRING = "7.4.0";
+}
 
 /* Get version numbers and DEFINE as a string */
 function get_version_numbers()
 {
 	var cin = file_get_contents("configure.ac");
+	var regex = /AC_INIT.+(\d+)\.(\d+)\.(\d+)([^\,^\]]*).+/g;
 
-	if (cin.match(new RegExp("PHP_MAJOR_VERSION=(\\d+)"))) {
+	if (cin.match(new RegExp(regex))) {
 		PHP_VERSION = RegExp.$1;
+		PHP_MINOR_VERSION = RegExp.$2;
+		PHP_RELEASE_VERSION = RegExp.$3;
+		PHP_EXTRA_VERSION = RegExp.$4;
 	}
-	if (cin.match(new RegExp("PHP_MINOR_VERSION=(\\d+)"))) {
-		PHP_MINOR_VERSION = RegExp.$1;
-	}
-	if (cin.match(new RegExp("PHP_RELEASE_VERSION=(\\d+)"))) {
-		PHP_RELEASE_VERSION = RegExp.$1;
-	}
-	PHP_VERSION_STRING = PHP_VERSION + "." + PHP_MINOR_VERSION + "." + PHP_RELEASE_VERSION;
 
-	if (cin.match(new RegExp("PHP_EXTRA_VERSION=\"([^\"]+)\""))) {
-		PHP_EXTRA_VERSION = RegExp.$1;
-		if (PHP_EXTRA_VERSION.length) {
-			PHP_VERSION_STRING += PHP_EXTRA_VERSION;
-		}
-	}
+	PHP_VERSION_STRING = PHP_VERSION + "." + PHP_MINOR_VERSION + "." + PHP_RELEASE_VERSION + PHP_EXTRA_VERSION;
+
 	DEFINE('PHP_VERSION_STRING', PHP_VERSION_STRING);
 }
 
@@ -352,7 +323,7 @@ function conf_process_args()
 	var i, j;
 	var configure_help_mode = false;
 	var analyzed = false;
-	var nice = "cscript /nologo configure.js ";
+	var nice = "cscript /nologo /e:jscript configure.js ";
 	var disable_all = false;
 
 	args = WScript.Arguments;
@@ -462,6 +433,10 @@ can be built that way. \
 			}
 			STDOUT.WriteLine("  " + arg.arg + pad + word_wrap_and_indent(max_width + 5, arg.helptext));
 		}
+		STDOUT.WriteBlankLines(1);
+		STDOUT.WriteLine("Some influential environment variables:");
+		STDOUT.WriteLine("  CFLAGS      C compiler flags");
+		STDOUT.WriteLine("  LDFLAGS     linker flags");
 		WScript.Quit(1);
 	}
 
@@ -1975,7 +1950,7 @@ function write_summary()
 	}
 	ar[k++] = ['Build type', PHP_DEBUG == "yes" ? "Debug" : "Release"];
 	ar[k++] = ['Thread Safety', PHP_ZTS == "yes" ? "Yes" : "No"];
-	ar[k++] = ['Compiler', COMPILER_NAME];
+	ar[k++] = ['Compiler', COMPILER_NAME_LONG];
 	ar[k++] = ['Architecture', X64 ? 'x64' : 'x86'];
 	if (PHP_PGO == "yes") {
 		ar[k++] = ['Optimization', "PGO"];
@@ -2367,6 +2342,8 @@ function generate_phpize()
 	MF.WriteLine("var PHP_VERSION=" + PHP_VERSION);
 	MF.WriteLine("var PHP_MINOR_VERSION=" + PHP_MINOR_VERSION);
 	MF.WriteLine("var PHP_RELEASE_VERSION=" + PHP_RELEASE_VERSION);
+	MF.WriteLine("var PHP_EXTRA_VERSION=\"" + PHP_EXTRA_VERSION + "\"");
+	MF.WriteLine("var PHP_VERSION_STRING=\"" + PHP_VERSION_STRING + "\"");
 	MF.WriteBlankLines(1);
 	MF.WriteLine("/* Genereted extensions list with mode (static/shared) */");
 
@@ -2956,56 +2933,41 @@ function toolset_setup_compiler()
 	}
 
 	COMPILER_NUMERIC_VERSION = toolset_get_compiler_version();
-	COMPILER_NAME = toolset_get_compiler_name();
+	COMPILER_NAME_LONG = toolset_get_compiler_name();
+	COMPILER_NAME_SHORT = toolset_get_compiler_name(true);
 
 	if (VS_TOOLSET) {
-		/* For the record here: */
-		// 1200 is VC6
-		// 1300 is vs.net 2002
-		// 1310 is vs.net 2003
-		// 1400 is vs.net 2005
-		// 1500 is vs.net 2008
-		// 1600 is vs.net 2010
-		// 1700 is vs.net 2011
-		// 1800 is vs.net 2012
-		// 1900 is vs.net 2015
-		// 1910 is vs.net 2017
-		// Which version of the compiler do we have?
 		VCVERS = COMPILER_NUMERIC_VERSION;
 
-		if (VCVERS < 1700) {
-			ERROR("Unsupported MS C++ Compiler, VC11 (2011) minimum is required");
-		}
-
-		if (undefined == COMPILER_NAME) {
+		if ("unknown" == COMPILER_NAME_LONG) {
 			var tmp = probe_binary(PHP_CL);
-			COMPILER_NAME = "MSVC " + tmp + ", untested";
+			COMPILER_NAME_LONG = COMPILER_NAME_SHORT = "MSVC " + tmp + ", untested";
 
 			WARNING("Using unknown MSVC version " + tmp);
 
-			AC_DEFINE('COMPILER', COMPILER_NAME, "Detected compiler version");
+			AC_DEFINE('COMPILER', COMPILER_NAME_LONG, "Detected compiler version");
 			DEFINE("PHP_COMPILER_SHORT", tmp);
 			AC_DEFINE('PHP_COMPILER_ID', tmp, "Compiler compatibility ID");
 		} else {
-			AC_DEFINE('COMPILER', COMPILER_NAME, "Detected compiler version");
-			DEFINE("PHP_COMPILER_SHORT", VC_VERSIONS_SHORT[VCVERS]);
-			AC_DEFINE('PHP_COMPILER_ID', VC_VERSIONS_SHORT[VCVERS], "Compiler compatibility ID");
+			AC_DEFINE('COMPILER', COMPILER_NAME_LONG, "Detected compiler version");
+			DEFINE("PHP_COMPILER_SHORT", COMPILER_NAME_SHORT.toLowerCase());
+			AC_DEFINE('PHP_COMPILER_ID', COMPILER_NAME_SHORT.toUpperCase(), "Compiler compatibility ID");
 		}
 	} else if (CLANG_TOOLSET) {
 		CLANGVERS = COMPILER_NUMERIC_VERSION;
 
-		AC_DEFINE('COMPILER', COMPILER_NAME, "Detected compiler version");
+		AC_DEFINE('COMPILER', COMPILER_NAME_LONG, "Detected compiler version");
 		DEFINE("PHP_COMPILER_SHORT", "clang");
 		AC_DEFINE('PHP_COMPILER_ID', "clang"); /* XXX something better were to write here */
 
 	} else if (ICC_TOOLSET) {
 		INTELVERS = COMPILER_NUMERIC_VERSION;
 
-		AC_DEFINE('COMPILER', COMPILER_NAME, "Detected compiler version");
+		AC_DEFINE('COMPILER', COMPILER_NAME_LONG, "Detected compiler version");
 		DEFINE("PHP_COMPILER_SHORT", "icc");
 		AC_DEFINE('PHP_COMPILER_ID', "icc"); /* XXX something better were to write here */
 	}
-	STDOUT.WriteLine("  Detected compiler " + COMPILER_NAME);
+	STDOUT.WriteLine("  Detected compiler " + COMPILER_NAME_LONG);
 }
 
 function toolset_setup_project_tools()
@@ -3130,17 +3092,32 @@ function toolset_get_compiler_version()
 }
 
 /* Get compiler name if the toolset is supported */
-function toolset_get_compiler_name()
+function toolset_get_compiler_name(short)
 {
 	var version;
+	short = !!short;
 
 	if (VS_TOOLSET) {
-		var name = undefined;
+		var name = "unknown";
 
 		version = probe_binary(PHP_CL).substr(0, 5).replace('.', '');
 
-		if (undefined != VC_VERSIONS[version]) {
-			name = VC_VERSIONS[version];
+		if (version >= 1930) {
+			return name;
+		} if (version >= 1920) {
+			/* NOTE - VS is intentional. Due to changes in recent Visual Studio
+						versioning scheme refering to the exact VC++ version is
+						hardly predictable. From this version on, it refers to 
+						Visual Studio version and implies the default toolset.
+						When new versions are introduced, adapt also checks in
+						php_win32_image_compatible(), if needed. */
+			name = short ? "VS16" : "Visual C++ 2019";
+		} else if (version >= 1910) {
+			name = short ? "VC15" : "Visual C++ 2017";
+		} else if (version >= 1900) {
+			name = short ? "VC14" : "Visual C++ 2015";
+		} else {
+			ERROR("Unsupported Visual C++ compiler " + version);
 		}
 
 		return name;
@@ -3211,20 +3188,35 @@ function toolset_setup_codegen_arch()
 
 function toolset_setup_linker()
 {
+	var lnk = false;
 	if (VS_TOOLSET) {
-		return PATH_PROG('link', null);
+		lnk = PATH_PROG('link', null);
 	} else if (CLANG_TOOLSET) {
 		//return PATH_PROG('lld', WshShell.Environment("Process").Item("PATH"), "LINK");
-		return PATH_PROG('link', WshShell.Environment("Process").Item("PATH"));
+		lnk = PATH_PROG('link', WshShell.Environment("Process").Item("PATH"));
 	} else if (ICC_TOOLSET) {
-		return PATH_PROG('xilink', WshShell.Environment("Process").Item("PATH"), "LINK");
+		lnk = PATH_PROG('xilink', WshShell.Environment("Process").Item("PATH"), "LINK");
 	}
 
-	ERROR("Unsupported toolset");
+	if (!lnk) {
+		ERROR("Unsupported toolset");
+	}
+
+	var ver = probe_binary(lnk);
+
+	var major = ver.substr(0, 2);
+	var minor = ver.substr(3, 2);
+
+	AC_DEFINE('PHP_LINKER_MAJOR', major, "Linker major version", false);
+	AC_DEFINE('PHP_LINKER_MINOR', minor, "Linker minor version", false);
+
+	return lnk;
 }
 
 function toolset_setup_common_cflags()
 {
+	var envCFLAGS = WshShell.Environment("PROCESS").Item("CFLAGS");
+
 	// CFLAGS for building the PHP dll
 	DEFINE("CFLAGS_PHP", "/D _USRDLL /D PHP7DLLTS_EXPORTS /D PHP_EXPORTS \
 	/D LIBZEND_EXPORTS /D TSRM_EXPORTS /D SAPI_EXPORTS /D WINVER=" + WINVER);
@@ -3235,6 +3227,10 @@ function toolset_setup_common_cflags()
 	DEFINE("CFLAGS", "/nologo $(BASE_INCLUDES) /D _WINDOWS /D WINDOWS=1 \
 		/D ZEND_WIN32=1 /D PHP_WIN32=1 /D WIN32 /D _MBCS /W3 \
 		/D _USE_MATH_DEFINES");
+
+	if (envCFLAGS) {
+		ADD_FLAG("CFLAGS", envCFLAGS);
+	}
 
 	if (VS_TOOLSET) {
 		ADD_FLAG("CFLAGS", " /FD ");
@@ -3294,6 +3290,8 @@ function toolset_setup_common_cflags()
 		if (VCVERS >= 1914) {
 			ADD_FLAG("CFLAGS", "/d2FuncCache1");
 		}
+
+		ADD_FLAG("CFLAGS", "/Zc:wchar_t");
 	} else if (CLANG_TOOLSET) {
 		if (X64) {
 			ADD_FLAG('CFLAGS', '-m64');
@@ -3384,6 +3382,8 @@ function toolset_setup_intrinsic_cflags()
 
 function toolset_setup_common_ldlags()
 {
+	var envLDFLAGS = WshShell.Environment("PROCESS").Item("LDFLAGS");
+
 	// General DLL link flags
 	DEFINE("DLL_LDFLAGS", "/dll ");
 
@@ -3391,6 +3391,10 @@ function toolset_setup_common_ldlags()
 	DEFINE("PHP_LDFLAGS", "$(DLL_LDFLAGS)");
 
 	DEFINE("LDFLAGS", "/nologo ");
+
+	if (envLDFLAGS) {
+		ADD_FLAG("LDFLAGS", envLDFLAGS);
+	}
 
 	// we want msvcrt in the PHP DLL
 	ADD_FLAG("PHP_LDFLAGS", "/nodefaultlib:libcmt");
@@ -3407,7 +3411,7 @@ function toolset_setup_common_ldlags()
 function toolset_setup_common_libs()
 {
 	// urlmon.lib ole32.lib oleaut32.lib uuid.lib gdi32.lib winspool.lib comdlg32.lib
-	DEFINE("LIBS", "kernel32.lib ole32.lib user32.lib advapi32.lib shell32.lib ws2_32.lib Dnsapi.lib psapi.lib bcrypt.lib");
+	DEFINE("LIBS", "kernel32.lib ole32.lib user32.lib advapi32.lib shell32.lib ws2_32.lib Dnsapi.lib psapi.lib bcrypt.lib imagehlp.lib");
 }
 
 function toolset_setup_build_mode()
@@ -3425,8 +3429,13 @@ function toolset_setup_build_mode()
 			ADD_FLAG("CFLAGS", "/Zi");
 			ADD_FLAG("LDFLAGS", "/incremental:no /debug /opt:ref,icf");
 		}
-		// Equivalent to Release_TSInline build -> best optimization
-		ADD_FLAG("CFLAGS", "/LD /MD /W3 /Ox /D NDebug /D NDEBUG /D ZEND_WIN32_FORCE_INLINE /GF /D ZEND_DEBUG=0");
+		ADD_FLAG("CFLAGS", "/LD /MD /W3");
+		if (PHP_SANITIZER == "yes" && CLANG_TOOLSET) {
+			ADD_FLAG("CFLAGS", "/Od /D NDebug /D NDEBUG /D ZEND_WIN32_NEVER_INLINE /D ZEND_DEBUG=0");
+		} else {
+			// Equivalent to Release_TSInline build -> best optimization
+			ADD_FLAG("CFLAGS", "/Ox /D NDebug /D NDEBUG /D ZEND_WIN32_FORCE_INLINE /GF /D ZEND_DEBUG=0");
+		}
 
 		// if you have VS.Net /GS hardens the binary against buffer overruns
 		// ADD_FLAG("CFLAGS", "/GS");
@@ -3661,7 +3670,7 @@ function get_clang_lib_dir()
 	var ret = null;
 	var ver = null;
 
-	if (COMPILER_NAME.match(/clang version ([\d\.]+) \((.*)\)/)) {
+	if (COMPILER_NAME_LONG.match(/clang version ([\d\.]+) \((.*)\)/)) {
 		ver = RegExp.$1;
 	} else {
 		ERROR("Faled to determine clang lib path");
@@ -3694,15 +3703,14 @@ function add_asan_opts(cflags_name, libs_name, ldflags_name)
 
 	var ver = null;
 
-	if (COMPILER_NAME.match(/clang version ([\d\.]+) \((.*)\)/)) {
+	if (COMPILER_NAME_LONG.match(/clang version ([\d\.]+) \((.*)\)/)) {
 		ver = RegExp.$1;
 	} else {
 		ERROR("Faled to determine clang lib path");
 	}
 
 	if (!!cflags_name) {
-		ADD_FLAG(cflags_name, "-fsanitize=address");
-		ADD_FLAG(cflags_name, "-fsanitize-address-use-after-scope");
+		ADD_FLAG(cflags_name, "-fsanitize=address,undefined");
 	}
 	if (!!libs_name) {
 		if (X64) {

@@ -323,9 +323,15 @@ int dom_node_node_value_read(dom_object *obj, zval *retval)
 int dom_node_node_value_write(dom_object *obj, zval *newval)
 {
 	xmlNode *nodep = dom_object_get_node(obj);
+	zend_string *str;
 
 	if (nodep == NULL) {
 		php_dom_throw_error(INVALID_STATE_ERR, 0);
+		return FAILURE;
+	}
+
+	str = zval_try_get_string(newval);
+	if (UNEXPECTED(!str)) {
 		return FAILURE;
 	}
 
@@ -342,16 +348,13 @@ int dom_node_node_value_write(dom_object *obj, zval *newval)
 		case XML_COMMENT_NODE:
 		case XML_CDATA_SECTION_NODE:
 		case XML_PI_NODE:
-			{
-				zend_string *str = zval_get_string(newval);
-				xmlNodeSetContentLen(nodep, (xmlChar *) ZSTR_VAL(str), ZSTR_LEN(str) + 1);
-				zend_string_release_ex(str, 0);
-				break;
-			}
+			xmlNodeSetContentLen(nodep, (xmlChar *) ZSTR_VAL(str), ZSTR_LEN(str) + 1);
+			break;
 		default:
 			break;
 	}
 
+	zend_string_release_ex(str, 0);
 	return SUCCESS;
 }
 
@@ -428,13 +431,9 @@ int dom_node_child_nodes_read(dom_object *obj, zval *retval)
 		return FAILURE;
 	}
 
-	if (dom_node_children_valid(nodep) == FAILURE) {
-		ZVAL_NULL(retval);
-	} else {
-		php_dom_create_interator(retval, DOM_NODELIST);
-		intern = Z_DOMOBJ_P(retval);
-		dom_namednode_iter(obj, XML_ELEMENT_NODE, intern, NULL, NULL, NULL);
-	}
+	php_dom_create_interator(retval, DOM_NODELIST);
+	intern = Z_DOMOBJ_P(retval);
+	dom_namednode_iter(obj, XML_ELEMENT_NODE, intern, NULL, NULL, NULL);
 
 	return SUCCESS;
 }
@@ -721,7 +720,11 @@ int dom_node_prefix_write(dom_object *obj, zval *newval)
 					nsnode = xmlDocGetRootElement(nodep->doc);
 				}
 			}
-			str = zval_get_string(newval);
+			str = zval_try_get_string(newval);
+			if (UNEXPECTED(!str)) {
+				return FAILURE;
+			}
+
 			prefix = ZSTR_VAL(str);
 			if (nsnode && nodep->ns != NULL && !xmlStrEqual(nodep->ns->prefix, (xmlChar *)prefix)) {
 				strURI = (char *) nodep->ns->href;
@@ -854,6 +857,11 @@ int dom_node_text_content_write(dom_object *obj, zval *newval)
 		return FAILURE;
 	}
 
+	str = zval_try_get_string(newval);
+	if (UNEXPECTED(!str)) {
+		return FAILURE;
+	}
+
 	if (nodep->type == XML_ELEMENT_NODE || nodep->type == XML_ATTRIBUTE_NODE) {
 		if (nodep->children) {
 			node_list_unlink(nodep->children);
@@ -862,7 +870,6 @@ int dom_node_text_content_write(dom_object *obj, zval *newval)
 		}
 	}
 
-	str = zval_get_string(newval);
 	/* we have to use xmlNodeAddContent() to get the same behavior as with xmlNewText() */
 	xmlNodeSetContent(nodep, (xmlChar *) "");
 	xmlNodeAddContent(nodep, (xmlChar *) ZSTR_VAL(str));

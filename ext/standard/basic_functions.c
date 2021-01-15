@@ -76,10 +76,7 @@ typedef struct yy_buffer_state *YY_BUFFER_STATE;
 #endif
 
 #include <string.h>
-
-#if HAVE_LOCALE_H
-# include <locale.h>
-#endif
+#include <locale.h>
 
 #if HAVE_SYS_MMAN_H
 # include <sys/mman.h>
@@ -382,13 +379,11 @@ ZEND_BEGIN_ARG_INFO_EX(arginfo_array_slice, 0, 0, 2)
 	ZEND_ARG_INFO(0, preserve_keys)
 ZEND_END_ARG_INFO()
 
-ZEND_BEGIN_ARG_INFO_EX(arginfo_array_merge, 0, 0, 1)
-	ZEND_ARG_INFO(0, arr1) /* ARRAY_INFO(0, arg, 0) */
+ZEND_BEGIN_ARG_INFO_EX(arginfo_array_merge, 0, 0, 0)
 	ZEND_ARG_VARIADIC_INFO(0, arrays)
 ZEND_END_ARG_INFO()
 
-ZEND_BEGIN_ARG_INFO_EX(arginfo_array_merge_recursive, 0, 0, 1)
-	ZEND_ARG_INFO(0, arr1) /* ARRAY_INFO(0, arg, 0) */
+ZEND_BEGIN_ARG_INFO_EX(arginfo_array_merge_recursive, 0, 0, 0)
 	ZEND_ARG_VARIADIC_INFO(0, arrays)
 ZEND_END_ARG_INFO()
 
@@ -1811,7 +1806,7 @@ ZEND_END_ARG_INFO()
 #endif
 /* }}} */
 /* {{{ pack.c */
-ZEND_BEGIN_ARG_INFO_EX(arginfo_pack, 0, 0, 2)
+ZEND_BEGIN_ARG_INFO_EX(arginfo_pack, 0, 0, 1)
 	ZEND_ARG_INFO(0, format)
 	ZEND_ARG_VARIADIC_INFO(0, args)
 ZEND_END_ARG_INFO()
@@ -2043,7 +2038,7 @@ ZEND_BEGIN_ARG_INFO(arginfo_stream_context_get_options, 0)
 	ZEND_ARG_INFO(0, stream_or_context)
 ZEND_END_ARG_INFO()
 
-ZEND_BEGIN_ARG_INFO(arginfo_stream_context_set_option, 0)
+ZEND_BEGIN_ARG_INFO_EX(arginfo_stream_context_set_option, 0, 0, 2)
 	ZEND_ARG_INFO(0, stream_or_context)
 	ZEND_ARG_INFO(0, wrappername)
 	ZEND_ARG_INFO(0, optionname)
@@ -2167,12 +2162,10 @@ ZEND_BEGIN_ARG_INFO(arginfo_nl_langinfo, 0)
 ZEND_END_ARG_INFO()
 #endif
 
-#ifdef HAVE_STRCOLL
 ZEND_BEGIN_ARG_INFO(arginfo_strcoll, 0)
 	ZEND_ARG_INFO(0, str1)
 	ZEND_ARG_INFO(0, str2)
 ZEND_END_ARG_INFO()
-#endif
 
 ZEND_BEGIN_ARG_INFO_EX(arginfo_trim, 0, 0, 1)
 	ZEND_ARG_INFO(0, str)
@@ -2791,7 +2784,7 @@ static const zend_function_entry basic_functions[] = { /* {{{ */
 	PHP_FE(strripos,														arginfo_strripos)
 	PHP_FE(strrev,															arginfo_strrev)
 	PHP_FE(hebrev,															arginfo_hebrev)
-	PHP_FE(hebrevc,															arginfo_hebrevc)
+	PHP_DEP_FE(hebrevc,														arginfo_hebrevc)
 	PHP_FE(nl2br,															arginfo_nl2br)
 	PHP_FE(basename,														arginfo_basename)
 	PHP_FE(dirname,															arginfo_dirname)
@@ -2808,13 +2801,10 @@ static const zend_function_entry basic_functions[] = { /* {{{ */
 	PHP_FE(substr_compare,													arginfo_substr_compare)
 	PHP_FE(utf8_encode, 													arginfo_utf8_encode)
 	PHP_FE(utf8_decode, 													arginfo_utf8_decode)
-
-#ifdef HAVE_STRCOLL
 	PHP_FE(strcoll,															arginfo_strcoll)
-#endif
 
 #ifdef HAVE_STRFMON
-	PHP_FE(money_format,													arginfo_money_format)
+	PHP_DEP_FE(money_format,												arginfo_money_format)
 #endif
 
 	PHP_FE(substr,															arginfo_substr)
@@ -3015,14 +3005,14 @@ static const zend_function_entry basic_functions[] = { /* {{{ */
 
 	PHP_FE(quoted_printable_decode,											arginfo_quoted_printable_decode)
 	PHP_FE(quoted_printable_encode,											arginfo_quoted_printable_encode)
-	PHP_FE(convert_cyr_string,												arginfo_convert_cyr_string)
+	PHP_DEP_FE(convert_cyr_string,												arginfo_convert_cyr_string)
 	PHP_FE(get_current_user,												arginfo_get_current_user)
 	PHP_FE(set_time_limit,													arginfo_set_time_limit)
 	PHP_FE(header_register_callback,										arginfo_header_register_callback)
 	PHP_FE(get_cfg_var,														arginfo_get_cfg_var)
 
-	PHP_FE(get_magic_quotes_gpc,										arginfo_get_magic_quotes_gpc)
-	PHP_FE(get_magic_quotes_runtime,									arginfo_get_magic_quotes_runtime)
+	PHP_DEP_FE(get_magic_quotes_gpc,										arginfo_get_magic_quotes_gpc)
+	PHP_DEP_FE(get_magic_quotes_runtime,									arginfo_get_magic_quotes_runtime)
 
 	PHP_FE(error_log,														arginfo_error_log)
 	PHP_FE(error_get_last,													arginfo_error_get_last)
@@ -3057,7 +3047,7 @@ static const zend_function_entry basic_functions[] = { /* {{{ */
 	PHP_FE(ini_restore,														arginfo_ini_restore)
 	PHP_FE(get_include_path,												arginfo_get_include_path)
 	PHP_FE(set_include_path,												arginfo_set_include_path)
-	PHP_FE(restore_include_path,											arginfo_restore_include_path)
+	PHP_DEP_FE(restore_include_path,											arginfo_restore_include_path)
 
 	PHP_FE(setcookie,														arginfo_setcookie)
 	PHP_FE(setrawcookie,													arginfo_setrawcookie)
@@ -3119,7 +3109,7 @@ static const zend_function_entry basic_functions[] = { /* {{{ */
 	PHP_FALIAS(is_integer,			is_int,									arginfo_is_int)
 	PHP_FALIAS(is_long,				is_int,									arginfo_is_int)
 	PHP_FALIAS(is_double,			is_float,								arginfo_is_float)
-	PHP_FALIAS(is_real,				is_float,								arginfo_is_float)
+	PHP_DEP_FALIAS(is_real,			is_float,								arginfo_is_float)
 	PHP_FE(is_numeric,														arginfo_is_numeric)
 	PHP_FE(is_string,														arginfo_is_string)
 	PHP_FE(is_array,														arginfo_is_array)
@@ -3301,7 +3291,7 @@ static const zend_function_entry basic_functions[] = { /* {{{ */
 
 	/* functions from mail.c */
 	PHP_FE(mail,															arginfo_mail)
-	PHP_FE(ezmlm_hash,														arginfo_ezmlm_hash)
+	PHP_DEP_FE(ezmlm_hash,													arginfo_ezmlm_hash)
 
 	/* functions from syslog.c */
 #ifdef HAVE_SYSLOG_H
@@ -3677,6 +3667,7 @@ PHP_MINIT_FUNCTION(basic) /* {{{ */
 	register_html_constants(INIT_FUNC_ARGS_PASSTHRU);
 	register_string_constants(INIT_FUNC_ARGS_PASSTHRU);
 
+	BASIC_MINIT_SUBMODULE(var)
 	BASIC_MINIT_SUBMODULE(file)
 	BASIC_MINIT_SUBMODULE(pack)
 	BASIC_MINIT_SUBMODULE(browscap)
@@ -3685,7 +3676,7 @@ PHP_MINIT_FUNCTION(basic) /* {{{ */
 	BASIC_MINIT_SUBMODULE(password)
 	BASIC_MINIT_SUBMODULE(mt_rand)
 
-#if defined(HAVE_LOCALECONV) && defined(ZTS)
+#if defined(ZTS)
 	BASIC_MINIT_SUBMODULE(localeconv)
 #endif
 
@@ -3769,7 +3760,7 @@ PHP_MSHUTDOWN_FUNCTION(basic) /* {{{ */
 	BASIC_MSHUTDOWN_SUBMODULE(url_scanner_ex)
 	BASIC_MSHUTDOWN_SUBMODULE(file)
 	BASIC_MSHUTDOWN_SUBMODULE(standard_filters)
-#if defined(HAVE_LOCALECONV) && defined(ZTS)
+#if defined(ZTS)
 	BASIC_MSHUTDOWN_SUBMODULE(localeconv)
 #endif
 	BASIC_MSHUTDOWN_SUBMODULE(crypt)
@@ -3832,7 +3823,9 @@ PHP_RSHUTDOWN_FUNCTION(basic) /* {{{ */
 	ZVAL_UNDEF(&BG(strtok_zval));
 	BG(strtok_string) = NULL;
 #ifdef HAVE_PUTENV
+	tsrm_env_lock();
 	zend_hash_destroy(&BG(putenv_ht));
+	tsrm_env_unlock();
 #endif
 
 	BG(mt_rand_is_seeded) = 0;
@@ -4141,11 +4134,22 @@ PHP_FUNCTION(getenv)
 		}
 	}
 #else
+
+    tsrm_env_lock();
+
 	/* system method returns a const */
 	ptr = getenv(str);
+
 	if (ptr) {
-		RETURN_STRING(ptr);
+		RETVAL_STRING(ptr);
 	}
+
+    tsrm_env_unlock();
+
+    if (ptr) {
+        return;
+    }
+
 #endif
 	RETURN_FALSE;
 }
@@ -4196,6 +4200,7 @@ PHP_FUNCTION(putenv)
 	}
 #endif
 
+	tsrm_env_lock();
 	zend_hash_str_del(&BG(putenv_ht), pe.key, pe.key_len);
 
 	/* find previous value */
@@ -4229,6 +4234,7 @@ PHP_FUNCTION(putenv)
 		}
 		/* valw may be NULL, but the failed conversion still needs to be checked. */
 		if (!keyw || !valw && value) {
+			tsrm_env_unlock();
 			efree(pe.putenv_string);
 			efree(pe.key);
 			free(keyw);
@@ -4256,6 +4262,7 @@ PHP_FUNCTION(putenv)
 			tzset();
 		}
 #endif
+		tsrm_env_unlock();
 #if defined(PHP_WIN32)
 		free(keyw);
 		free(valw);
@@ -4372,7 +4379,7 @@ PHP_FUNCTION(getopt)
 
 	/* Init zoptind to 1 */
 	if (zoptind) {
-		ZEND_TRY_ASSIGN_LONG(zoptind, 1);
+		ZEND_TRY_ASSIGN_REF_LONG(zoptind, 1);
 	}
 
 	/* Get argv from the global symbol table. We calculate argc ourselves
@@ -4468,7 +4475,7 @@ PHP_FUNCTION(getopt)
 
 	while ((o = php_getopt(argc, argv, opts, &php_optarg, &php_optind, 0, 1)) != -1) {
 		/* Skip unknown arguments. */
-		if (o == '?') {
+		if (o == PHP_GETOPT_INVALID_ARG) {
 			continue;
 		}
 
@@ -4520,7 +4527,7 @@ PHP_FUNCTION(getopt)
 
 	/* Set zoptind to php_optind */
 	if (zoptind) {
-		ZEND_TRY_ASSIGN_LONG(zoptind, php_optind);
+		ZEND_TRY_ASSIGN_REF_LONG(zoptind, php_optind);
 	}
 
 	free_longopts(orig_opts);
@@ -4627,30 +4634,30 @@ PHP_FUNCTION(time_nanosleep)
    Make the script sleep until the specified time */
 PHP_FUNCTION(time_sleep_until)
 {
-	double d_ts, c_ts;
+	double target_secs;
 	struct timeval tm;
 	struct timespec php_req, php_rem;
+	uint64_t current_ns, target_ns, diff_ns;
+	const uint64_t ns_per_sec = 1000000000;
 
 	ZEND_PARSE_PARAMETERS_START(1, 1)
-		Z_PARAM_DOUBLE(d_ts)
+		Z_PARAM_DOUBLE(target_secs)
 	ZEND_PARSE_PARAMETERS_END();
 
 	if (gettimeofday((struct timeval *) &tm, NULL) != 0) {
 		RETURN_FALSE;
 	}
 
-	c_ts = (double)(d_ts - tm.tv_sec - tm.tv_usec / 1000000.00);
-	if (c_ts < 0) {
+	target_ns = (uint64_t) (target_secs * ns_per_sec);
+	current_ns = ((uint64_t) tm.tv_sec) * ns_per_sec + ((uint64_t) tm.tv_usec) * 1000;
+	if (target_ns < current_ns) {
 		php_error_docref(NULL, E_WARNING, "Sleep until to time is less than current time");
 		RETURN_FALSE;
 	}
 
-	php_req.tv_sec = (time_t) c_ts;
-	if (php_req.tv_sec > c_ts) { /* rounding up occurred */
-		php_req.tv_sec--;
-	}
-	/* 1sec = 1000000000 nanoseconds */
-	php_req.tv_nsec = (long) ((c_ts - php_req.tv_sec) * 1000000000.00);
+	diff_ns = target_ns - current_ns;
+	php_req.tv_sec = (time_t) (diff_ns / ns_per_sec);
+	php_req.tv_nsec = (long) (diff_ns % ns_per_sec);
 
 	while (nanosleep(&php_req, &php_rem)) {
 		if (errno == EINTR) {
@@ -4678,25 +4685,31 @@ PHP_FUNCTION(get_current_user)
 }
 /* }}} */
 
+static void add_config_entries(HashTable *hash, zval *return_value);
+
 /* {{{ add_config_entry
  */
 static void add_config_entry(zend_ulong h, zend_string *key, zval *entry, zval *retval)
 {
 	if (Z_TYPE_P(entry) == IS_STRING) {
+		zend_string *str = Z_STR_P(entry);
+		if (!ZSTR_IS_INTERNED(str)) {
+			if (!(GC_FLAGS(str) & GC_PERSISTENT)) {
+				zend_string_addref(str);
+			} else {
+				str = zend_string_init(ZSTR_VAL(str), ZSTR_LEN(str), 0);
+			}
+		}
+
 		if (key) {
-			add_assoc_str_ex(retval, ZSTR_VAL(key), ZSTR_LEN(key), zend_string_copy(Z_STR_P(entry)));
+			add_assoc_str_ex(retval, ZSTR_VAL(key), ZSTR_LEN(key), str);
 		} else {
-			add_index_str(retval, h, zend_string_copy(Z_STR_P(entry)));
+			add_index_str(retval, h, str);
 		}
 	} else if (Z_TYPE_P(entry) == IS_ARRAY) {
-		zend_ulong h;
-		zend_string *key;
-		zval *zv, tmp;
-
+		zval tmp;
 		array_init(&tmp);
-		ZEND_HASH_FOREACH_KEY_VAL(Z_ARRVAL_P(entry), h, key, zv)
-			add_config_entry(h, key, zv, &tmp);
-		ZEND_HASH_FOREACH_END();
+		add_config_entries(Z_ARRVAL_P(entry), &tmp);
 		zend_hash_update(Z_ARRVAL_P(retval), key, &tmp);
 	}
 }
@@ -5313,11 +5326,7 @@ PHP_FUNCTION(php_strip_whitespace)
 
 	php_output_start_default();
 
-	memset(&file_handle, 0, sizeof(file_handle));
-	file_handle.type = ZEND_HANDLE_FILENAME;
-	file_handle.filename = filename;
-	file_handle.free_filename = 0;
-	file_handle.opened_path = NULL;
+	zend_stream_init_filename(&file_handle, filename);
 	zend_save_lexical_state(&original_lex_state);
 	if (open_file_for_scanning(&file_handle) == FAILURE) {
 		zend_restore_lexical_state(&original_lex_state);
@@ -5350,7 +5359,10 @@ PHP_FUNCTION(highlight_string)
 		Z_PARAM_OPTIONAL
 		Z_PARAM_BOOL(i)
 	ZEND_PARSE_PARAMETERS_END_EX(RETURN_FALSE);
-	convert_to_string_ex(expr);
+
+	if (!try_convert_to_string(expr)) {
+		return;
+	}
 
 	if (i) {
 		php_output_start_default();
@@ -6077,9 +6089,7 @@ PHP_FUNCTION(parse_ini_file)
 	}
 
 	/* Setup filehandle */
-	memset(&fh, 0, sizeof(fh));
-	fh.filename = filename;
-	fh.type = ZEND_HANDLE_FILENAME;
+	zend_stream_init_filename(&fh, filename);
 
 	array_init(return_value);
 	if (zend_parse_ini_file(&fh, 0, (int)scanner_mode, ini_parser_cb, return_value) == FAILURE) {

@@ -33,11 +33,9 @@
 #ifdef PDO_USE_MYSQLND
 #	define pdo_mysql_stmt_execute_prepared(stmt) pdo_mysql_stmt_execute_prepared_mysqlnd(stmt)
 #	define pdo_free_bound_result(res) zval_ptr_dtor(res.zv)
-#	define pdo_mysql_stmt_close(stmt) mysqlnd_stmt_close(stmt, 0)
 #else
 #	define pdo_mysql_stmt_execute_prepared(stmt) pdo_mysql_stmt_execute_prepared_libmysql(stmt)
 #	define pdo_free_bound_result(res) efree(res.buffer)
-#	define pdo_mysql_stmt_close(stmt) mysql_stmt_close(stmt)
 #endif
 
 
@@ -58,7 +56,7 @@ static int pdo_mysql_stmt_dtor(pdo_stmt_t *stmt) /* {{{ */
 		S->einfo.errmsg = NULL;
 	}
 	if (S->stmt) {
-		pdo_mysql_stmt_close(S->stmt);
+		mysql_stmt_close(S->stmt);
 		S->stmt = NULL;
 	}
 
@@ -257,7 +255,10 @@ static int pdo_mysql_stmt_execute_prepared_libmysql(pdo_stmt_t *stmt) /* {{{ */
 
 			/* if buffered, pre-fetch all the data */
 			if (H->buffered) {
-				mysql_stmt_store_result(S->stmt);
+				if (mysql_stmt_store_result(S->stmt)) {
+					pdo_mysql_error_stmt(stmt);
+					PDO_DBG_RETURN(0);
+				}
 			}
 		}
 	}
@@ -300,6 +301,7 @@ static int pdo_mysql_stmt_execute_prepared_mysqlnd(pdo_stmt_t *stmt) /* {{{ */
 		/* if buffered, pre-fetch all the data */
 		if (H->buffered) {
 			if (mysql_stmt_store_result(S->stmt)) {
+				pdo_mysql_error_stmt(stmt);
 				PDO_DBG_RETURN(0);
 			}
 		}
@@ -348,11 +350,12 @@ static int pdo_mysql_stmt_next_rowset(pdo_stmt_t *stmt) /* {{{ */
 	PDO_DBG_INF_FMT("stmt=%p", S->stmt);
 
 #if PDO_USE_MYSQLND
-	if (!H->emulate_prepare) {
+	if (S->stmt) {
 		if (!mysqlnd_stmt_more_results(S->stmt)) {
 			PDO_DBG_RETURN(0);
 		}
 		if (mysqlnd_stmt_next_result(S->stmt)) {
+			pdo_mysql_error_stmt(stmt);
 			PDO_DBG_RETURN(0);
 		}
 
@@ -388,7 +391,8 @@ static int pdo_mysql_stmt_next_rowset(pdo_stmt_t *stmt) /* {{{ */
 			/* if buffered, pre-fetch all the data */
 			if (H->buffered) {
 				if (mysql_stmt_store_result(S->stmt)) {
-					PDO_DBG_RETURN(1);
+					pdo_mysql_error_stmt(stmt);
+					PDO_DBG_RETURN(0);
 				}
 			}
 		}
@@ -558,6 +562,10 @@ static int pdo_mysql_stmt_param_hook(pdo_stmt_t *stmt, struct pdo_bound_param_da
 						mysqlnd_stmt_bind_one_param(S->stmt, param->paramno, parameter, MYSQL_TYPE_LONG);
 #endif /* SIZEOF_LONG */
 						break;
+					case IS_TRUE:
+					case IS_FALSE:
+						mysqlnd_stmt_bind_one_param(S->stmt, param->paramno, parameter, MYSQL_TYPE_TINY);
+						break;
 					case IS_DOUBLE:
 						mysqlnd_stmt_bind_one_param(S->stmt, param->paramno, parameter, MYSQL_TYPE_DOUBLE);
 						break;
@@ -612,17 +620,27 @@ static int pdo_mysql_stmt_param_hook(pdo_stmt_t *stmt, struct pdo_bound_param_da
 static int pdo_mysql_stmt_fetch(pdo_stmt_t *stmt, enum pdo_fetch_orientation ori, zend_long offset) /* {{{ */
 {
 	pdo_mysql_stmt *S = (pdo_mysql_stmt*)stmt->driver_data;
-#if PDO_USE_MYSQLND
+
+	if (!S->result) {
+		PDO_DBG_RETURN(0);
+	}
+
+#ifdef PDO_USE_MYSQLND
 	zend_bool fetched_anything;
 
 	PDO_DBG_ENTER("pdo_mysql_stmt_fetch");
 	PDO_DBG_INF_FMT("stmt=%p", S->stmt);
 	if (S->stmt) {
 		if (FAIL == mysqlnd_stmt_fetch(S->stmt, &fetched_anything) || fetched_anything == FALSE) {
+			pdo_mysql_error_stmt(stmt);
 			PDO_DBG_RETURN(0);
 		}
 
 		PDO_DBG_RETURN(1);
+	}
+
+	if (!S->stmt && S->current_data) {
+		mnd_free(S->current_data);
 	}
 #else
 	int ret;
@@ -647,22 +665,8 @@ static int pdo_mysql_stmt_fetch(pdo_stmt_t *stmt, enum pdo_fetch_orientation ori
 	}
 #endif /* PDO_USE_MYSQLND */
 
-	if (!S->result) {
-		strcpy(stmt->error_code, "HY000");
-		PDO_DBG_RETURN(0);
-	}
-#if PDO_USE_MYSQLND
-	if (!S->stmt && S->current_data) {
-		mnd_free(S->current_data);
-	}
-#endif /* PDO_USE_MYSQLND */
-
 	if ((S->current_data = mysql_fetch_row(S->result)) == NULL) {
-#if PDO_USE_MYSQLND
-		if (S->result->unbuf && !S->result->unbuf->eof_reached && mysql_errno(S->H->server)) {
-#else
-		if (!S->result->eof && mysql_errno(S->H->server)) {
-#endif
+		if (!S->H->buffered && mysql_errno(S->H->server)) {
 			pdo_mysql_error_stmt(stmt);
 		}
 		PDO_DBG_RETURN(0);
@@ -874,7 +878,7 @@ static int pdo_mysql_stmt_col_meta(pdo_stmt_t *stmt, zend_long colno, zval *retu
 		case MYSQL_TYPE_SHORT:
 		case MYSQL_TYPE_INT24:
 		case MYSQL_TYPE_LONG:
-#if SIZEOF_LONG==8
+#if SIZEOF_ZEND_LONG==8
 		case MYSQL_TYPE_LONGLONG:
 #endif
 			add_assoc_long(return_value, "pdo_type", PDO_PARAM_INT);

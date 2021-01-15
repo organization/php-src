@@ -110,7 +110,7 @@ static void php_filter_strip(zval *value, zend_long flags)
 {
 	unsigned char *str;
 	size_t i;
-	int c;
+	size_t c;
 	zend_string *buf;
 
 	/* Optimization for if no strip flags are set */
@@ -119,7 +119,7 @@ static void php_filter_strip(zval *value, zend_long flags)
 	}
 
 	str = (unsigned char *)Z_STRVAL_P(value);
-	buf = zend_string_alloc(Z_STRLEN_P(value) + 1, 0);
+	buf = zend_string_alloc(Z_STRLEN_P(value), 0);
 	c = 0;
 	for (i = 0; i < Z_STRLEN_P(value); i++) {
 		if ((str[i] >= 127) && (flags & FILTER_FLAG_STRIP_HIGH)) {
@@ -161,7 +161,7 @@ static void filter_map_apply(zval *value, filter_map *map)
 	zend_string *buf;
 
 	str = (unsigned char *)Z_STRVAL_P(value);
-	buf = zend_string_alloc(Z_STRLEN_P(value) + 1, 0);
+	buf = zend_string_alloc(Z_STRLEN_P(value), 0);
 	c = 0;
 	for (i = 0; i < Z_STRLEN_P(value); i++) {
 		if ((*map)[str[i]]) {
@@ -369,11 +369,20 @@ void php_filter_number_float(PHP_INPUT_FILTER_PARAM_DECL)
 /* {{{ php_filter_add_slashes */
 void php_filter_add_slashes(PHP_INPUT_FILTER_PARAM_DECL)
 {
-	/* This filter is used by both 'add_slashes' & 'magic_quotes' (legacy) */
+	zend_string *buf = php_addslashes(Z_STR_P(value));
 
+	zval_ptr_dtor(value);
+	ZVAL_STR(value, buf);
+}
+/* }}} */
+
+/* {{{ php_filter_magic_quotes */
+void php_filter_magic_quotes(PHP_INPUT_FILTER_PARAM_DECL)
+{
 	zend_string *buf;
+	php_error_docref(NULL, E_DEPRECATED,
+		"FILTER_SANITIZE_MAGIC_QUOTES is deprecated, use FILTER_SANITIZE_ADD_SLASHES instead");
 
-	/* just call php_addslashes quotes */
 	buf = php_addslashes(Z_STR_P(value));
 
 	zval_ptr_dtor(value);

@@ -337,25 +337,16 @@ static inline zval *spl_fixedarray_object_read_dimension_helper(spl_fixedarray_o
 }
 /* }}} */
 
+static int spl_fixedarray_object_has_dimension(zval *object, zval *offset, int check_empty);
+
 static zval *spl_fixedarray_object_read_dimension(zval *object, zval *offset, int type, zval *rv) /* {{{ */
 {
 	spl_fixedarray_object *intern;
 
 	intern = Z_SPLFIXEDARRAY_P(object);
 
-	if (type == BP_VAR_IS && intern->fptr_offset_has) {
-		SEPARATE_ARG_IF_REF(offset);
-		zend_call_method_with_1_params(object, intern->std.ce, &intern->fptr_offset_has, "offsetexists", rv, offset);
-		if (UNEXPECTED(Z_ISUNDEF_P(rv))) {
-			zval_ptr_dtor(offset);
-			return NULL;
-		}
-		if (!i_zend_is_true(rv)) {
-			zval_ptr_dtor(offset);
-			zval_ptr_dtor(rv);
-			return &EG(uninitialized_zval);
-		}
-		zval_ptr_dtor(rv);
+	if (type == BP_VAR_IS && !spl_fixedarray_object_has_dimension(object, offset, 0)) {
+		return &EG(uninitialized_zval);
 	}
 
 	if (intern->fptr_offset_get) {
@@ -642,12 +633,12 @@ SPL_METHOD(SplFixedArray, toArray)
 			}
 		}
 	} else {
-		ZVAL_EMPTY_ARRAY(return_value);
+		RETURN_EMPTY_ARRAY();
 	}
 }
 /* }}} */
 
-/* {{{ proto object SplFixedArray::fromArray(array data[, bool save_indexes])
+/* {{{ proto object SplFixedArray::fromArray(array array[, bool save_indexes])
 */
 SPL_METHOD(SplFixedArray, fromArray)
 {
@@ -1008,7 +999,8 @@ zend_object_iterator *spl_fixedarray_get_iterator(zend_class_entry *ce, zval *ob
 
 	zend_iterator_init((zend_object_iterator*)iterator);
 
-	ZVAL_COPY(&iterator->intern.it.data, object);
+	Z_ADDREF_P(object);
+	ZVAL_OBJ(&iterator->intern.it.data, Z_OBJ_P(object));
 	iterator->intern.it.funcs = &spl_fixedarray_it_funcs;
 	iterator->intern.ce = ce;
 	ZVAL_UNDEF(&iterator->intern.value);
@@ -1035,7 +1027,7 @@ ZEND_BEGIN_ARG_INFO(arginfo_fixedarray_setSize, 0)
 ZEND_END_ARG_INFO()
 
 ZEND_BEGIN_ARG_INFO_EX(arginfo_fixedarray_fromArray, 0, 0, 1)
-	ZEND_ARG_INFO(0, data)
+	ZEND_ARG_INFO(0, array)
 	ZEND_ARG_INFO(0, save_indexes)
 ZEND_END_ARG_INFO()
 

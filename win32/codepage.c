@@ -66,7 +66,7 @@ __forceinline static wchar_t *php_win32_cp_to_w_int(const char* in, size_t in_le
 	}
 
 	assert(ret ? tmp_len == ret_len : 1);
-	assert(ret ? wcslen(ret) == ret_len - 1 : 1);
+	assert(ret && !in_len ? wcslen(ret) == ret_len - 1 : 1);
 
 	ret[ret_len-1] = L'\0';
 
@@ -105,6 +105,11 @@ PW32CP wchar_t *php_win32_cp_conv_ascii_to_w(const char* in, size_t in_len, size
 {/*{{{*/
 	wchar_t *ret, *ret_idx;
 	const char *idx = in, *end;
+	char ch_err = 0;
+
+#if PHP_DEBUG
+	size_t save_in_len = in_len;
+#endif
 
 	assert(in && in_len ? in[in_len] == '\0' : 1);
 
@@ -123,28 +128,32 @@ PW32CP wchar_t *php_win32_cp_conv_ascii_to_w(const char* in, size_t in_len, size
 
 		/* Process unaligned chunk. */
 		while (idx < aidx) {
-			if (!__isascii(*idx) && '\0' != *idx) {
-				ASCII_FAIL_RETURN()
-			}
+			ch_err |= *idx;
 			idx++;
+		}
+		if (ch_err & 0x80) {
+			ASCII_FAIL_RETURN()
 		}
 
 		/* Process aligned chunk. */
+		__m128i vec_err = _mm_setzero_si128();
 		while (end - idx > 15) {
 			const __m128i block = _mm_load_si128((__m128i *)idx);
-			if (_mm_movemask_epi8(block)) {
-				ASCII_FAIL_RETURN()
-			}
+			vec_err = _mm_or_si128(vec_err, block);
 			idx += 16;
+		}
+		if (_mm_movemask_epi8(vec_err)) {
+			ASCII_FAIL_RETURN()
 		}
 	}
 
 	/* Process the trailing part, or otherwise process string < 16 bytes. */
 	while (idx < end) {
-		if (!__isascii(*idx) && '\0' != *idx) {
-			ASCII_FAIL_RETURN()
-		}
+		ch_err |= *idx;
 		idx++;
+	}
+	if (ch_err & 0x80) {
+		ASCII_FAIL_RETURN()
 	}
 
 	ret = malloc((in_len+1)*sizeof(wchar_t));
@@ -156,9 +165,6 @@ PW32CP wchar_t *php_win32_cp_conv_ascii_to_w(const char* in, size_t in_len, size
 	ret_idx = ret;
 	idx = in;
 
-	/* Check and conversion could be merged. This however would
-		be more expencive, if a non ASCII string was passed.
-		TODO check whether the impact is acceptable. */
 	if (in_len > 15) {
 		const char *aidx = (const char *)ZEND_SLIDE_TO_ALIGNED16(in);
 
@@ -197,7 +203,7 @@ PW32CP wchar_t *php_win32_cp_conv_ascii_to_w(const char* in, size_t in_len, size
 
 	ret[in_len] = L'\0';
 
-	assert(ret ? wcslen(ret) == in_len : 1);
+	assert(ret && !save_in_len ? wcslen(ret) == in_len : 1);
 
 	if (PHP_WIN32_CP_IGNORE_LEN_P != out_len) {
 		*out_len = in_len;
@@ -241,7 +247,7 @@ __forceinline static char *php_win32_cp_from_w_int(const wchar_t* in, size_t in_
 	}
 
 	assert(target ? r == target_len : 1);
-	assert(target ? strlen(target) == target_len - 1 : 1);
+	assert(target && !in_len ? strlen(target) == target_len - 1 : 1);
 
 	target[target_len-1] = '\0';
 
@@ -651,7 +657,9 @@ PHP_FUNCTION(sapi_windows_cp_conv)
 			RETURN_NULL();
 		}
 	} else {
-		convert_to_string(z_in_cp);
+		if (!try_convert_to_string(z_in_cp)) {
+			return;
+		}
 
 		in_cp = php_win32_cp_get_by_enc(Z_STRVAL_P(z_in_cp));
 		if (!in_cp) {
@@ -672,7 +680,9 @@ PHP_FUNCTION(sapi_windows_cp_conv)
 			RETURN_NULL();
 		}
 	} else {
-		convert_to_string(z_out_cp);
+		if (!try_convert_to_string(z_out_cp)) {
+			return;
+		}
 
 		out_cp = php_win32_cp_get_by_enc(Z_STRVAL_P(z_out_cp));
 		if (!out_cp) {

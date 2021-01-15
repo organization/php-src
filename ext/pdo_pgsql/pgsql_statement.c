@@ -149,7 +149,7 @@ static int pgsql_stmt_execute(pdo_stmt_t *stmt)
 
 		if (S->is_prepared) {
 			spprintf(&q, 0, "CLOSE %s", S->cursor_name);
-			S->result = PQexec(H->server, q);
+			PQclear(PQexec(H->server, q));
 			efree(q);
 		}
 
@@ -399,7 +399,7 @@ static int pgsql_stmt_param_hook(pdo_stmt_t *stmt, struct pdo_bound_param_data *
 				}
 				break;
 		}
-	} else if (param->is_param) {
+	} else if (param->is_param && event_type == PDO_PARAM_EVT_NORMALIZE) {
 		/* We need to manually convert to a pg native boolean value */
 		if (PDO_PARAM_TYPE(param->param_type) == PDO_PARAM_BOOL &&
 			((param->param_type & PDO_PARAM_INPUT_OUTPUT) != PDO_PARAM_INPUT_OUTPUT)) {
@@ -526,7 +526,7 @@ static int pgsql_stmt_describe(pdo_stmt_t *stmt, int colno)
 	return 1;
 }
 
-static int pgsql_stmt_get_col(pdo_stmt_t *stmt, int colno, char **ptr, zend_ulong *len, int *caller_frees )
+static int pgsql_stmt_get_col(pdo_stmt_t *stmt, int colno, char **ptr, size_t *len, int *caller_frees )
 {
 	pdo_pgsql_stmt *S = (pdo_pgsql_stmt*)stmt->driver_data;
 	struct pdo_column_data *cols = stmt->columns;

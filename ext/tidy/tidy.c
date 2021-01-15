@@ -66,6 +66,13 @@
 	}	\
 	obj = Z_TIDY_P(object);	\
 
+#define TIDY_FETCH_INITIALIZED_OBJECT \
+	TIDY_FETCH_OBJECT; \
+	if (!obj->ptdoc->initialized) { \
+		zend_throw_error(NULL, "tidy object is not initialized"); \
+		return; \
+	}
+
 #define TIDY_FETCH_ONLY_OBJECT	\
 	PHPTidyObj *obj;	\
 	TIDY_SET_CONTEXT; \
@@ -233,6 +240,7 @@ static int php_tidy_output_handler(void **nothing, php_output_context *output_co
 static PHP_MINIT_FUNCTION(tidy);
 static PHP_MSHUTDOWN_FUNCTION(tidy);
 static PHP_RINIT_FUNCTION(tidy);
+static PHP_RSHUTDOWN_FUNCTION(tidy);
 static PHP_MINFO_FUNCTION(tidy);
 
 static PHP_FUNCTION(tidy_getopt);
@@ -493,7 +501,7 @@ zend_module_entry tidy_module_entry = {
 	PHP_MINIT(tidy),
 	PHP_MSHUTDOWN(tidy),
 	PHP_RINIT(tidy),
-	NULL,
+	PHP_RSHUTDOWN(tidy),
 	PHP_MINFO(tidy),
 	PHP_TIDY_VERSION,
 	PHP_MODULE_GLOBALS(tidy),
@@ -783,7 +791,11 @@ static int tidy_doc_cast_handler(zval *in, zval *out, int type)
 			obj = Z_TIDY_P(in);
 			tidyBufInit(&output);
 			tidySaveBuffer (obj->ptdoc->doc, &output);
-			ZVAL_STRINGL(out, (char *) output.bp, output.size ? output.size-1 : 0);
+			if (output.size) {
+				ZVAL_STRINGL(out, (char *) output.bp, output.size-1);
+			} else {
+				ZVAL_EMPTY_STRING(out);
+			}
 			tidyBufFree(&output);
 			break;
 
@@ -1091,6 +1103,13 @@ static PHP_RINIT_FUNCTION(tidy)
 #endif
 
 	php_tidy_clean_output_start(ZEND_STRL("ob_tidyhandler"));
+
+	return SUCCESS;
+}
+
+static PHP_RSHUTDOWN_FUNCTION(tidy)
+{
+	TG(clean_output) = INI_ORIG_BOOL("tidy.clean_output");
 
 	return SUCCESS;
 }
@@ -1482,7 +1501,7 @@ static PHP_FUNCTION(tidy_get_status)
    Get the Detected HTML version for the specified document. */
 static PHP_FUNCTION(tidy_get_html_ver)
 {
-	TIDY_FETCH_OBJECT;
+	TIDY_FETCH_INITIALIZED_OBJECT;
 
 	RETURN_LONG(tidyDetectedHtmlVersion(obj->ptdoc->doc));
 }
@@ -1492,7 +1511,7 @@ static PHP_FUNCTION(tidy_get_html_ver)
    Indicates if the document is a XHTML document. */
 static PHP_FUNCTION(tidy_is_xhtml)
 {
-	TIDY_FETCH_OBJECT;
+	TIDY_FETCH_INITIALIZED_OBJECT;
 
 	RETURN_BOOL(tidyDetectedXhtml(obj->ptdoc->doc));
 }
@@ -1502,7 +1521,7 @@ static PHP_FUNCTION(tidy_is_xhtml)
    Indicates if the document is a generic (non HTML/XHTML) XML document. */
 static PHP_FUNCTION(tidy_is_xml)
 {
-	TIDY_FETCH_OBJECT;
+	TIDY_FETCH_INITIALIZED_OBJECT;
 
 	RETURN_BOOL(tidyDetectedGenericXml(obj->ptdoc->doc));
 }
@@ -1794,11 +1813,14 @@ static TIDY_NODE_METHOD(isHtml)
 {
 	TIDY_FETCH_ONLY_OBJECT;
 
-	if (tidyNodeGetType(obj->node) & (TidyNode_Start | TidyNode_End | TidyNode_StartEnd)) {
-		RETURN_TRUE;
+	switch (tidyNodeGetType(obj->node)) {
+		case TidyNode_Start:
+		case TidyNode_End:
+		case TidyNode_StartEnd:
+			RETURN_TRUE;
+		default:
+			RETURN_FALSE;
 	}
-
-	RETURN_FALSE;
 }
 /* }}} */
 

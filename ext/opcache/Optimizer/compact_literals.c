@@ -126,7 +126,7 @@ void zend_optimizer_compact_literals(zend_op_array *op_array, zend_optimizer_ctx
 	int l_false = -1;
 	int l_true = -1;
 	int l_empty_arr = -1;
-	HashTable hash;
+	HashTable hash, double_hash;
 	zend_string *key = NULL;
 	void *checkpoint = zend_arena_checkpoint(ctx->arena);
 	int *const_slot, *class_slot, *func_slot, *bind_var_slot, *property_slot, *method_slot;
@@ -197,7 +197,7 @@ void zend_optimizer_compact_literals(zend_op_array *op_array, zend_optimizer_ctx
 				case ZEND_PRE_DEC_STATIC_PROP:
 				case ZEND_POST_INC_STATIC_PROP:
 				case ZEND_POST_DEC_STATIC_PROP:
-literals_handle_static_prop:
+				case ZEND_ASSIGN_STATIC_PROP_OP:
 					if (opline->op2_type == IS_CONST) {
 						LITERAL_INFO(opline->op2.constant, LITERAL_CLASS, 2);
 					}
@@ -230,37 +230,12 @@ literals_handle_static_prop:
 				case ZEND_POST_INC_OBJ:
 				case ZEND_POST_DEC_OBJ:
 				case ZEND_ISSET_ISEMPTY_PROP_OBJ:
+				case ZEND_ASSIGN_OBJ_OP:
+					if (opline->op1_type == IS_CONST) {
+						LITERAL_INFO(opline->op1.constant, LITERAL_VALUE, 1);
+					}
 					if (opline->op2_type == IS_CONST) {
 						LITERAL_INFO(opline->op2.constant, LITERAL_PROPERTY, 1);
-					}
-					break;
-				case ZEND_ASSIGN_ADD:
-				case ZEND_ASSIGN_SUB:
-				case ZEND_ASSIGN_MUL:
-				case ZEND_ASSIGN_DIV:
-				case ZEND_ASSIGN_POW:
-				case ZEND_ASSIGN_MOD:
-				case ZEND_ASSIGN_SL:
-				case ZEND_ASSIGN_SR:
-				case ZEND_ASSIGN_CONCAT:
-				case ZEND_ASSIGN_BW_OR:
-				case ZEND_ASSIGN_BW_AND:
-				case ZEND_ASSIGN_BW_XOR:
-					if (opline->extended_value == ZEND_ASSIGN_STATIC_PROP) {
-						goto literals_handle_static_prop;
-					}
-					if (opline->op2_type == IS_CONST) {
-						if (opline->extended_value == ZEND_ASSIGN_OBJ) {
-							LITERAL_INFO(opline->op2.constant, LITERAL_PROPERTY, 1);
-						} else if (opline->extended_value == ZEND_ASSIGN_DIM) {
-							if (Z_EXTRA(op_array->literals[opline->op2.constant]) == ZEND_EXTRA_VALUE) {
-								LITERAL_INFO(opline->op2.constant, LITERAL_VALUE, 2);
-							} else {
-								LITERAL_INFO(opline->op2.constant, LITERAL_VALUE, 1);
-							}
-						} else {
-							LITERAL_INFO(opline->op2.constant, LITERAL_VALUE, 1);
-						}
 					}
 					break;
 				case ZEND_BIND_GLOBAL:
@@ -270,17 +245,14 @@ literals_handle_static_prop:
 					LITERAL_INFO(opline->op2.constant, LITERAL_VALUE, 1);
 					break;
 				case ZEND_DECLARE_FUNCTION:
+					LITERAL_INFO(opline->op1.constant, LITERAL_VALUE, 2);
+					break;
 				case ZEND_DECLARE_CLASS:
+				case ZEND_DECLARE_CLASS_DELAYED:
 					LITERAL_INFO(opline->op1.constant, LITERAL_VALUE, 2);
-					break;
-				case ZEND_DECLARE_INHERITED_CLASS:
-				case ZEND_DECLARE_INHERITED_CLASS_DELAYED:
-					LITERAL_INFO(opline->op1.constant, LITERAL_VALUE, 2);
-					LITERAL_INFO(opline->op2.constant, LITERAL_VALUE, 2);
-					break;
-				case ZEND_DECLARE_ANON_INHERITED_CLASS:
-					LITERAL_INFO(opline->op1.constant, LITERAL_VALUE, 1);
-					LITERAL_INFO(opline->op2.constant, LITERAL_VALUE, 2);
+					if (opline->op2_type == IS_CONST) {
+						LITERAL_INFO(opline->op2.constant, LITERAL_VALUE, 1);
+					}
 					break;
 				case ZEND_ISSET_ISEMPTY_DIM_OBJ:
 				case ZEND_ASSIGN_DIM:
@@ -293,6 +265,7 @@ literals_handle_static_prop:
 				case ZEND_FETCH_DIM_UNSET:
 				case ZEND_FETCH_LIST_R:
 				case ZEND_FETCH_LIST_W:
+				case ZEND_ASSIGN_DIM_OP:
 					if (opline->op1_type == IS_CONST) {
 						LITERAL_INFO(opline->op1.constant, LITERAL_VALUE, 1);
 					}
@@ -339,6 +312,8 @@ literals_handle_static_prop:
 		/* Merge equal constants */
 		j = 0;
 		zend_hash_init(&hash, op_array->last_literal, NULL, NULL, 0);
+		/* Use separate hashtable for doubles stored as string keys, to avoid collisions. */
+		zend_hash_init(&double_hash, 0, NULL, NULL, 0);
 		map = (int*)zend_arena_alloc(&ctx->arena, op_array->last_literal * sizeof(int));
 		memset(map, 0, op_array->last_literal * sizeof(int));
 		for (i = 0; i < op_array->last_literal; i++) {
@@ -421,12 +396,12 @@ literals_handle_static_prop:
 					}
 					break;
 				case IS_DOUBLE:
-					if ((pos = zend_hash_str_find(&hash, (char*)&Z_DVAL(op_array->literals[i]), sizeof(double))) != NULL) {
+					if ((pos = zend_hash_str_find(&double_hash, (char*)&Z_DVAL(op_array->literals[i]), sizeof(double))) != NULL) {
 						map[i] = Z_LVAL_P(pos);
 					} else {
 						map[i] = j;
 						ZVAL_LONG(&zv, j);
-						zend_hash_str_add(&hash, (char*)&Z_DVAL(op_array->literals[i]), sizeof(double), &zv);
+						zend_hash_str_add_new(&double_hash, (char*)&Z_DVAL(op_array->literals[i]), sizeof(double), &zv);
 						if (i != j) {
 							op_array->literals[j] = op_array->literals[i];
 							info[j] = info[i];
@@ -434,16 +409,18 @@ literals_handle_static_prop:
 						j++;
 					}
 					break;
-				case IS_STRING:
+				case IS_STRING: {
 					if (LITERAL_NUM_RELATED(info[i].flags) == 1) {
 						key = zend_string_copy(Z_STR(op_array->literals[i]));
-					} else {
+					} else if ((info[i].flags & LITERAL_KIND_MASK) != LITERAL_VALUE) {
 						key = zend_string_init(Z_STRVAL(op_array->literals[i]), Z_STRLEN(op_array->literals[i]), 0);
 						ZSTR_H(key) = ZSTR_HASH(Z_STR(op_array->literals[i])) +
 							LITERAL_NUM_RELATED(info[i].flags) - 1;
+					} else {
+						/* Don't merge LITERAL_VALUE that has related literals */
+						key = NULL;
 					}
-					pos = zend_hash_find(&hash, key);
-					if (pos != NULL &&
+					if (key && (pos = zend_hash_find(&hash, key)) != NULL &&
 					    Z_TYPE(op_array->literals[Z_LVAL_P(pos)]) == IS_STRING &&
 					    LITERAL_NUM_RELATED(info[i].flags) == LITERAL_NUM_RELATED(info[Z_LVAL_P(pos)].flags) &&
 					    (LITERAL_NUM_RELATED(info[i].flags) != 2 ||
@@ -461,8 +438,10 @@ literals_handle_static_prop:
 					} else {
 						map[i] = j;
 						ZVAL_LONG(&zv, j);
-						zend_hash_add_new(&hash, key, &zv);
-						zend_string_release_ex(key, 0);
+						if (key) {
+							zend_hash_add_new(&hash, key, &zv);
+							zend_string_release_ex(key, 0);
+						}
 						if (i != j) {
 							op_array->literals[j] = op_array->literals[i];
 							info[j] = info[i];
@@ -477,6 +456,7 @@ literals_handle_static_prop:
 						}
 					}
 					break;
+				}
 				case IS_ARRAY:
 					if (zend_hash_num_elements(Z_ARRVAL(op_array->literals[i])) == 0) {
 						if (l_empty_arr < 0) {
@@ -504,7 +484,10 @@ literals_handle_static_prop:
 					break;
 			}
 		}
+
+		/* Only clean "hash", as it will be reused in the loop below. */
 		zend_hash_clean(&hash);
+		zend_hash_destroy(&double_hash);
 		op_array->last_literal = j;
 
 		const_slot = zend_arena_alloc(&ctx->arena, j * 6 * sizeof(int));
@@ -546,54 +529,41 @@ literals_handle_static_prop:
 						cache_size += sizeof(void *);
 					}
 					break;
-				case ZEND_ASSIGN_ADD:
-				case ZEND_ASSIGN_SUB:
-				case ZEND_ASSIGN_MUL:
-				case ZEND_ASSIGN_DIV:
-				case ZEND_ASSIGN_POW:
-				case ZEND_ASSIGN_MOD:
-				case ZEND_ASSIGN_SL:
-				case ZEND_ASSIGN_SR:
-				case ZEND_ASSIGN_CONCAT:
-				case ZEND_ASSIGN_BW_OR:
-				case ZEND_ASSIGN_BW_AND:
-				case ZEND_ASSIGN_BW_XOR:
-					if (opline->extended_value == ZEND_ASSIGN_STATIC_PROP) {
-						if (opline->op1_type == IS_CONST) {
-							// op1 static property
-							if (opline->op2_type == IS_CONST) {
-								(opline+1)->extended_value = add_static_slot(&hash, op_array,
-									opline->op2.constant,
-									opline->op1.constant,
-									LITERAL_STATIC_PROPERTY,
-									&cache_size);
-							} else {
-								(opline+1)->extended_value = cache_size;
-								cache_size += 3 * sizeof(void *);
-							}
-						} else if (opline->op2_type == IS_CONST) {
-							// op2 class
-							if (class_slot[opline->op2.constant] >= 0) {
-								(opline+1)->extended_value = class_slot[opline->op2.constant];
-							} else {
-								(opline+1)->extended_value = cache_size;
-								class_slot[opline->op2.constant] = cache_size;
-								cache_size += sizeof(void *);
-							}
+				case ZEND_ASSIGN_STATIC_PROP_OP:
+					if (opline->op1_type == IS_CONST) {
+						// op1 static property
+						if (opline->op2_type == IS_CONST) {
+							(opline+1)->extended_value = add_static_slot(&hash, op_array,
+								opline->op2.constant,
+								opline->op1.constant,
+								LITERAL_STATIC_PROPERTY,
+								&cache_size);
+						} else {
+							(opline+1)->extended_value = cache_size;
+							cache_size += 3 * sizeof(void *);
+						}
+					} else if (opline->op2_type == IS_CONST) {
+						// op2 class
+						if (class_slot[opline->op2.constant] >= 0) {
+							(opline+1)->extended_value = class_slot[opline->op2.constant];
+						} else {
+							(opline+1)->extended_value = cache_size;
+							class_slot[opline->op2.constant] = cache_size;
+							cache_size += sizeof(void *);
 						}
 					}
-					if (opline->extended_value == ZEND_ASSIGN_OBJ) {
-						if (opline->op2_type == IS_CONST) {
-							// op2 property
-							if (opline->op1_type == IS_UNUSED &&
-							    property_slot[opline->op2.constant] >= 0) {
-								(opline+1)->extended_value = property_slot[opline->op2.constant];
-							} else {
-								(opline+1)->extended_value = cache_size;
-								cache_size += 3 * sizeof(void *);
-								if (opline->op1_type == IS_UNUSED) {
-									property_slot[opline->op2.constant] = (opline+1)->extended_value;
-								}
+					break;
+				case ZEND_ASSIGN_OBJ_OP:
+					if (opline->op2_type == IS_CONST) {
+						// op2 property
+						if (opline->op1_type == IS_UNUSED &&
+						    property_slot[opline->op2.constant] >= 0) {
+							(opline+1)->extended_value = property_slot[opline->op2.constant];
+						} else {
+							(opline+1)->extended_value = cache_size;
+							cache_size += 3 * sizeof(void *);
+							if (opline->op1_type == IS_UNUSED) {
+								property_slot[opline->op2.constant] = (opline+1)->extended_value;
 							}
 						}
 					}
@@ -807,6 +777,12 @@ literals_handle_static_prop:
 						cache_size += sizeof(void *);
 						bind_var_slot[opline->op2.constant] = opline->extended_value;
 					}
+					break;
+				case ZEND_DECLARE_LAMBDA_FUNCTION:
+				case ZEND_DECLARE_ANON_CLASS:
+				case ZEND_DECLARE_CLASS_DELAYED:
+					opline->extended_value = cache_size;
+					cache_size += sizeof(void *);
 					break;
 			}
 			opline++;

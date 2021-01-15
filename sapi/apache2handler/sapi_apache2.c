@@ -362,7 +362,7 @@ static void php_apache_sapi_log_message_ex(char *msg, request_rec *r)
 static double php_apache_sapi_get_request_time(void)
 {
 	php_struct *ctx = SG(server_context);
-	return ((double) apr_time_as_msec(ctx->r->request_time)) / 1000.0;
+	return ((double) ctx->r->request_time) / 1000000.0;
 }
 
 extern zend_module_entry php_apache_module;
@@ -694,11 +694,7 @@ zend_first_try {
 		highlight_file((char *)r->filename, &syntax_highlighter_ini);
 	} else {
 		zend_file_handle zfd;
-
-		zfd.type = ZEND_HANDLE_FILENAME;
-		zfd.filename = (char *) r->filename;
-		zfd.free_filename = 0;
-		zfd.opened_path = NULL;
+		zend_stream_init_filename(&zfd, (char *) r->filename);
 
 		if (!parent_req) {
 			php_execute_script(&zfd);

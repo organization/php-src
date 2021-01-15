@@ -1,4 +1,4 @@
-﻿/*
+/*
  *    PHP Sendmail for Windows.
  *
  *  This file is rewritten specificly for PHPFI.  Some functionality
@@ -26,7 +26,6 @@
 #include <string.h>
 #include <math.h>
 #include <malloc.h>
-#include <memory.h>
 #include <winbase.h>
 #include "sendmail.h"
 #include "php_ini.h"
@@ -208,9 +207,6 @@ PHPAPI int TSendMail(char *host, int *error, char **error_message,
 		/* Create a lowercased header for all the searches so we're finally case
 		 * insensitive when searching for a pattern. */
 		headers_lc = zend_string_tolower(headers_trim);
-		if (headers_lc == headers_trim) {
-			zend_string_release_ex(headers_lc, 0);
-		}
 	}
 
 	/* Fall back to sendmail_from php.ini setting */
@@ -252,8 +248,9 @@ PHPAPI int TSendMail(char *host, int *error, char **error_message,
 		}
 
 		if (!found) {
-			if (headers_lc) {
-				zend_string_free(headers_lc);
+			if (headers) {
+				zend_string_release(headers_trim);
+				zend_string_release(headers_lc);
 			}
 			*error = W32_SM_SENDMAIL_FROM_NOT_SET;
 			return FAILURE;
@@ -267,8 +264,8 @@ PHPAPI int TSendMail(char *host, int *error, char **error_message,
 			efree(RPath);
 		}
 		if (headers) {
-			zend_string_free(headers_trim);
-			zend_string_free(headers_lc);
+			zend_string_release(headers_trim);
+			zend_string_release(headers_lc);
 		}
 		/* 128 is safe here, the specifier in snprintf isn't longer than that */
 		*error_message = ecalloc(1, HOST_NAME_LEN + 128);
@@ -284,8 +281,8 @@ PHPAPI int TSendMail(char *host, int *error, char **error_message,
 			efree(RPath);
 		}
 		if (headers) {
-			zend_string_free(headers_trim);
-			zend_string_free(headers_lc);
+			zend_string_release(headers_trim);
+			zend_string_release(headers_lc);
 		}
 		if (ret != SUCCESS) {
 			*error = ret;
@@ -461,6 +458,16 @@ static int SendText(char *RPath, char *Subject, char *mailTo, char *mailCc, char
 		if (NULL == (pos2 = strstr(pos1, "\r\n"))) {
 			tempMailTo = estrndup(pos1, strlen(pos1));
 		} else {
+			char *pos3;
+			while (pos2[2] == ' ' || pos2[2] == '\t') {
+				pos3 = strstr(pos2 + 2, "\r\n");
+				if (pos3 != NULL) {
+					pos2 = pos3;
+				} else {
+					pos2 += strlen(pos2);
+					break;
+				}
+			}
 			tempMailTo = estrndup(pos1, pos2 - pos1);
 		}
 
@@ -519,7 +526,22 @@ static int SendText(char *RPath, char *Subject, char *mailTo, char *mailCc, char
 				   header we know it was the last thing. */
 				pos2 = pos1;
 			} else {
+				char *pos3 = NULL;
+				while (pos2[2] == ' ' || pos2[2] == '\t') {
+					pos3 = strstr(pos2 + 2, "\r\n");
+					if (pos3 != NULL) {
+						pos2 = pos3;
+					} else {
+						pos2 += strlen(pos2);
+						break;
+					}
+				}
 				tempMailTo = estrndup(pos1, pos2 - pos1);
+				if (pos3 == NULL) {
+					/* Later, when we remove the Bcc: out of the
+					   header we know it was the last thing. */
+					pos2 = pos1;
+				}
 			}
 
 			token = strtok(tempMailTo, ",");

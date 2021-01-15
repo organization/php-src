@@ -43,13 +43,9 @@
 # include <unistd.h>
 #endif
 
-#if HAVE_SIGNAL_H
-# include <signal.h>
-#endif
+#include <signal.h>
 
-#if HAVE_SETLOCALE
-# include <locale.h>
-#endif
+#include <locale.h>
 
 #if HAVE_SYS_TYPES_H
 # include <sys/types.h>
@@ -90,6 +86,8 @@ int __riscosify_control = __RISCOSIFY_STRICT_UNIX_SPECS;
 #include "fpm.h"
 #include "fpm_request.h"
 #include "fpm_status.h"
+#include "fpm_signals.h"
+#include "fpm_stdio.h"
 #include "fpm_conf.h"
 #include "fpm_php.h"
 #include "fpm_log.h"
@@ -622,7 +620,7 @@ static void sapi_cgi_log_message(char *message, int syslog_type_int)
 
 /* {{{ php_cgi_ini_activate_user_config
  */
-static void php_cgi_ini_activate_user_config(char *path, int path_len, const char *doc_root, int doc_root_len, int start)
+static void php_cgi_ini_activate_user_config(char *path, int path_len, const char *doc_root, int doc_root_len)
 {
 	char *ptr;
 	time_t request_time = sapi_get_request_time();
@@ -672,7 +670,7 @@ static void php_cgi_ini_activate_user_config(char *path, int path_len, const cha
 			to find more user.ini, if not we only scan the current path.
 		  */
 		if (strncmp(s1, s2, s_len) == 0) {
-			ptr = s2 + start;  /* start is the point where doc_root ends! */
+			ptr = s2 + doc_root_len;
 			while ((ptr = strchr(ptr, DEFAULT_SLASH)) != NULL) {
 				*ptr = 0;
 				php_parse_user_ini_file(path, PG(user_ini_filename), entry->user_config);
@@ -746,7 +744,7 @@ static int sapi_cgi_activate(void) /* {{{ */
 					--doc_root_len;
 				}
 
-				php_cgi_ini_activate_user_config(path, path_len, doc_root, doc_root_len, doc_root_len - 1);
+				php_cgi_ini_activate_user_config(path, path_len, doc_root, doc_root_len);
 			}
 		}
 
@@ -975,7 +973,7 @@ static void init_request_info(void)
 
 	/* initialize the defaults */
 	SG(request_info).path_translated = NULL;
-	SG(request_info).request_method = NULL;
+	SG(request_info).request_method = FCGI_GETENV(request, "REQUEST_METHOD");
 	SG(request_info).proto_num = 1000;
 	SG(request_info).query_string = NULL;
 	SG(request_info).request_uri = NULL;
@@ -983,10 +981,8 @@ static void init_request_info(void)
 	SG(request_info).content_length = 0;
 	SG(sapi_headers).http_response_code = 200;
 
-	/* script_path_translated being set is a good indication that
-	 * we are running in a cgi environment, since it is always
-	 * null otherwise.  otherwise, the filename
-	 * of the script will be retrieved later via argc/argv */
+	/* if script_path_translated is not set, then there is no point to carry on
+	 * as the response is 404 and there is no further processing. */
 	if (script_path_translated) {
 		const char *auth;
 		char *content_length = FCGI_GETENV(request, "CONTENT_LENGTH");
@@ -1143,8 +1139,8 @@ static void init_request_info(void)
 								path_info = script_path_translated + ptlen;
 								tflag = (slen != 0 && (!orig_path_info || strcmp(orig_path_info, path_info) != 0));
 							} else {
-								path_info = env_path_info ? env_path_info + pilen - slen : NULL;
-								tflag = (orig_path_info != path_info);
+								path_info = (env_path_info && pilen > slen) ? env_path_info + pilen - slen : NULL;
+								tflag = path_info && (orig_path_info != path_info);
 							}
 
 							if (tflag) {
@@ -1316,7 +1312,6 @@ static void init_request_info(void)
 			SG(request_info).path_translated = estrdup(script_path_translated);
 		}
 
-		SG(request_info).request_method = FCGI_GETENV(request, "REQUEST_METHOD");
 		/* FIXME - Work out proto_num here */
 		SG(request_info).query_string = FCGI_GETENV(request, "QUERY_STRING");
 		SG(request_info).content_type = (content_type ? content_type : "" );
@@ -1532,7 +1527,7 @@ static zend_module_entry cgi_module_entry = {
 	NULL,
 	NULL,
 	PHP_MINFO(cgi),
-	NO_VERSION_YET,
+	PHP_VERSION,
 	STANDARD_MODULE_PROPERTIES
 };
 
@@ -1567,7 +1562,6 @@ int main(int argc, char *argv[])
 	zend_bool old_rc_debug;
 #endif
 
-#ifdef HAVE_SIGNAL_H
 #if defined(SIGPIPE) && defined(SIG_IGN)
 	signal(SIGPIPE, SIG_IGN); /* ignore SIGPIPE in standalone mode so
 								that sockets created via fsockopen()
@@ -1575,7 +1569,11 @@ int main(int argc, char *argv[])
 								closes it.  in apache|apxs mode apache
 								does that for us!  thies@thieso.net
 								20000419 */
-#endif
+
+	if (0 > fpm_signals_init_mask() || 0 > fpm_signals_block()) {
+		zlog(ZLOG_WARNING, "Could die in the case of too early reload signal");
+	}
+	zlog(ZLOG_DEBUG, "Blocked some signals");
 #endif
 
 #ifdef ZTS
@@ -1697,6 +1695,7 @@ int main(int argc, char *argv[])
 			default:
 			case 'h':
 			case '?':
+			case PHP_GETOPT_INVALID_ARG:
 				cgi_sapi_module.startup(&cgi_sapi_module);
 				php_output_activate();
 				SG(headers_sent) = 1;
@@ -1704,7 +1703,7 @@ int main(int argc, char *argv[])
 				php_output_end_all();
 				php_output_deactivate();
 				fcgi_shutdown();
-				exit_status = (c == 'h') ? FPM_EXIT_OK : FPM_EXIT_USAGE;
+				exit_status = (c != PHP_GETOPT_INVALID_ARG) ? FPM_EXIT_OK : FPM_EXIT_USAGE;
 				goto out;
 
 			case 'v': /* show php version & quit */
@@ -1966,6 +1965,8 @@ fastcgi_request_done:
 			SG(request_info).path_translated = NULL;
 
 			php_request_shutdown((void *) 0);
+
+			fpm_stdio_flush_child();
 
 			requests++;
 			if (UNEXPECTED(max_requests && (requests == max_requests))) {

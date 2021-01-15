@@ -449,9 +449,9 @@ static int php_read_APP(php_stream * stream, unsigned int marker, zval *info)
 	}
 	length -= 2;				/* length includes itself */
 
-	buffer = emalloc(length);
+	buffer = emalloc((size_t)length);
 
-	if (php_stream_read(stream, buffer, (zend_long) length) != length) {
+	if (php_stream_read(stream, buffer, (size_t) length) != length) {
 		efree(buffer);
 		return 0;
 	}
@@ -1495,6 +1495,11 @@ static void php_getimagesize_from_any(INTERNAL_FUNCTION_PARAMETERS, int mode) { 
 		Z_PARAM_OPTIONAL
 		Z_PARAM_ZVAL(info)
 	ZEND_PARSE_PARAMETERS_END();
+
+	if (mode == FROM_PATH && CHECK_NULL_PATH(input, input_len)) {
+		php_error_docref(NULL, E_WARNING, "Invalid path");
+		return;
+	}
 
 	if (argc == 2) {
 		info = zend_try_array_init(info);

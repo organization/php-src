@@ -822,7 +822,7 @@ static HashTable *spl_array_get_properties_for(zval *object, zend_prop_purpose p
 	return ht;
 } /* }}} */
 
-static HashTable* spl_array_get_debug_info(zval *obj, int *is_temp) /* {{{ */
+static inline HashTable* spl_array_get_debug_info(zval *obj) /* {{{ */
 {
 	zval *storage;
 	zend_string *zname;
@@ -834,11 +834,9 @@ static HashTable* spl_array_get_debug_info(zval *obj, int *is_temp) /* {{{ */
 	}
 
 	if (intern->ar_flags & SPL_ARRAY_IS_SELF) {
-		*is_temp = 0;
-		return intern->std.properties;
+		return zend_array_dup(intern->std.properties);
 	} else {
 		HashTable *debug_info;
-		*is_temp = 1;
 
 		debug_info = zend_new_array(zend_hash_num_elements(intern->std.properties) + 1);
 		zend_hash_copy(debug_info, intern->std.properties, (copy_ctor_func_t) zval_add_ref);
@@ -1163,7 +1161,8 @@ zend_object_iterator *spl_array_get_iterator(zend_class_entry *ce, zval *object,
 
 	zend_iterator_init(&iterator->it);
 
-	ZVAL_COPY(&iterator->it.data, object);
+	Z_ADDREF_P(object);
+	ZVAL_OBJ(&iterator->it.data, Z_OBJ_P(object));
 	iterator->it.funcs = &spl_array_it_funcs;
 	iterator->ce = ce;
 	ZVAL_UNDEF(&iterator->value);
@@ -1290,7 +1289,7 @@ SPL_METHOD(Array, setFlags)
 }
 /* }}} */
 
-/* {{{ proto Array|Object ArrayObject::exchangeArray(Array|Object ar = array())
+/* {{{ proto Array|Object ArrayObject::exchangeArray(Array|Object input = array())
    Replace the referenced array or object with a new one and return the old one (right now copy - to be changed) */
 SPL_METHOD(Array, exchangeArray)
 {
@@ -1470,7 +1469,8 @@ exit:
 		} else {
 			GC_DELREF(aht);
 		}
-		efree(Z_REF(params[0]));
+		ZVAL_NULL(Z_REFVAL(params[0]));
+		zval_ptr_dtor(&params[0]);
 		zend_string_free(Z_STR(function_name));
 	}
 } /* }}} */
@@ -1812,6 +1812,115 @@ outexcept:
 
 } /* }}} */
 
+/* {{{ proto array ArrayObject::__serialize() */
+SPL_METHOD(Array, __serialize)
+{
+	spl_array_object *intern = Z_SPLARRAY_P(ZEND_THIS);
+	zval tmp;
+
+	if (zend_parse_parameters_none_throw() == FAILURE) {
+		return;
+	}
+
+	array_init(return_value);
+
+	/* flags */
+	ZVAL_LONG(&tmp, (intern->ar_flags & SPL_ARRAY_CLONE_MASK));
+	zend_hash_next_index_insert(Z_ARRVAL_P(return_value), &tmp);
+
+	/* storage */
+	if (intern->ar_flags & SPL_ARRAY_IS_SELF) {
+		ZVAL_NULL(&tmp);
+	} else {
+		ZVAL_COPY(&tmp, &intern->array);
+	}
+	zend_hash_next_index_insert(Z_ARRVAL_P(return_value), &tmp);
+
+	/* members */
+	ZVAL_ARR(&tmp, zend_std_get_properties(ZEND_THIS));
+	Z_TRY_ADDREF(tmp);
+	zend_hash_next_index_insert(Z_ARRVAL_P(return_value), &tmp);
+
+	/* iterator class */
+	if (intern->ce_get_iterator == spl_ce_ArrayIterator) {
+		ZVAL_NULL(&tmp);
+	} else {
+		ZVAL_STR_COPY(&tmp, intern->ce_get_iterator->name);
+	}
+	zend_hash_next_index_insert(Z_ARRVAL_P(return_value), &tmp);
+}
+/* }}} */
+
+
+/* {{{ proto void ArrayObject::__unserialize(array data) */
+SPL_METHOD(Array, __unserialize)
+{
+	spl_array_object *intern = Z_SPLARRAY_P(ZEND_THIS);
+	HashTable *data;
+	zval *flags_zv, *storage_zv, *members_zv, *iterator_class_zv;
+	zend_long flags;
+
+	if (zend_parse_parameters_throw(ZEND_NUM_ARGS(), "h", &data) == FAILURE) {
+		return;
+	}
+
+	flags_zv          = zend_hash_index_find(data, 0);
+	storage_zv        = zend_hash_index_find(data, 1);
+	members_zv        = zend_hash_index_find(data, 2);
+	iterator_class_zv = zend_hash_index_find(data, 3);
+
+	if (!flags_zv || !storage_zv || !members_zv ||
+			Z_TYPE_P(flags_zv) != IS_LONG || Z_TYPE_P(members_zv) != IS_ARRAY ||
+			(iterator_class_zv && (Z_TYPE_P(iterator_class_zv) != IS_NULL &&
+				Z_TYPE_P(iterator_class_zv) != IS_STRING))) {
+		zend_throw_exception(spl_ce_UnexpectedValueException,
+			"Incomplete or ill-typed serialization data", 0);
+		return;
+	}
+
+	flags = Z_LVAL_P(flags_zv);
+	intern->ar_flags &= ~SPL_ARRAY_CLONE_MASK;
+	intern->ar_flags |= flags & SPL_ARRAY_CLONE_MASK;
+
+	if (flags & SPL_ARRAY_IS_SELF) {
+		zval_ptr_dtor(&intern->array);
+		ZVAL_UNDEF(&intern->array);
+	} else {
+		spl_array_set_array(ZEND_THIS, intern, storage_zv, 0L, 1);
+	}
+
+	object_properties_load(&intern->std, Z_ARRVAL_P(members_zv));
+
+	if (iterator_class_zv && Z_TYPE_P(iterator_class_zv) == IS_STRING) {
+		zend_class_entry *ce = zend_lookup_class(Z_STR_P(iterator_class_zv));
+
+		if (!ce) {
+			zend_throw_exception_ex(spl_ce_UnexpectedValueException, 0,
+				"Cannot deserialize ArrayObject with iterator class '%s'; no such class exists",
+				ZSTR_VAL(Z_STR_P(iterator_class_zv)));
+			return;
+		} else if (!instanceof_function(ce, spl_ce_Iterator)) {
+			zend_throw_exception_ex(spl_ce_UnexpectedValueException, 0,
+				"Cannot deserialize ArrayObject with iterator class '%s'; this class does not implement the Iterator interface",
+				ZSTR_VAL(Z_STR_P(iterator_class_zv)));
+			return;
+		} else {
+			intern->ce_get_iterator = ce;
+		}
+	}
+}
+/* }}} */
+
+/* {{{ proto void Array::__debugInfo() */
+SPL_METHOD(Array, __debugInfo)
+{
+	if (zend_parse_parameters_none() == FAILURE) {
+		return;
+	}
+
+	RETURN_ARR(spl_array_get_debug_info(getThis()));
+} /* }}} */
+
 /* {{{ arginfo and function table */
 ZEND_BEGIN_ARG_INFO_EX(arginfo_array___construct, 0, 0, 0)
 	ZEND_ARG_INFO(0, input)
@@ -1822,7 +1931,7 @@ ZEND_END_ARG_INFO()
 /* ArrayIterator::__construct and ArrayObject::__construct have different signatures */
 ZEND_BEGIN_ARG_INFO_EX(arginfo_array_iterator___construct, 0, 0, 0)
 	ZEND_ARG_INFO(0, array)
-	ZEND_ARG_INFO(0, ar_flags)
+	ZEND_ARG_INFO(0, flags)
 ZEND_END_ARG_INFO()
 
 ZEND_BEGIN_ARG_INFO_EX(arginfo_array_offsetGet, 0, 0, 1)
@@ -1843,7 +1952,7 @@ ZEND_BEGIN_ARG_INFO(arginfo_array_seek, 0)
 ZEND_END_ARG_INFO()
 
 ZEND_BEGIN_ARG_INFO(arginfo_array_exchangeArray, 0)
-	ZEND_ARG_INFO(0, array)
+	ZEND_ARG_INFO(0, input)
 ZEND_END_ARG_INFO()
 
 ZEND_BEGIN_ARG_INFO(arginfo_array_setFlags, 0)
@@ -1884,6 +1993,9 @@ static const zend_function_entry spl_funcs_ArrayObject[] = {
 	SPL_ME(Array, natcasesort,      arginfo_array_void,             ZEND_ACC_PUBLIC)
 	SPL_ME(Array, unserialize,      arginfo_array_unserialize,      ZEND_ACC_PUBLIC)
 	SPL_ME(Array, serialize,        arginfo_array_void,             ZEND_ACC_PUBLIC)
+	SPL_ME(Array, __unserialize,    arginfo_array_unserialize,      ZEND_ACC_PUBLIC)
+	SPL_ME(Array, __serialize,      arginfo_array_void,             ZEND_ACC_PUBLIC)
+	SPL_ME(Array, __debugInfo,      arginfo_array_void,             ZEND_ACC_PUBLIC)
 	/* ArrayObject specific */
 	SPL_ME(Array, getIterator,      arginfo_array_void,             ZEND_ACC_PUBLIC)
 	SPL_ME(Array, exchangeArray,    arginfo_array_exchangeArray,    ZEND_ACC_PUBLIC)
@@ -1911,6 +2023,9 @@ static const zend_function_entry spl_funcs_ArrayIterator[] = {
 	SPL_ME(Array, natcasesort,      arginfo_array_void,             ZEND_ACC_PUBLIC)
 	SPL_ME(Array, unserialize,      arginfo_array_unserialize,      ZEND_ACC_PUBLIC)
 	SPL_ME(Array, serialize,        arginfo_array_void,             ZEND_ACC_PUBLIC)
+	SPL_ME(Array, __unserialize,    arginfo_array_unserialize,      ZEND_ACC_PUBLIC)
+	SPL_ME(Array, __serialize,      arginfo_array_void,             ZEND_ACC_PUBLIC)
+	SPL_ME(Array, __debugInfo,      arginfo_array_void,             ZEND_ACC_PUBLIC)
 	/* ArrayIterator specific */
 	SPL_ME(Array, rewind,           arginfo_array_void,             ZEND_ACC_PUBLIC)
 	SPL_ME(Array, current,          arginfo_array_void,             ZEND_ACC_PUBLIC)
@@ -1948,7 +2063,6 @@ PHP_MINIT_FUNCTION(spl_array)
 	spl_handler_ArrayObject.count_elements = spl_array_object_count_elements;
 
 	spl_handler_ArrayObject.get_properties_for = spl_array_get_properties_for;
-	spl_handler_ArrayObject.get_debug_info = spl_array_get_debug_info;
 	spl_handler_ArrayObject.get_gc = spl_array_get_gc;
 	spl_handler_ArrayObject.read_property = spl_array_read_property;
 	spl_handler_ArrayObject.write_property = spl_array_write_property;

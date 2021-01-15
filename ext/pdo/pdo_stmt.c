@@ -163,6 +163,10 @@ static int dispatch_param_event(pdo_stmt_t *stmt, enum pdo_param_event event_typ
 	struct pdo_bound_param_data *param;
 	HashTable *ht;
 
+	if (stmt->dbh->skip_param_evt & (1 << event_type)) {
+		return 1;
+	}
+
 	if (!stmt->methods->param_hook) {
 		return 1;
 	}
@@ -307,7 +311,9 @@ static int really_register_bound_param(struct pdo_bound_param_data *param, pdo_s
 			ZVAL_STRINGL(parameter, p, len);
 			efree(p);
 		} else {
-			convert_to_string(parameter);
+			if (!try_convert_to_string(parameter)) {
+				return 0;
+			}
 		}
 	} else if (PDO_PARAM_TYPE(param->param_type) == PDO_PARAM_INT && (Z_TYPE_P(parameter) == IS_FALSE || Z_TYPE_P(parameter) == IS_TRUE)) {
 		convert_to_long(parameter);
@@ -762,7 +768,7 @@ static int make_callable_ex(pdo_stmt_t *stmt, zval *callable, zend_fcall_info * 
 		return 0;
 	}
 	if (is_callable_error) {
-		/* Possible E_STRICT error message */
+		/* Possible error message */
 		efree(is_callable_error);
 	}
 
@@ -819,7 +825,7 @@ static int do_fetch(pdo_stmt_t *stmt, int do_bind, zval *return_value, enum pdo_
 {
 	int flags, idx, old_arg_count = 0;
 	zend_class_entry *ce = NULL, *old_ce = NULL;
-	zval grp_val, *pgrp, retval, old_ctor_args;
+	zval grp_val, *pgrp, retval, old_ctor_args = {{0}};
 	int colno;
 
 	if (how == PDO_FETCH_USE_DEFAULT) {
@@ -911,7 +917,9 @@ static int do_fetch(pdo_stmt_t *stmt, int do_bind, zval *return_value, enum pdo_
 
 					fetch_value(stmt, &val, i++, NULL);
 					if (Z_TYPE(val) != IS_NULL) {
-						convert_to_string(&val);
+						if (!try_convert_to_string(&val)) {
+							return 0;
+						}
 						if ((cep = zend_lookup_class(Z_STR(val))) == NULL) {
 							stmt->fetch.cls.ce = ZEND_STANDARD_CLASS_DEF_PTR;
 						} else {
@@ -1087,17 +1095,6 @@ static int do_fetch(pdo_stmt_t *stmt, int do_bind, zval *return_value, enum pdo_
 							&val);
 						zval_ptr_dtor(&val);
 					} else {
-#ifdef MBO_0
-						php_unserialize_data_t var_hash;
-
-						PHP_VAR_UNSERIALIZE_INIT(var_hash);
-						if (php_var_unserialize(return_value, (const unsigned char**)&Z_STRVAL(val), Z_STRVAL(val)+Z_STRLEN(val), NULL) == FAILURE) {
-							pdo_raise_impl_error(stmt->dbh, stmt, "HY000", "cannot unserialize data");
-							PHP_VAR_UNSERIALIZE_DESTROY(var_hash);
-							return 0;
-						}
-						PHP_VAR_UNSERIALIZE_DESTROY(var_hash);
-#endif
 						if (!ce->unserialize) {
 							zval_ptr_dtor(&val);
 							pdo_raise_impl_error(stmt->dbh, stmt, "HY000", "cannot unserialize class");
@@ -1370,7 +1367,7 @@ static PHP_METHOD(PDOStatement, fetchAll)
 {
 	zend_long how = PDO_FETCH_USE_DEFAULT;
 	zval data, *return_all;
-	zval *arg2;
+	zval *arg2 = NULL;
 	zend_class_entry *old_ce;
 	zval old_ctor_args, *ctor_args = NULL;
 	int error = 0, flags, old_arg_count;
@@ -1869,7 +1866,8 @@ int pdo_stmt_setup_fetch_mode(INTERNAL_FUNCTION_PARAMETERS, pdo_stmt_t *stmt, in
 			mode = Z_LVAL(args[skip]);
 			flags = mode & PDO_FETCH_FLAGS;
 
-			retval = pdo_stmt_verify_mode(stmt, mode, 0);
+			/* pdo_stmt_verify_mode() returns a boolean value */
+			retval = pdo_stmt_verify_mode(stmt, mode, 0) ? SUCCESS : FAILURE;
 		}
 	}
 
@@ -2180,7 +2178,9 @@ static zval *dbstmt_prop_write(zval *object, zval *member, zval *value, void **c
 {
 	pdo_stmt_t *stmt = Z_PDO_STMT_P(object);
 
-	convert_to_string(member);
+	if (!try_convert_to_string(member)) {
+		return value;
+	}
 
 	if (strcmp(Z_STRVAL_P(member), "queryString") == 0) {
 		pdo_raise_impl_error(stmt->dbh, stmt, "HY000", "property queryString is read only");
@@ -2194,7 +2194,9 @@ static void dbstmt_prop_delete(zval *object, zval *member, void **cache_slot)
 {
 	pdo_stmt_t *stmt = Z_PDO_STMT_P(object);
 
-	convert_to_string(member);
+	if (!try_convert_to_string(member)) {
+		return;
+	}
 
 	if (strcmp(Z_STRVAL_P(member), "queryString") == 0) {
 		pdo_raise_impl_error(stmt->dbh, stmt, "HY000", "property queryString is read only");
@@ -2244,22 +2246,6 @@ out:
 static int dbstmt_compare(zval *object1, zval *object2)
 {
 	return -1;
-}
-
-static zend_object *dbstmt_clone_obj(zval *zobject)
-{
-	pdo_stmt_t *stmt;
-	pdo_stmt_t *old_stmt;
-
-	stmt = zend_object_alloc(sizeof(pdo_stmt_t), Z_OBJCE_P(zobject));
-	zend_object_std_init(&stmt->std, Z_OBJCE_P(zobject));
-	object_properties_init(&stmt->std, Z_OBJCE_P(zobject));
-
-	old_stmt = Z_PDO_STMT_P(zobject);
-
-	zend_objects_clone_members(&stmt->std, &old_stmt->std);
-
-	return &stmt->std;
 }
 
 zend_object_handlers pdo_dbstmt_object_handlers;
@@ -2434,7 +2420,8 @@ zend_object_iterator *pdo_stmt_iter_get(zend_class_entry *ce, zval *object, int 
 	I = ecalloc(1, sizeof(struct php_pdo_iterator));
 	zend_iterator_init(&I->iter);
 	I->iter.funcs = &pdo_stmt_iter_funcs;
-	ZVAL_COPY(&I->iter.data, object);
+	Z_ADDREF_P(object);
+	ZVAL_OBJ(&I->iter.data, Z_OBJ_P(object));
 
 	if (!do_fetch(stmt, 1, &I->fetch_ahead, PDO_FETCH_USE_DEFAULT,
 			PDO_FETCH_ORI_NEXT, 0, 0)) {
@@ -2474,7 +2461,10 @@ static zval *row_prop_read(zval *object, zval *member, int type, void **cache_sl
 				fetch_value(stmt, rv, lval, NULL);
 			}
 		} else {
-			convert_to_string(member);
+			if (!try_convert_to_string(member)) {
+				return &EG(uninitialized_zval);
+			}
+
 			/* TODO: replace this with a hash of available column names to column
 			 * numbers */
 			for (colno = 0; colno < stmt->column_count; colno++) {
@@ -2526,7 +2516,9 @@ static int row_prop_exists(zval *object, zval *member, int check_empty, void **c
 				return lval >=0 && lval < stmt->column_count;
 			}
 		} else {
-			convert_to_string(member);
+			if (!try_convert_to_string(member)) {
+				return 0;
+			}
 		}
 
 		/* TODO: replace this with a hash of available column names to column
@@ -2667,7 +2659,7 @@ void pdo_stmt_init(void)
 	pdo_dbstmt_object_handlers.unset_property = dbstmt_prop_delete;
 	pdo_dbstmt_object_handlers.get_method = dbstmt_method_get;
 	pdo_dbstmt_object_handlers.compare_objects = dbstmt_compare;
-	pdo_dbstmt_object_handlers.clone_obj = dbstmt_clone_obj;
+	pdo_dbstmt_object_handlers.clone_obj = NULL;
 
 	INIT_CLASS_ENTRY(ce, "PDORow", pdo_row_functions);
 	pdo_row_ce = zend_register_internal_class(&ce);

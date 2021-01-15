@@ -199,7 +199,7 @@ static void do_to_zval_err(res_context *ctx, const char *fmt, ...)
 void err_msg_dispose(struct err_s *err)
 {
 	if (err->msg != NULL) {
-		php_error_docref0(NULL, err->level, "%s", err->msg);
+		php_error_docref(NULL, err->level, "%s", err->msg);
 		if (err->should_free) {
 			efree(err->msg);
 		}
@@ -332,7 +332,10 @@ double_case:
 		zend_long lval;
 		double dval;
 
-		convert_to_string(&lzval);
+		if (!try_convert_to_string(&lzval)) {
+			ctx->err.has_error = 1;
+			break;
+		}
 
 		switch (is_numeric_string(Z_STRVAL(lzval), Z_STRLEN(lzval), &lval, &dval, 0)) {
 		case IS_DOUBLE:
@@ -438,6 +441,8 @@ static void from_zval_write_sa_family(const zval *arr_value, char *field, ser_co
 	ival = (sa_family_t)lval;
 	memcpy(field, &ival, sizeof(ival));
 }
+
+#ifdef SO_PASSCRED
 static void from_zval_write_pid_t(const zval *arr_value, char *field, ser_context *ctx)
 {
 	zend_long lval;
@@ -485,17 +490,11 @@ static void from_zval_write_uid_t(const zval *arr_value, char *field, ser_contex
 	ival = (uid_t)lval;
 	memcpy(field, &ival, sizeof(ival));
 }
+#endif
 
 void to_zval_read_int(const char *data, zval *zv, res_context *ctx)
 {
 	int ival;
-	memcpy(&ival, data, sizeof(ival));
-
-	ZVAL_LONG(zv, (zend_long)ival);
-}
-static void to_zval_read_unsigned(const char *data, zval *zv, res_context *ctx)
-{
-	unsigned ival;
 	memcpy(&ival, data, sizeof(ival));
 
 	ZVAL_LONG(zv, (zend_long)ival);
@@ -507,13 +506,6 @@ static void to_zval_read_net_uint16(const char *data, zval *zv, res_context *ctx
 
 	ZVAL_LONG(zv, (zend_long)ntohs(ival));
 }
-static void to_zval_read_uint32(const char *data, zval *zv, res_context *ctx)
-{
-	uint32_t ival;
-	memcpy(&ival, data, sizeof(ival));
-
-	ZVAL_LONG(zv, (zend_long)ival);
-}
 static void to_zval_read_sa_family(const char *data, zval *zv, res_context *ctx)
 {
 	sa_family_t ival;
@@ -521,6 +513,23 @@ static void to_zval_read_sa_family(const char *data, zval *zv, res_context *ctx)
 
 	ZVAL_LONG(zv, (zend_long)ival);
 }
+#if HAVE_IPV6
+static void to_zval_read_unsigned(const char *data, zval *zv, res_context *ctx)
+{
+	unsigned ival;
+	memcpy(&ival, data, sizeof(ival));
+
+	ZVAL_LONG(zv, (zend_long)ival);
+}
+static void to_zval_read_uint32(const char *data, zval *zv, res_context *ctx)
+{
+	uint32_t ival;
+	memcpy(&ival, data, sizeof(ival));
+
+	ZVAL_LONG(zv, (zend_long)ival);
+}
+#endif
+#ifdef SO_PASSCRED
 static void to_zval_read_pid_t(const char *data, zval *zv, res_context *ctx)
 {
 	pid_t ival;
@@ -535,6 +544,7 @@ static void to_zval_read_uid_t(const char *data, zval *zv, res_context *ctx)
 
 	ZVAL_LONG(zv, (zend_long)ival);
 }
+#endif
 
 /* CONVERSIONS for sockaddr */
 static void from_zval_write_sin_addr(const zval *zaddr_str, char *inaddr, ser_context *ctx)
@@ -700,6 +710,9 @@ static void from_zval_write_sockaddr_aux(const zval *container,
 	int		family;
 	zval	*elem;
 	int		fill_sockaddr;
+
+	*sockaddr_ptr = NULL;
+	*sockaddr_len = 0;
 
 	if (Z_TYPE_P(container) != IS_ARRAY) {
 		do_from_zval_err(ctx, "%s", "expected an array here");
@@ -1004,13 +1017,6 @@ static void to_zval_read_control_array(const char *msghdr_c, zval *zv, res_conte
 	char			*bufp = buf;
 	uint32_t		i = 1;
 
-	/*if (msg->msg_flags & MSG_CTRUNC) {
-		php_error_docref0(NULL, E_WARNING, "The MSG_CTRUNC flag is present; will not "
-				"attempt to read control messages");
-		ZVAL_FALSE(zv);
-		return;
-	}*/
-
 	array_init(zv);
 
 	for (cmsg = CMSG_FIRSTHDR(msg);
@@ -1228,6 +1234,7 @@ void to_zval_read_msghdr(const char *msghdr_c, zval *zv, res_context *ctx)
 	to_zval_read_aggregation(msghdr_c, zv, descriptors, ctx);
 }
 
+#if defined(IPV6_PKTINFO) && HAVE_IPV6
 /* CONVERSIONS for if_index */
 static void from_zval_write_ifindex(const zval *zv, char *uinteger, ser_context *ctx)
 {
@@ -1284,7 +1291,6 @@ static void from_zval_write_ifindex(const zval *zv, char *uinteger, ser_context 
 }
 
 /* CONVERSIONS for struct in6_pktinfo */
-#if defined(IPV6_PKTINFO) && HAVE_IPV6
 static const field_descriptor descriptors_in6_pktinfo[] = {
 		{"addr", sizeof("addr"), 1, offsetof(struct in6_pktinfo, ipi6_addr), from_zval_write_sin6_addr, to_zval_read_sin6_addr},
 		{"ifindex", sizeof("ifindex"), 1, offsetof(struct in6_pktinfo, ipi6_ifindex), from_zval_write_ifindex, to_zval_read_unsigned},
