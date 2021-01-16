@@ -562,8 +562,9 @@ static int zend_may_overflow(const zend_op *opline, zend_op_array *op_array, zen
 						!ssa->var_info[res].has_range ||
 						ssa->var_info[res].range.underflow ||
 						ssa->var_info[res].range.overflow);
+				default:
+					return 1;
 			}
-		}
 		default:
 			return 1;
 	}
@@ -1432,7 +1433,7 @@ static int zend_jit_try_allocate_free_reg(zend_op_array *op_array, zend_ssa *ssa
 	} while (range);
 
 #if 0
-	/* Coalesing */
+	/* Coalescing */
 	if (ssa->vars[current->ssa_var].definition == current->start) {
 		zend_op *opline = op_array->opcodes + current->start;
 		int hint = -1;
@@ -1448,10 +1449,10 @@ static int zend_jit_try_allocate_free_reg(zend_op_array *op_array, zend_ssa *ssa
 			case ZEND_MUL:
 				hint = ssa->ops[current->start].op1_use;
 				break;
-			case ZEND_ASSIGN_ADD:
-			case ZEND_ASSIGN_SUB:
-			case ZEND_ASSIGN_MUL:
-				if (opline->extended_value) {
+			case ZEND_ASSIGN_OP:
+				if (opline->extended_value == ZEND_ADD
+				 || opline->extended_value == ZEND_SUB
+				 || opline->extended_value == ZEND_MUL) {
 					hint = ssa->ops[current->start].op1_use;
 				}
 				break;
@@ -2172,17 +2173,12 @@ static int zend_jit(zend_op_array *op_array, zend_ssa *ssa, const zend_op *rt_op
 							goto jit_failure;
 						}
 						goto done;
-					case ZEND_ASSIGN_ADD:
-					case ZEND_ASSIGN_SUB:
-					case ZEND_ASSIGN_MUL:
-//					case ZEND_ASSIGN_DIV: // TODO: check for division by zero ???
-					case ZEND_ASSIGN_CONCAT:
-					case ZEND_ASSIGN_BW_OR:
-					case ZEND_ASSIGN_BW_AND:
-					case ZEND_ASSIGN_BW_XOR:
-					case ZEND_ASSIGN_SL:
-					case ZEND_ASSIGN_SR:
-					case ZEND_ASSIGN_MOD:
+					case ZEND_ASSIGN_OP:
+						if (opline->extended_value == ZEND_POW
+						 || opline->extended_value == ZEND_DIV) {
+							// TODO: check for division by zero ???
+							break;
+						}
 						if (!zend_jit_assign_op(&dasm_state, opline, op_array, ssa)) {
 							goto jit_failure;
 						}
