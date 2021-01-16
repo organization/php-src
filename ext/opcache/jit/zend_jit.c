@@ -479,90 +479,91 @@ static int zend_may_overflow(const zend_op *opline, zend_op_array *op_array, zen
 				!ssa->var_info[res].has_range ||
 				ssa->var_info[res].range.underflow ||
 				ssa->var_info[res].range.overflow);
-		case ZEND_ASSIGN_ADD:
-			if (opline->extended_value != 0) {
-				return 1;
-			}
-			num = opline - op_array->opcodes;
-			res = ssa->ops[num].op1_def;
-			if (res < 0 ||
-			    !ssa->var_info[res].has_range) {
-				return 1;
-			}
-			if (ssa->var_info[res].range.underflow) {
-				zend_long op1_min, op2_min, res_min;
+		case ZEND_ASSIGN_OP:
+			switch (opline->extended_value) {
+				case ZEND_ADD:
+					num = opline - op_array->opcodes;
+					res = ssa->ops[num].op1_def;
+					if (res < 0 ||
+						!ssa->var_info[res].has_range) {
+						return 1;
+					}
+					if (ssa->var_info[res].range.underflow) {
+						zend_long op1_min, op2_min, res_min;
 
-				if (!OP1_HAS_RANGE() || !OP2_HAS_RANGE()) {
-					return 1;
-				}
-				op1_min = OP1_MIN_RANGE();
-				op2_min = OP2_MIN_RANGE();
-				res_min = op1_min + op2_min;
-				if (op1_min < 0 && op2_min < 0 && res_min >= 0) {
-					return 1;
-				}
-			}
-			if (ssa->var_info[res].range.overflow) {
-				zend_long op1_max, op2_max, res_max;
+						if (!OP1_HAS_RANGE() || !OP2_HAS_RANGE()) {
+							return 1;
+						}
+						op1_min = OP1_MIN_RANGE();
+						op2_min = OP2_MIN_RANGE();
+						res_min = op1_min + op2_min;
+						if (op1_min < 0 && op2_min < 0 && res_min >= 0) {
+							return 1;
+						}
+					}
+					if (ssa->var_info[res].range.overflow) {
+						zend_long op1_max, op2_max, res_max;
 
-				if (!OP1_HAS_RANGE() || !OP2_HAS_RANGE()) {
-					return 1;
-				}
-				op1_max = OP1_MAX_RANGE();
-				op2_max = OP2_MAX_RANGE();
-				res_max = op1_max + op2_max;
-				if (op1_max > 0 && op2_max > 0 && res_max <= 0) {
-					return 1;
-				}
-			}
-			return 0;
-		case ZEND_ASSIGN_SUB:
-			if (opline->extended_value != 0) {
-				return 1;
-			}
-			num = opline - op_array->opcodes;
-			res = ssa->ops[num].op1_def;
-			if (res < 0 ||
-			    !ssa->var_info[res].has_range) {
-				return 1;
-			}
-			if (ssa->var_info[res].range.underflow) {
-				zend_long op1_min, op2_max, res_min;
+						if (!OP1_HAS_RANGE() || !OP2_HAS_RANGE()) {
+							return 1;
+						}
+						op1_max = OP1_MAX_RANGE();
+						op2_max = OP2_MAX_RANGE();
+						res_max = op1_max + op2_max;
+						if (op1_max > 0 && op2_max > 0 && res_max <= 0) {
+							return 1;
+						}
+					}
+					return 0;
+				case ZEND_SUB:
+					if (opline->extended_value != 0) {
+						return 1;
+					}
+					num = opline - op_array->opcodes;
+					res = ssa->ops[num].op1_def;
+					if (res < 0 ||
+						!ssa->var_info[res].has_range) {
+						return 1;
+					}
+					if (ssa->var_info[res].range.underflow) {
+						zend_long op1_min, op2_max, res_min;
 
-				if (!OP1_HAS_RANGE() || !OP2_HAS_RANGE()) {
-					return 1;
-				}
-				op1_min = OP1_MIN_RANGE();
-				op2_max = OP2_MAX_RANGE();
-				res_min = op1_min - op2_max;
-				if (op1_min < 0 && op2_max > 0 && res_min >= 0) {
-					return 1;
-				}
-			}
-			if (ssa->var_info[res].range.overflow) {
-				zend_long op1_max, op2_min, res_max;
+						if (!OP1_HAS_RANGE() || !OP2_HAS_RANGE()) {
+							return 1;
+						}
+						op1_min = OP1_MIN_RANGE();
+						op2_max = OP2_MAX_RANGE();
+						res_min = op1_min - op2_max;
+						if (op1_min < 0 && op2_max > 0 && res_min >= 0) {
+							return 1;
+						}
+					}
+					if (ssa->var_info[res].range.overflow) {
+						zend_long op1_max, op2_min, res_max;
 
-				if (!OP1_HAS_RANGE() || !OP2_HAS_RANGE()) {
-					return 1;
-				}
-				op1_max = OP1_MAX_RANGE();
-				op2_min = OP2_MIN_RANGE();
-				res_max = op1_max - op2_min;
-				if (op1_max > 0 && op2_min < 0 && res_max <= 0) {
-					return 1;
-				}
+						if (!OP1_HAS_RANGE() || !OP2_HAS_RANGE()) {
+							return 1;
+						}
+						op1_max = OP1_MAX_RANGE();
+						op2_min = OP2_MIN_RANGE();
+						res_max = op1_max - op2_min;
+						if (op1_max > 0 && op2_min < 0 && res_max <= 0) {
+							return 1;
+						}
+					}
+					return 0;
+				case ZEND_MUL:
+					if (opline->extended_value != 0) {
+						return 1;
+					}
+					num = opline - op_array->opcodes;
+					res = ssa->ops[num].op1_def;
+					return (res < 0 ||
+						!ssa->var_info[res].has_range ||
+						ssa->var_info[res].range.underflow ||
+						ssa->var_info[res].range.overflow);
 			}
-			return 0;
-		case ZEND_ASSIGN_MUL:
-			if (opline->extended_value != 0) {
-				return 1;
-			}
-			num = opline - op_array->opcodes;
-			res = ssa->ops[num].op1_def;
-			return (res < 0 ||
-				!ssa->var_info[res].has_range ||
-				ssa->var_info[res].range.underflow ||
-				ssa->var_info[res].range.overflow);
+		}
 		default:
 			return 1;
 	}
@@ -1896,18 +1897,7 @@ static void zend_calc_checked_this_r(zend_bitset checked_this, zend_op_array *op
 
 	for (; opline < end; opline++) {
 		switch (opline->opcode) {
-			case ZEND_ASSIGN_ADD:
-			case ZEND_ASSIGN_SUB:
-			case ZEND_ASSIGN_MUL:
-			case ZEND_ASSIGN_DIV:
-			case ZEND_ASSIGN_MOD:
-			case ZEND_ASSIGN_SL:
-			case ZEND_ASSIGN_SR:
-			case ZEND_ASSIGN_CONCAT:
-			case ZEND_ASSIGN_BW_OR:
-			case ZEND_ASSIGN_BW_AND:
-			case ZEND_ASSIGN_BW_XOR:
-			case ZEND_ASSIGN_POW:
+			case ZEND_ASSIGN_OP:
 				if (opline->extended_value != ZEND_ASSIGN_OBJ) {
 					break;
 				}
@@ -2473,7 +2463,6 @@ static int zend_jit(zend_op_array *op_array, zend_ssa *ssa, const zend_op *rt_op
 				case ZEND_FE_FETCH_R:
 				case ZEND_FE_FETCH_RW:
 				case ZEND_DECLARE_ANON_CLASS:
-				case ZEND_DECLARE_ANON_INHERITED_CLASS:
 					if (!zend_jit_handler(&dasm_state, opline, zend_may_throw(opline, op_array, ssa)) ||
 					    !zend_jit_cond_jmp(&dasm_state, opline + 1, ssa->cfg.blocks[b].successors[0])) {
 						goto jit_failure;
